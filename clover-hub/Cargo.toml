@@ -1,0 +1,26 @@
+[package]
+name = "clover"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
+tokio = { version = "1.28", features = ["macros", "sync", "rt-multi-thread"] }
+tokio-stream = "0.1.14"
+warp = "0.3"
+serde = {version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = { version = "0.3", default-features = false }
+uuid = { version = "1.8.0", features = ["serde", "v4"] }
+crossterm = { version = "0.19", features = [ "serde" ] }
+chrono = { version = "0.4", features = ["serde"] }
+rand = { version = "0.7.3", default-features = false, features = ["std"] }
+tui = { version = "0.14", default-features = false, features = ['crossterm', 'serde'] }
+thiserror = "1.0"
+log = "0.4.8"
+env_logger = "0.11.3"
+fast_websocket_client = "0.2.0"
+eventbus = "0.5.1"
+regex = "1.10.4"
+api_key = "0.1.0"
+url = "2.5.0"
