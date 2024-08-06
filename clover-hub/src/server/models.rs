@@ -54,6 +54,41 @@ pub struct IPCMessage {
   pub message: String,
 }
 
+impl IPCMessage {
+  pub fn to_message_with_id(self, id: String) -> IPCMessageWithId {
+    IPCMessageWithId {
+      id,
+      author: self.author,
+      kind: self.kind,
+      message: self.message,
+    }
+  }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct IPCMessageWithId {
+  pub author: String,
+  pub kind: String,
+  pub message: String,
+  pub id: String,
+}
+
+impl IPCMessageWithId {
+  pub fn to_message(self) -> IPCMessage {
+    self.into()
+  }
+}
+
+impl Into<IPCMessage> for IPCMessageWithId {
+  fn into(self) -> IPCMessage {
+    IPCMessage {
+      author: self.author,
+      kind: self.kind,
+      message: self.message,
+    }
+  }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Client {
   pub api_key: String,
@@ -154,6 +189,7 @@ pub struct Store {
   pub users: Arc<Mutex<HashMap<String, User>>>,
   pub api_keys: Arc<Mutex<HashMap<String, ApiKey>>>,
   pub clients: Arc<Mutex<HashMap<String, Client>>>,
+  pub messages: Arc<Mutex<HashMap<String, IPCMessage>>>,
 }
 
 impl Store {
@@ -162,6 +198,7 @@ impl Store {
       users: Arc::new(Mutex::new(HashMap::new())),
       api_keys: Arc::new(Mutex::new(HashMap::new())),
       clients: Arc::new(Mutex::new(HashMap::new())),
+      messages: Arc::new(Mutex::new(HashMap::new())),
     }
   }
 

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use warp::{Filter, http::StatusCode};
 use crate::utils::iso8601;
-use crate::server::models::{ApiKeyWithKey, ClientWithId, IPCMessage, Session, Store, UserWithId};
+use crate::server::models::{ApiKeyWithKey, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
 use crate::server::websockets::handle_ws_client;
 
 // example error response
@@ -148,11 +148,11 @@ pub struct ServerHealth {
   up_since: String
 }
 
-pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessage>, mut ipc_rx: UnboundedReceiver<IPCMessage>, store: Arc<Store>) {
+pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId>, mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, store: Arc<Store>) {
   info!("Starting HTTP and WebSocket Server on port: {}...", port);
   
-  let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
-  let (from_client_tx, mut from_client_rx) = mpsc::unbounded_channel::<IPCMessage>();
+  let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>> = Arc::new(Mutex::new(HashMap::new()));
+  let (from_client_tx, mut from_client_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
 
   let filter_to_clients_tx = Arc::new(clients_tx.clone());
   let to_clients_tx_filter = warp::any().map(move || filter_to_clients_tx.clone());
@@ -204,53 +204,75 @@ pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessage>, mut
         let mutex = &ipc_dispatch_clients_tx.to_owned();
         let client_senders = mutex.lock();
         let hash_map = &client_senders.await;
-        let client_sender = hash_map.get(&client_id.to_string()).unwrap();
         let mut message_sent = false;
 
-        if client.1.active {
-          match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
-            Some(api_key) => {
-              for allowed_event_regex in &api_key.allowed_events_to {
-                match Regex::new(&allowed_event_regex) {
-                  Ok(regex) => {
-                    if regex.is_match(&allowed_event_regex) {
-                      debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                      message_sent = true;
-                      match client_sender.send(message.clone()) {
-                        Ok(_) => {
+        match hash_map.get(&client_id.to_string()) {
+          Some(client_sender) => {
+            if client.1.active {
+              match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
+                Some(api_key) => {
+                  for allowed_event_regex in &api_key.allowed_events_to {
+                    match Regex::new(&allowed_event_regex) {
+                      Ok(regex) => {
+                        if regex.is_match(&allowed_event_regex) {
+                          debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                          message_sent = true;
+                          match client_sender.send(message.clone()) {
+                            Ok(_) => {
 
-                        },
-                        Err(e) => {
-                          error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                            },
+                            Err(e) => {
+                              error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                            }
+                          };
+                          
+                          break;
                         }
-                      };
-                      
-                      break;
+                      },
+                      Err(e) => {
+                        error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
+                      }
                     }
-                  },
-                  Err(e) => {
-                    error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
                   }
+                },
+                None => {
+                  error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
+
+                  let message_id = loop {
+                    let message_id = Uuid::new_v4().to_string();
+                    match ipc_dispatch_store.messages.lock().await.get(&message_id.clone()) {
+                      Some(_) => {
+                        debug!("Client: {}, exists, retrying...", message_id.clone());
+                      },
+                      None => {
+                        break message_id;
+                      }
+                    }
+                  };
+                  let generated_message = IPCMessageWithId { 
+                    id: message_id.clone(),
+                    author: "hub:server".to_string(),
+                    kind: Url::parse("clover://hub/server/listener/clients/unauthorize")
+                      .unwrap()
+                      .query_pairs_mut()
+                      .append_pair("id", &client_id.clone())
+                      .finish()
+                      .to_string(), 
+                    message: "api key removed from store".to_string() 
+                  };
+                  ipc_dispatch_store.messages.lock().await.insert(message_id.clone(), generated_message.clone().into());
+
+                  let _ = client_sender.send(generated_message.clone());
                 }
               }
-            },
-            None => {
-              error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
-              let _ = client_sender.send(IPCMessage { 
-                author: "hub:server".to_string(),
-                kind: Url::parse("clover://hub/server/listener/clients/unauthorize")
-                  .unwrap()
-                  .query_pairs_mut()
-                  .append_pair("id", &client_id.clone())
-                  .finish()
-                  .to_string(), 
-                message: "api key removed from store".to_string() 
-              });
             }
+          },
+          None => {
+            error!("Client: {}, does not exist in the client map!", client_id.clone());
           }
         }
 
-        if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind, client_id); }
+        if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind.clone(), client_id.clone()); }
       }
     }
   });

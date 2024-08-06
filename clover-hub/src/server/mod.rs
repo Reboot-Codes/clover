@@ -7,10 +7,10 @@ use tokio::sync::mpsc;
 use log::{debug, error, info};
 use models::Store;
 use uuid::Uuid;
-use crate::server::models::IPCMessage;
+use crate::server::models::IPCMessageWithId;
 use crate::server::listener::server_listener;
 
-fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessage>, msg: IPCMessage, target_name: String) {
+fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: IPCMessageWithId, target_name: String) {
   match sender.send(msg.clone()) {
     Ok(_) => {},
     Err(e) => {
@@ -26,8 +26,8 @@ pub async fn server_main(port: u16) {
   let store = Store::new_with_set_master_user(master_user_id.clone()).await;
   debug!("Master user id: {}, primary api key {}", master_user_id.clone(), store.users.lock().await.get(&master_user_id.clone()).unwrap().api_keys.get(0).unwrap());
 
-  let (listener_from_tx, mut listener_from_rx) = mpsc::unbounded_channel::<IPCMessage>();
-  let (listener_to_tx, listener_to_rx) = mpsc::unbounded_channel::<IPCMessage>();
+  let (listener_from_tx, mut listener_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
+  let (listener_to_tx, listener_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
   let listener_port = Arc::new(port);
   let listener_store = Arc::new(store.clone());
   let listener_handler = tokio::task::spawn(async move { 

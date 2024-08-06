@@ -3,6 +3,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use url::Url;
+use uuid::Uuid;
 use std::collections::HashMap;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use std::time::SystemTime;
 use futures::{SinkExt, StreamExt};
 use warp::filters::ws::{Message, WebSocket};
 use crate::utils::iso8601;
-use crate::server::models::{ApiKeyWithKey, ClientWithId, Client, IPCMessage, Session, Store, UserWithId};
+use crate::server::models::{ApiKeyWithKey, Client, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct WsIn {
@@ -18,7 +19,7 @@ pub struct WsIn {
   pub message: String,
 }
 
-pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Session), ws: warp::ws::Ws, store: Arc<Arc<Store>>, to_clients_tx: Arc<Arc<Mutex<HashMap<String, UnboundedSender<IPCMessage>>>>>, from_clients_tx: Arc<UnboundedSender<IPCMessage>>) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Session), ws: warp::ws::Ws, store: Arc<Arc<Store>>, to_clients_tx: Arc<Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>>>, from_clients_tx: Arc<UnboundedSender<IPCMessageWithId>>) -> Result<impl warp::Reply, warp::Rejection> {
   let user = auth.0.clone();
   let api_key = auth.1.clone();
   let client = auth.2.clone();
@@ -31,12 +32,13 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
     info!("Upgraded client: {}, to websocket connection!", ws_client.id.clone());
 
     let (mut sender, mut receiver) = websocket.split();
-    let (to_client_tx, mut to_client_rx) = mpsc::unbounded_channel::<IPCMessage>();
+    let (to_client_tx, mut to_client_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
     let mut deauthed = false;
 
     to_clients_tx.lock().await.insert(ws_client.id.clone(), to_client_tx);
 
     let recv_client = Arc::new(client.clone());
+    let recv_store = Arc::new(store.clone());
     let recv_handle = tokio::task::spawn(async move {
       while !deauthed && let Some(body) = receiver.next().await {
         match body {
@@ -51,7 +53,18 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
 
             match serde_json::from_str::<WsIn>(message) {
               Ok(msg) => {
-                debug!("Client: {}, send message: {{ \"kind\": \"{}\", \"message\": \"{}\" }}...", ws_client.id.clone(), msg.kind.clone(), msg.message.clone());
+                let message_id = loop {
+                  let message_id = Uuid::new_v4().to_string();
+                  match recv_store.messages.lock().await.get(&message_id.clone()) {
+                    Some(_) => {
+                      debug!("Client: {}, exists, retrying...", message_id.clone());
+                    },
+                    None => {
+                      break message_id;
+                    }
+                  }
+                };
+                debug!("Client: {}, send message: {{ \"id\": \"{}\",  \"kind\": \"{}\", \"message\": \"{}\" }}...", ws_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone());
                 
                 let mut allowed_to_send = false;
                 for allowed_send_pattern in api_key.allowed_events_from.clone() {
@@ -69,12 +82,16 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                 }
 
                 if allowed_to_send {
-                  match from_clients_tx.send(IPCMessage { author: format!("ws:{}?client={}", api_key.user_id.clone(), ws_client.id.clone()), kind: msg.kind.clone(), message: msg.message.clone() }) {
+                  let generated_message = IPCMessageWithId { id: message_id.clone(), author: format!("ws:{}?client={}", api_key.user_id.clone(), ws_client.id.clone()), kind: msg.kind.clone(), message: msg.message.clone() };
+
+                  recv_store.messages.lock().await.insert(message_id.clone(), generated_message.clone().into());
+
+                  match from_clients_tx.send(generated_message.clone()) {
                     Ok(_) => {
-                      debug!("Client: {}, successfully sent message: {{ \"kind\": \"{}\", \"message\": \"{}\" }}, over to dispatch IPC thread!", recv_client.id.clone(), msg.kind.clone(), msg.message.clone());
+                      debug!("Client: {}, successfully sent message: {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, over to dispatch IPC thread!", recv_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone());
                     },
                     Err(e) => {
-                      error!("Client: {}, failed to send message: {{ \"kind\": \"{}\", \"message\": \"{}\" }}, over to dispatch IPC thread, due to:\n  {}", recv_client.id.clone(), msg.kind.clone(), msg.message.clone(), e);
+                      error!("Client: {}, failed to send message: {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, over to dispatch IPC thread, due to:\n  {}", recv_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone(), e);
                     }
                   };
                 } else {
@@ -120,7 +137,8 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
         } else if deauthed {
           break;
         } else {
-          let response = serde_json::to_string(&IPCMessage {
+          let response = serde_json::to_string(&IPCMessageWithId {
+            id: msg.id.clone(),
             author: msg.author.clone(),
             kind: msg.kind.clone(),
             message: msg.message.clone(),
@@ -132,14 +150,15 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
     });
 
     let clean_up_client = Arc::new(client.clone());
+    let clean_up_store = Arc::new(store.clone());
     let clean_up_handle = tokio::task::spawn(async move {
       while !deauthed {if deauthed { break; }}
 
       info!("Client: {}, disconnected, cleaning up...", clean_up_client.id.clone());
       debug!("Ending session for: {}...", clean_up_client.id.clone());
-      store.users.clone().lock().await.get(&user.id.clone()).unwrap().sessions.lock().await.insert(clean_up_client.id.clone(), Session { start_time: session.start_time.clone(), end_time: iso8601(&SystemTime::now()), api_key: api_key.key.clone() });
+      clean_up_store.users.clone().lock().await.get(&user.id.clone()).unwrap().sessions.lock().await.insert(clean_up_client.id.clone(), Session { start_time: session.start_time.clone(), end_time: iso8601(&SystemTime::now()), api_key: api_key.key.clone() });
       debug!("Deactivating client: {}...", clean_up_client.id.clone());
-      store.clients.clone().lock().await.insert(clean_up_client.id.clone(), Client { api_key: api_key.key.clone(), user_id: user.id.clone(), active: false });
+      clean_up_store.clients.clone().lock().await.insert(clean_up_client.id.clone(), Client { api_key: api_key.key.clone(), user_id: user.id.clone(), active: false });
     });
 
     futures::future::join_all(vec![recv_handle, send_handle, clean_up_handle]).await;
