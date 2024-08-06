@@ -3,6 +3,8 @@ name: Push docs to GitHub pages.
 on:
   push:
     branches: ["main"]
+    paths:
+      - docs/**
   workflow_dispatch:
 
 permissions:
