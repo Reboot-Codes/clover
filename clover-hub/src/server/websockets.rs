@@ -37,6 +37,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
 
     to_clients_tx.lock().await.insert(ws_client.id.clone(), to_client_tx);
 
+    let recv_user = Arc::new(user.clone());
     let recv_client = Arc::new(client.clone());
     let recv_store = Arc::new(store.clone());
     let recv_handle = tokio::task::spawn(async move {
@@ -76,7 +77,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                       }
                     },
                     Err(e) => {
-                      warn!("Allowed send from pattern: {}, is not valid, due to:\n{}", allowed_send_pattern.clone(), e);
+                      warn!("Allowed send from pattern: \"{}\" (for user: \"{}\"), is not valid, due to:\n{}", allowed_send_pattern.clone(), recv_user.id.clone(), e);
                     }
                   }
                 }
@@ -95,16 +96,18 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                     }
                   };
                 } else {
-                  warn!("Client: {}, attempted to send message of ", recv_client.id.clone());
+                  warn!("Client: {}, attempted to send message of {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }} when unauthorized!", recv_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone());
+                  // TODO: Send unauthorized warning.
                 }
               },
               Err(e) => {
                 warn!("Client: {}, error reading message: \"{}\", due to:\n  {}", recv_client.id.clone(), message, e);
+                // TODO: Send err?
               }
             };
           },
           Err(e) => {
-            error!("error reading message on websocket: {}", e);
+            error!("Error reading message on client: \"{}\", {}", ws_client.id.clone(), e);
             // TODO: send error?
           }
         };
