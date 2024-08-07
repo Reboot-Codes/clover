@@ -10,6 +10,7 @@ pub struct ApiKey {
   pub allowed_events_to: Vec<String>,
   pub allowed_events_from: Vec<String>,
   pub user_id: String,
+  pub echo: bool,
 }
 
 impl ApiKey {
@@ -19,6 +20,7 @@ impl ApiKey {
       allowed_events_to: self.allowed_events_to,
       allowed_events_from: self.allowed_events_from,
       user_id: self.user_id,
+      echo: self.echo,
     }
   }
 }
@@ -29,6 +31,7 @@ pub struct ApiKeyWithKey {
   pub allowed_events_to: Vec<String>,
   pub allowed_events_from: Vec<String>,
   pub user_id: String,
+  pub echo: bool,
 }
 
 impl ApiKeyWithKey {
@@ -43,6 +46,7 @@ impl Into<ApiKey> for ApiKeyWithKey {
       allowed_events_to: self.allowed_events_to,
       allowed_events_from: self.allowed_events_from,
       user_id: self.user_id,
+      echo: self.echo,
     }
   }
 }
@@ -223,6 +227,6 @@ impl Store {
     let master_api_key = gen_api_key();
 
     self.users.lock().await.insert(master_user_id.clone(), User { api_keys: vec![master_api_key.clone()], sessions: Arc::new(Mutex::new(HashMap::new())) });
-    self.api_keys.lock().await.insert(master_api_key.clone(), ApiKey { allowed_events_to: vec![".*".to_string()], allowed_events_from: vec![".*".to_string()], user_id: master_user_id.clone() });
+    self.api_keys.lock().await.insert(master_api_key.clone(), ApiKey { allowed_events_to: vec![".*".to_string()], allowed_events_from: vec![".*".to_string()], user_id: master_user_id.clone(), echo: true });
   }
 }

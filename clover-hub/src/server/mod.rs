@@ -24,7 +24,7 @@ pub async fn server_main(port: u16) {
 
   let master_user_id = Uuid::new_v4().to_string();
   let store = Store::new_with_set_master_user(master_user_id.clone()).await;
-  debug!("Master user id: {}, primary api key {}", master_user_id.clone(), store.users.lock().await.get(&master_user_id.clone()).unwrap().api_keys.get(0).unwrap());
+  debug!("Master user id: {}, primary api key: {}", master_user_id.clone(), store.users.lock().await.get(&master_user_id.clone()).unwrap().api_keys.get(0).unwrap());
 
   let (listener_from_tx, mut listener_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
   let (listener_to_tx, listener_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();

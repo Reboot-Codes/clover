@@ -37,6 +37,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
 
     to_clients_tx.lock().await.insert(ws_client.id.clone(), to_client_tx);
 
+    let recv_api_key = Arc::new(api_key.clone());
     let recv_user = Arc::new(user.clone());
     let recv_client = Arc::new(client.clone());
     let recv_store = Arc::new(store.clone());
@@ -48,7 +49,13 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
             let message = if let Ok(s) = msg.to_str() {
               s
             } else {
-              info!("ping-pong");
+              if msg.is_close() {
+                info!("Client: {}, disconnected!", recv_client.id.clone());
+                (#[allow(unused_assignments)]
+                deauthed) = true;
+                break;
+              }
+
               return;
             };
 
@@ -58,7 +65,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                   let message_id = Uuid::new_v4().to_string();
                   match recv_store.messages.lock().await.get(&message_id.clone()) {
                     Some(_) => {
-                      debug!("Client: {}, exists, retrying...", message_id.clone());
+                      debug!("Message: {}, exists, retrying...", message_id.clone());
                     },
                     None => {
                       break message_id;
@@ -68,7 +75,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                 debug!("Client: {}, send message: {{ \"id\": \"{}\",  \"kind\": \"{}\", \"message\": \"{}\" }}...", ws_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone());
                 
                 let mut allowed_to_send = false;
-                for allowed_send_pattern in api_key.allowed_events_from.clone() {
+                for allowed_send_pattern in recv_api_key.allowed_events_from.clone() {
                   match Regex::new(&allowed_send_pattern) {
                     Ok(pattern) => {
                       if pattern.is_match(&msg.kind.clone()) {
@@ -83,7 +90,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                 }
 
                 if allowed_to_send {
-                  let generated_message = IPCMessageWithId { id: message_id.clone(), author: format!("ws:{}?client={}", api_key.user_id.clone(), ws_client.id.clone()), kind: msg.kind.clone(), message: msg.message.clone() };
+                  let generated_message = IPCMessageWithId { id: message_id.clone(), author: format!("ws:{}?client={}", recv_api_key.user_id.clone(), ws_client.id.clone()), kind: msg.kind.clone(), message: msg.message.clone() };
 
                   recv_store.messages.lock().await.insert(message_id.clone(), generated_message.clone().into());
 
@@ -118,6 +125,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
       deauthed) = true;
     });
 
+    let send_api_key = Arc::new(api_key.clone());
     let send_client = Arc::new(client.clone());
     let send_handle = tokio::task::spawn(async move {
       while let Some(msg) = to_client_rx.recv().await {
@@ -140,14 +148,23 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
         } else if deauthed {
           break;
         } else {
-          let response = serde_json::to_string(&IPCMessageWithId {
-            id: msg.id.clone(),
-            author: msg.author.clone(),
-            kind: msg.kind.clone(),
-            message: msg.message.clone(),
-          })
-          .unwrap();
-          sender.send(Message::text(response)).await.unwrap();
+          if (msg.author.clone().split("?client=").collect::<Vec<_>>()[1] != send_client.id.clone()) || send_api_key.echo.clone() {
+            let response = serde_json::to_string(&IPCMessageWithId {
+              id: msg.id.clone(),
+              author: msg.author.clone(),
+              kind: msg.kind.clone(),
+              message: msg.message.clone(),
+            })
+            .unwrap();
+            match sender.send(Message::text(response)).await {
+              Ok(_) => {
+
+              },
+              Err(err) => {
+                error!("Client: {}, error sending message: {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, {}", send_client.id.clone(), msg.id.clone(), msg.kind.clone(), msg.message.clone(), err);
+              }
+            }
+          }
         }
       }
     });

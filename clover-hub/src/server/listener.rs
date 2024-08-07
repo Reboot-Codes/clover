@@ -214,12 +214,11 @@ pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId
                   for allowed_event_regex in &api_key.allowed_events_to {
                     match Regex::new(&allowed_event_regex) {
                       Ok(regex) => {
-                        if regex.is_match(&allowed_event_regex) {
+                        if regex.is_match(&allowed_event_regex) && !(message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
                           debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                          message_sent = true;
                           match client_sender.send(message.clone()) {
                             Ok(_) => {
-
+                              message_sent = true;
                             },
                             Err(e) => {
                               error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
@@ -234,6 +233,19 @@ pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId
                       }
                     }
                   }
+
+                  if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
+                    debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                    match client_sender.send(message.clone()) {
+                      Ok(_) => {
+                        message_sent = true;
+                      },
+                      Err(e) => {
+                        error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                      }
+
+                    };
+                  }
                 },
                 None => {
                   error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
@@ -242,7 +254,7 @@ pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId
                     let message_id = Uuid::new_v4().to_string();
                     match ipc_dispatch_store.messages.lock().await.get(&message_id.clone()) {
                       Some(_) => {
-                        debug!("Client: {}, exists, retrying...", message_id.clone());
+                        debug!("Message: {}, exists, retrying...", message_id.clone());
                       },
                       None => {
                         break message_id;
