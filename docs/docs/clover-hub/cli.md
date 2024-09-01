@@ -10,7 +10,7 @@ CloverHub uses [env_logger](https://docs.rs/env_logger/0.11.3/env_logger/) to pr
 clover run server
 ```
 
-See: [Server Component](/clover/docs/clover-hub/server/intro)
+See: [Server Component](/docs/clover-hub/server/intro)
 
 ## Run the TUI
 
@@ -18,7 +18,7 @@ See: [Server Component](/clover/docs/clover-hub/server/intro)
 clover run tui
 ```
 
-See: [TUI Component](/clover/docs/clover-hub/tui/intro)
+See: [TUI Component](/docs/clover-hub/tui/intro)
 
 ## Run Both
 
