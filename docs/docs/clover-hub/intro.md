@@ -1,3 +1,3 @@
 # CloverHub
 
-The main executable that orchestrates CLOVER's operation. Also a really nice websocket event bus.
+The main executable that orchestrates CLOVER's operation. Holds the server and management utils provided by the CLI.
