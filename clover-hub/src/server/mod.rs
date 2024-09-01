@@ -12,7 +12,7 @@ use log::{debug, error, info};
 use evtbuzz::models::Store;
 use uuid::Uuid;
 use evtbuzz::models::IPCMessageWithId;
-use evtbuzz::listener::server_listener;
+use evtbuzz::listener::evtbuzz_listener;
 use arbiter::arbiter_main;
 use renderer::renderer_main;
 use modman::modman_main;
@@ -36,18 +36,18 @@ pub async fn server_main(port: u16) {
 
   // Start EVTBuzz
   // TODO: Rename to EVTBuzz
-  let (listener_from_tx, mut listener_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
-  let (listener_to_tx, listener_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
-  let listener_port = Arc::new(port);
-  let listener_store = Arc::new(store.clone());
-  let listener_handler = tokio::task::spawn(async move { 
-    server_listener(*listener_port.to_owned(), listener_from_tx, listener_to_rx, listener_store.clone()).await;
+  let (evtbuzz_from_tx, mut evtbuzz_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
+  let (evtbuzz_to_tx, evtbuzz_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
+  let evtbuzz_port = Arc::new(port);
+  let evtbuzz_store = Arc::new(store.clone());
+  let evtbuzz_handler = tokio::task::spawn(async move { 
+    evtbuzz_listener(*evtbuzz_port.to_owned(), evtbuzz_from_tx, evtbuzz_to_rx, evtbuzz_store.clone()).await;
   });
 
   let ipc_from_listener_dispatch = tokio::task::spawn(async move {
-    while let Some(msg) = listener_from_rx.recv().await {
+    while let Some(msg) = evtbuzz_from_rx.recv().await {
       // TODO: Add all IPC channels to this list.
-      handle_ipc_send(&listener_to_tx, msg, "clover::server::listener".to_string());
+      handle_ipc_send(&evtbuzz_to_tx, msg, "clover::server::listener".to_string());
     }
   });
 
@@ -77,7 +77,7 @@ pub async fn server_main(port: u16) {
   });
 
   futures::future::join_all(vec![
-    listener_handler, 
+    evtbuzz_handler, 
     ipc_from_listener_dispatch, 
     arbiter_handler, 
     renderer_handler, 

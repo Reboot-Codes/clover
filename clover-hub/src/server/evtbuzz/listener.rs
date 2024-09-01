@@ -148,7 +148,7 @@ pub struct ServerHealth {
   up_since: String
 }
 
-pub async fn server_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId>, mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, store: Arc<Store>) {
+pub async fn evtbuzz_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId>, mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, store: Arc<Store>) {
   info!("Starting HTTP and WebSocket Server on port: {}...", port);
   
   let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>> = Arc::new(Mutex::new(HashMap::new()));
