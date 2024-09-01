@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use warp::{Filter, http::StatusCode};
 use crate::utils::iso8601;
-use crate::server::models::{ApiKeyWithKey, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
-use crate::server::websockets::handle_ws_client;
+use crate::server::evtbuzz::models::{ApiKeyWithKey, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
+use crate::server::evtbuzz::websockets::handle_ws_client;
 
 // example error response
 #[derive(Serialize, Debug)]

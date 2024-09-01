@@ -1,14 +1,22 @@
-mod listener;
-mod models;
-mod websockets;
+mod evtbuzz;
+mod arbiter;
+mod renderer;
+mod modman;
+mod inference_engine;
+mod appd;
 
 use std::sync::Arc;
+use appd::appd_main;
 use tokio::sync::mpsc;
 use log::{debug, error, info};
-use models::Store;
+use evtbuzz::models::Store;
 use uuid::Uuid;
-use crate::server::models::IPCMessageWithId;
-use crate::server::listener::server_listener;
+use evtbuzz::models::IPCMessageWithId;
+use evtbuzz::listener::server_listener;
+use arbiter::arbiter_main;
+use renderer::renderer_main;
+use modman::modman_main;
+use inference_engine::inference_engine_main;
 
 fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: IPCMessageWithId, target_name: String) {
   match sender.send(msg.clone()) {
@@ -26,6 +34,8 @@ pub async fn server_main(port: u16) {
   let store = Store::new_with_set_master_user(master_user_id.clone()).await;
   debug!("Master user id: {}, primary api key: {}", master_user_id.clone(), store.users.lock().await.get(&master_user_id.clone()).unwrap().api_keys.get(0).unwrap());
 
+  // Start EVTBuzz
+  // TODO: Rename to EVTBuzz
   let (listener_from_tx, mut listener_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
   let (listener_to_tx, listener_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
   let listener_port = Arc::new(port);
@@ -41,5 +51,38 @@ pub async fn server_main(port: u16) {
     }
   });
 
-  futures::future::join_all(vec![listener_handler, ipc_from_listener_dispatch]).await;
+  // Start Arbiter
+  let arbiter_handler = tokio::task::spawn(async move {
+    arbiter_main().await;
+  });
+
+  // Start Renderer
+  let renderer_handler = tokio::task::spawn(async move {
+    renderer_main().await;
+  });
+
+  // Start ModMan
+  let modman_handler = tokio::task::spawn(async move {
+    modman_main().await;
+  });
+
+  // Start InferenceEngine
+  let inference_engine_handler = tokio::task::spawn(async move {
+    inference_engine_main().await;
+  });
+
+  // Start AppDaemon
+  let appd_handler = tokio::task::spawn(async move {
+    appd_main().await;
+  });
+
+  futures::future::join_all(vec![
+    listener_handler, 
+    ipc_from_listener_dispatch, 
+    arbiter_handler, 
+    renderer_handler, 
+    modman_handler, 
+    inference_engine_handler, 
+    appd_handler
+  ]).await;
 }
