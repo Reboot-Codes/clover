@@ -1,3 +1,6 @@
 {
-  "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix"
+  "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
+  "cSpell.words": [
+    "evtbuzz"
+  ]
 }

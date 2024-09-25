@@ -185,6 +185,10 @@ pub async fn evtbuzz_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithI
     .or(ws_path)
     .with(warp::cors().allow_any_origin())
     .recover(handle_rejection);
+
+  // TODO: Add control REST API for start up and shut down.
+
+  // TODO: Start creating GQL API endpoint.
   
   let server_port = Arc::new(port.clone());
   let http_handle = tokio::task::spawn(async move {
