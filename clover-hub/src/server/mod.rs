@@ -55,7 +55,7 @@ async fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: 
 }
 
 pub async fn server_main(port: u16) {
-  info!("Running Backend Server Threads...");
+  info!("Starting CloverHub...");
 
   let (
     store, 
@@ -124,21 +124,27 @@ pub async fn server_main(port: u16) {
   let evtbuzz_port = Arc::new(port);
   let evtbuzz_store = Arc::new(store.clone());
   let evtbuzz_uca = Arc::new(evtbuzz_user_config.clone());
-  let evtbuzz_handler = tokio::task::spawn(async move { 
+  let evtbuzz_arbiter_user_config_arc = Arc::new(arbiter_user_config.clone());
+  let evtbuzz_renderer_user_config_arc = Arc::new(renderer_user_config.clone());
+  let evtbuzz_modman_user_config_arc = Arc::new(modman_user_config.clone());
+  let evtbuzz_inference_engine_user_config_arc = Arc::new(inference_engine_user_config.clone());
+  let evtbuzz_appd_user_config_arc = Arc::new(appd_user_config.clone());
+  let evtbuzz_handler = tokio::task::spawn(async move {
     evtbuzz_listener(
       *evtbuzz_port.to_owned(), 
       evtbuzz_from_tx, 
       evtbuzz_to_rx, 
       evtbuzz_store.clone(), 
-      arbiter_from_rx, 
-      renderer_from_rx, 
-      modman_from_rx,
-      inference_engine_from_rx,
-      appd_from_rx,
+      (&evtbuzz_arbiter_user_config_arc.clone(), arbiter_from_rx),
+      (&evtbuzz_renderer_user_config_arc.clone(), renderer_from_rx), 
+      (&evtbuzz_modman_user_config_arc.clone(), modman_from_rx),
+      (&evtbuzz_inference_engine_user_config_arc.clone(), inference_engine_from_rx),
+      (&evtbuzz_appd_user_config_arc.clone(), appd_from_rx),
       evtbuzz_uca.clone()
     ).await;
   });
 
+  // Get messages from EvtBuzz (incl ones from the other threads), and pass them around. Yes, this does include looping events back into EvtBuzz.
   let ipc_listener_dispatch_store = Arc::new(store.clone());
   let ipc_from_listener_dispatch = tokio::task::spawn(async move {
     while let Some(msg) = evtbuzz_from_rx.recv().await {

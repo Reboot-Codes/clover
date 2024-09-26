@@ -1,11 +1,8 @@
-use std::{hash::{DefaultHasher, Hash, Hasher}, ops::Deref};
-
+use std::{hash::{DefaultHasher, Hash, Hasher}, sync::Arc};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
-use async_recursion::async_recursion;
 use chrono::prelude::{DateTime, Utc};
-use futures::{future::BoxFuture, FutureExt};
 use uuid::Uuid;
-use crate::server::evtbuzz::models::Store;
+use crate::server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store};
 
 /// formats like "2001-07-08T00:34:60.026490+09:30"
 pub fn iso8601(st: &std::time::SystemTime) -> String {
@@ -34,40 +31,64 @@ pub fn gen_api_key() -> String {
   }
 }
 
-#[async_recursion]
-async fn gen_api_key_with_check_with_set_key(store: &Store, src_key: String) -> String {
-  let mut key = src_key;
-
-  match store.api_keys.lock().await.get(&key.clone()) {
-    Some(_) => {
-      key = gen_api_key_with_check_with_set_key(store, gen_api_key()).await;
-    },
-    None => {}
-  }
-
-  key
-}
-
 /// Generates a new API key after checking that it is not currently in the Store.
 pub async fn gen_api_key_with_check(store: &Store) -> String {
-  gen_api_key_with_check_with_set_key(store, gen_api_key()).await
-}
-
-#[async_recursion]
-async fn gen_uid_with_check_with_set_key(store: &Store, src_key: String) -> String {
-  let mut key = src_key;
-
-  match store.api_keys.lock().await.get(&key.clone()) {
-    Some(_) => {
-      key = gen_api_key_with_check_with_set_key(store, Uuid::new_v4().to_string()).await;
-    },
-    None => {}
+  loop {
+    let api_key = Uuid::new_v4().to_string();
+    match store.api_keys.lock().await.get(&api_key.clone()) {
+      Some(_) => {},
+      None => {
+        break api_key;
+      }
+    }
   }
-
-  key
 }
 
 /// Generates a new UID after checking that it is currently not in the Store.
 pub async fn gen_uid_with_check(store: &Store) -> String {
-  gen_uid_with_check_with_set_key(store, Uuid::new_v4().to_string()).await
+  loop {
+    let uid = Uuid::new_v4().to_string();
+    match store.users.lock().await.get(&uid.clone()) {
+      Some(_) => {},
+      None => {
+        break uid;
+      }
+    }
+  }
 }
+
+pub async fn gen_message_id_with_check(store: &Store) -> String {
+  loop {
+    let message_id = Uuid::new_v4().to_string();
+    match store.messages.lock().await.get(&message_id.clone()) {
+      Some(_) => {},
+      None => {
+        break message_id;
+      }
+    }
+  }
+}
+
+pub async fn gen_ipc_message(store: &Store, user_config: &CoreUserConfig, kind: String, message: String) -> IPCMessageWithId {
+  let message_id = gen_message_id_with_check(&store.clone()).await;
+  IPCMessageWithId { 
+    id: message_id.clone(),
+    author: user_config.id.to_string(),
+    kind,
+    message
+  }
+}
+
+pub async fn gen_cid_with_check(store: &Store) -> String {
+  loop {
+    let client_id = Uuid::new_v4().to_string();
+    match store.clients.lock().await.get(&client_id.clone()) {
+      Some(_) => {},
+      None => {
+        break client_id;
+      }
+    }
+  }
+}
+
+// TODO: Create a Util function for core users to send messages with their MasterUserConfig
