@@ -162,7 +162,7 @@ impl Into<User> for UserWithId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MasterUserConfig {
+pub struct CoreUserConfig {
   pub id: String,
   pub api_key: String
 }
@@ -199,7 +199,7 @@ impl Store {
   }
 
   // Create a new store with a set master user.
-  pub async fn new_configured_store() -> (Store, MasterUserConfig, (MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig)) {
+  pub async fn new_configured_store() -> (Store, CoreUserConfig, (CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig)) {
     let ret = Store::new();
 
     let master_user_config = ret.clone().create_master_user().await;
@@ -228,7 +228,7 @@ impl Store {
     };
   }
 
-  pub async fn create_master_user(self) -> MasterUserConfig {
+  pub async fn create_master_user(self) -> CoreUserConfig {
     let master_user_id = gen_uid_with_check(&self).await;
     let master_api_key = gen_api_key_with_check(&self).await;
 
@@ -245,12 +245,13 @@ impl Store {
       }]
     }).await;
 
-    MasterUserConfig {
+    CoreUserConfig {
       id: master_user_id.clone(), 
       api_key: master_api_key.clone()
     }
   }
 
+  // TODO: Turn this tuple into a type!!!!!
   /// Adds all the core user accounts, returns their configurations in the following order:
   /// 
   /// - EvtBuzz
@@ -259,7 +260,7 @@ impl Store {
   /// - AppD
   /// - ModMan
   /// - and Inference Engine
-  pub async fn add_all_core_users(self) -> (MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig, MasterUserConfig) {
+  pub async fn add_all_core_users(self) -> (CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig) {
     // EvtBuzz
     let evtbuzz_uid = gen_uid_with_check(&self).await;
     let evtbuzz_key = gen_api_key_with_check(&self).await;
@@ -351,27 +352,27 @@ impl Store {
     }).await;
 
     (
-      MasterUserConfig {
+      CoreUserConfig {
         id: evtbuzz_uid.clone(),
         api_key: evtbuzz_key.clone()
       },
-      MasterUserConfig {
+      CoreUserConfig {
         id: arbiter_uid.clone(),
         api_key: arbiter_key.clone()
       },
-      MasterUserConfig {
+      CoreUserConfig {
         id: renderer_uid.clone(),
         api_key: renderer_uid.clone()
       },
-      MasterUserConfig {
+      CoreUserConfig {
         id: appd_uid.clone(),
         api_key: appd_key.clone()
       },
-      MasterUserConfig {
+      CoreUserConfig {
         id: modman_uid.clone(),
         api_key: modman_key.clone()
       },
-      MasterUserConfig {
+      CoreUserConfig {
         id: inference_engine_uid.clone(),
         api_key: inference_engine_key.clone()
       }

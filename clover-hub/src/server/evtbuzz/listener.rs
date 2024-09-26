@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use warp::{Filter, http::StatusCode};
 use crate::utils::iso8601;
-use crate::server::evtbuzz::models::{ApiKeyWithKey, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
+use crate::server::evtbuzz::models::{ApiKeyWithKey, ClientWithId, IPCMessageWithId, Session, Store, UserWithId, CoreUserConfig};
 use crate::server::evtbuzz::websockets::handle_ws_client;
 
 // example error response
@@ -148,10 +148,23 @@ pub struct ServerHealth {
   up_since: String
 }
 
-pub async fn evtbuzz_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithId>, mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, store: Arc<Store>) {
-  info!("Starting HTTP and WebSocket Server on port: {}...", port);
+pub async fn evtbuzz_listener(
+  port: u16, 
+  ipc_tx: UnboundedSender<IPCMessageWithId>, 
+  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
+  store: Arc<Store>,
+  mut arbiter_ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  mut renderer_ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  mut modman_ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  mut inference_engine_ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  mut appd_ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  evtbuzz_user_config: Arc<CoreUserConfig>
+) {
+  info!("Starting EvtBuzz on port: {}...", port);
   
   let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>> = Arc::new(Mutex::new(HashMap::new()));
+  // TODO: Register core clients.
+
   let (from_client_tx, mut from_client_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
 
   let filter_to_clients_tx = Arc::new(clients_tx.clone());
@@ -254,6 +267,7 @@ pub async fn evtbuzz_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithI
                 None => {
                   error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
 
+                  // TODO: Turn message ID generation loop into a utility function.
                   let message_id = loop {
                     let message_id = Uuid::new_v4().to_string();
                     match ipc_dispatch_store.messages.lock().await.get(&message_id.clone()) {
@@ -265,6 +279,7 @@ pub async fn evtbuzz_listener(port: u16, ipc_tx: UnboundedSender<IPCMessageWithI
                       }
                     }
                   };
+                  // TODO: Create a Util function for core users to send messages with their MasterUserConfig
                   let generated_message = IPCMessageWithId { 
                     id: message_id.clone(),
                     author: "hub:server".to_string(),
