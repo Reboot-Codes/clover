@@ -130,7 +130,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
     let send_client = Arc::new(client.clone());
     let send_handle = tokio::task::spawn(async move {
       while let Some(msg) = to_client_rx.recv().await {
-        if msg.kind == Url::parse("clover://hub/server/listener/clients/unauthorize")
+        if msg.kind == Url::parse("clover://evtbuzz.clover.reboot-codes.com/clients/unauthorize")
         .unwrap()
         .query_pairs_mut()
         .append_pair("id", send_client.id.clone().as_str())

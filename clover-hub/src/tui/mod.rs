@@ -1,5 +1,6 @@
 use std::{io, thread, time::Duration};
 use log::info;
+use tokio::sync::mpsc::UnboundedReceiver;
 use tui::{
   backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::{Color, Style}, text::{Span, Spans}, widgets::{Block, Borders, Paragraph}, Terminal
 };
@@ -9,7 +10,7 @@ use crossterm::{
   terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-pub async fn tui_main(port: u16, host: Option<String>) -> Result<(), io::Error> {
+pub async fn tui_main(port: u16, host: Option<String>, signal_rx: UnboundedReceiver<i32>) -> Result<(), io::Error> {
   info!("Starting TUI...");
   
   // setup terminal

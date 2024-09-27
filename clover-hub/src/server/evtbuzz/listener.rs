@@ -1,6 +1,7 @@
 use log::{debug, error, info, warn};
 use regex::Regex;
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use url::Url;
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -182,10 +183,12 @@ pub async fn evtbuzz_listener(
   mut modman_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
   mut inference_engine_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
   mut appd_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
+  mut signal_rx: UnboundedReceiver<i32>,
   evtbuzz_user_config: Arc<CoreUserConfig>
 ) {
   info!("Starting EvtBuzz on port: {}...", port);
   
+  let cancellation_token = CancellationToken::new();
   let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>> = Arc::new(Mutex::new(HashMap::new()));
 
   let arbiter_cfg = arbiter_ipc.0;
@@ -250,169 +253,180 @@ pub async fn evtbuzz_listener(
   // TODO: Start creating GQL API endpoint.
   
   let server_port = Arc::new(port.clone());
+  let http_token = cancellation_token.clone();
   let http_handle = tokio::task::spawn(async move {
-    warp::serve(routes)
+    let (_, server) = warp::serve(routes)
       // TODO: Add option for listening address.
-      .try_bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), *server_port)).await;
+      .try_bind_with_graceful_shutdown(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), *server_port), async move {
+        tokio::select! {
+          _ = http_token.cancelled() => {}
+        }
+      }).expect("");
+    server.await;
+    info!("Server stopped.");
   });
 
   let ipc_dispatch_store = Arc::new(store.clone());
   let ipc_dispatch_clients_tx = Arc::new(clients_tx.clone());
   let ipc_dispatch_user_config = Arc::new(evtbuzz_user_config.clone());
-  let ipc_dispatch_handle = tokio::task::spawn(async move {
-    while let Some(message) = ipc_rx.recv().await {
-      debug!("Got message type: {}, with data:\n  {}", message.kind.clone(), message.message.clone());
-      for client in ipc_dispatch_store.clients.lock().await.clone().into_iter() {
-        let client_id = Arc::new(client.0);
-        let mutex = &ipc_dispatch_clients_tx.to_owned();
-        let client_senders = mutex.lock();
-        let hash_map = &client_senders.await;
-        let mut message_sent = false;
+  let ipc_dispatch_token = cancellation_token.clone();
+  tokio::spawn(ipc_dispatch_token.run_until_cancelled(async move {
+    match ipc_rx.recv().await {
+      Some(message) => {
+        debug!("Got message type: {}, with data:\n  {}", message.kind.clone(), message.message.clone());
+        for client in ipc_dispatch_store.clients.lock().await.clone().into_iter() {
+          let client_id = Arc::new(client.0);
+          let mutex = &ipc_dispatch_clients_tx.to_owned();
+          let client_senders = mutex.lock();
+          let hash_map = &client_senders.await;
+          let mut message_sent = false;
 
-        match hash_map.get(&client_id.to_string()) {
-          Some(client_sender) => {
-            if client.1.active {
-              match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
-                Some(api_key) => {
-                  for allowed_event_regex in &api_key.allowed_events_to {
-                    match Regex::new(&allowed_event_regex) {
-                      Ok(regex) => {
-                        if regex.is_match(&allowed_event_regex) && !(message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
-                          debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                          match client_sender.send(message.clone()) {
-                            Ok(_) => {
-                              message_sent = true;
-                            },
-                            Err(e) => {
-                              error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
-                            }
-                          };
-                          
-                          break;
+          match hash_map.get(&client_id.to_string()) {
+            Some(client_sender) => {
+              if client.1.active {
+                match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
+                  Some(api_key) => {
+                    for allowed_event_regex in &api_key.allowed_events_to {
+                      match Regex::new(&allowed_event_regex) {
+                        Ok(regex) => {
+                          if regex.is_match(&allowed_event_regex) && !(message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
+                            debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                            match client_sender.send(message.clone()) {
+                              Ok(_) => {
+                                message_sent = true;
+                              },
+                              Err(e) => {
+                                error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                              }
+                            };
+                            
+                            break;
+                          }
+                        },
+                        Err(e) => {
+                          error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
                         }
-                      },
-                      Err(e) => {
-                        error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
                       }
                     }
+
+                    if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
+                      debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                      match client_sender.send(message.clone()) {
+                        Ok(_) => {
+                          message_sent = true;
+                        },
+                        Err(e) => {
+                          error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                        }
+
+                      };
+                    }
+                  },
+                  None => {
+                    error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
+
+                    let kind = Url::parse("clover://evtbuzz.clover.reboot-codes.com/clients/unauthorize")
+                      .unwrap()
+                      .query_pairs_mut()
+                      .append_pair("id", &client_id.clone())
+                      .finish()
+                      .to_string();
+
+                    let generated_message = gen_ipc_message(
+                      &ipc_dispatch_store.clone(),
+                      &ipc_dispatch_user_config.clone(), 
+                      kind, 
+                      "api key removed from store".to_string()
+                    ).await;
+                    ipc_dispatch_store.messages.lock().await.insert(generated_message.id.clone(), generated_message.clone().into());
+
+                    let _ = client_sender.send(generated_message.clone());
                   }
-
-                  if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
-                    debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                    match client_sender.send(message.clone()) {
-                      Ok(_) => {
-                        message_sent = true;
-                      },
-                      Err(e) => {
-                        error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
-                      }
-
-                    };
-                  }
-                },
-                None => {
-                  error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
-
-                  let kind = Url::parse("clover://hub/server/listener/clients/unauthorize")
-                    .unwrap()
-                    .query_pairs_mut()
-                    .append_pair("id", &client_id.clone())
-                    .finish()
-                    .to_string();
-
-                  let generated_message = gen_ipc_message(
-                    &ipc_dispatch_store.clone(),
-                    &ipc_dispatch_user_config.clone(), 
-                    kind, 
-                    "api key removed from store".to_string()
-                  ).await;
-                  ipc_dispatch_store.messages.lock().await.insert(generated_message.id.clone(), generated_message.clone().into());
-
-                  let _ = client_sender.send(generated_message.clone());
                 }
               }
+            },
+            None => {
+              error!("Client: {}, does not exist in the client map!", client_id.clone());
             }
-          },
-          None => {
-            error!("Client: {}, does not exist in the client map!", client_id.clone());
           }
-        }
 
-        if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind.clone(), client_id.clone()); }
-      }
+          if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind.clone(), client_id.clone()); }
+        }
+      },
+      None => {}
     }
-  });
+  }));
 
   // IPC Handle for data from WS clients.
-  let ipc_receive_handle = tokio::task::spawn(async move {
-    while let Some(msg) = from_client_rx.recv().await {
-      debug!("Got message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}", msg.author.clone(), msg.kind.clone(), msg.message.clone());
-      match ipc_tx.send(msg.clone()) {
-        Ok(_) => {},
-        Err(e) => {
-          error!("Failed to send message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, due to:\n{}", msg.author.clone(), msg.kind.clone(), msg.message.clone(), e);
-        }
-      };
+  let ipc_recv_token = cancellation_token.clone();
+  let ipc_receive_handle = tokio::task::spawn(async move {ipc_recv_token.run_until_cancelled(async move {
+    match from_client_rx.recv().await {
+      Some(msg) => {
+        debug!("Got message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}", msg.author.clone(), msg.kind.clone(), msg.message.clone());
+        match ipc_tx.send(msg.clone()) {
+          Ok(_) => {},
+          Err(e) => {
+            error!("Failed to send message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, due to:\n{}", msg.author.clone(), msg.kind.clone(), msg.message.clone(), e);
+          }
+        };
+      },
+      None => {}
     }
-  });
+  });});
 
   // Internal IPC Handles
   let from_arbiter_cfg = Arc::new(arbiter_cfg.clone());
   let from_arbiter_store = Arc::new(store.clone());
   let from_arbiter_tx = Arc::new(from_client_tx.clone());
-  let from_arbiter_handle = tokio::task::spawn(async move {
+  let from_arbiter_token = cancellation_token.clone();
+  let from_arbiter_handle = tokio::task::spawn(async move {from_arbiter_token.run_until_cancelled(async move {
     while let Some(msg) = arbiter_ipc.1.recv().await {
       handle_ipc_send(&from_arbiter_tx, msg, &from_arbiter_cfg.clone(), &from_arbiter_store.clone()).await;
     }
-  });
+  });});
 
   let from_renderer_cfg = Arc::new(renderer_cfg.clone());
   let from_renderer_store = Arc::new(store.clone());
   let from_renderer_tx = Arc::new(from_client_tx.clone());
-  let from_renderer_handle = tokio::task::spawn(async move {
+  let from_renderer_token = cancellation_token.clone();
+  let from_renderer_handle = tokio::task::spawn(async move {from_renderer_token.run_until_cancelled(async move {
     while let Some(msg) = renderer_ipc.1.recv().await {
       handle_ipc_send(&from_renderer_tx, msg, &from_renderer_cfg.clone(), &from_renderer_store.clone()).await;
     }
-  });
+  });});
 
   let from_modman_cfg = Arc::new(modman_cfg.clone());
   let from_modman_store = Arc::new(store.clone());
   let from_modman_tx = Arc::new(from_client_tx.clone());
-  let from_modman_handle = tokio::task::spawn(async move {
+  let from_modman_token = cancellation_token.clone();
+  let from_modman_handle = tokio::task::spawn(async move {from_modman_token.run_until_cancelled(async move {
     while let Some(msg) = modman_ipc.1.recv().await {
       handle_ipc_send(&from_modman_tx, msg, &from_modman_cfg.clone(), &from_modman_store.clone()).await;
     }
-  });
+  });});
 
   let from_inference_engine_cfg = Arc::new(inference_engine_cfg.clone());
   let from_inference_engine_store = Arc::new(store.clone());
   let from_inference_engine_tx = Arc::new(from_client_tx.clone());
-  let from_inference_engine_handle = tokio::task::spawn(async move {
+  let from_inference_engine_token = cancellation_token.clone();
+  let from_inference_engine_handle = tokio::task::spawn(async move {from_inference_engine_token.run_until_cancelled(async move {
     while let Some(msg) = inference_engine_ipc.1.recv().await {
       handle_ipc_send(&from_inference_engine_tx, msg, &from_inference_engine_cfg.clone(), &from_inference_engine_store.clone()).await;
     }
-  });
+  });});
 
   let from_appd_cfg = Arc::new(appd_cfg.clone());
   let from_appd_store = Arc::new(store.clone());
   let from_appd_tx = Arc::new(from_client_tx.clone());
-  let from_appd_handle = tokio::task::spawn(async move {
+  let from_appd_token = cancellation_token.clone();
+  let from_appd_handle = tokio::task::spawn(async move {from_appd_token.run_until_cancelled(async move {
     while let Some(msg) = appd_ipc.1.recv().await {
       handle_ipc_send(&from_appd_tx, msg, &from_appd_cfg.clone(), &from_appd_store.clone()).await;
     }
-  });
+  });});
 
-  futures::future::join_all(vec![
-    http_handle, 
-    ipc_dispatch_handle, 
-    ipc_receive_handle, 
-    from_arbiter_handle,
-    from_renderer_handle,
-    from_modman_handle,
-    from_inference_engine_handle,
-    from_appd_handle
-  ]).await;
+  http_handle.await;
 
-  info!("Shutting down EvtBuzz...");
+  info!("Cleaning and saving store...");
   // TODO: Clean up registered sessions when server is shutting down.
 }

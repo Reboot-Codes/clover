@@ -4,7 +4,7 @@ These events are agnostic to what's connected to CloverHub.
 
 ## Unauthorize Client
 
-`clover://hub.clover.reboot-codes.com/server/listener/clients/unauthorize`
+`clover://evtbuzz.clover.reboot-codes.com/clients/unauthorize`
 
 Params:
 

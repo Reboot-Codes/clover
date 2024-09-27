@@ -1,4 +1,4 @@
-use std::{hash::{DefaultHasher, Hash, Hasher}, sync::Arc};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
 use chrono::prelude::{DateTime, Utc};
 use uuid::Uuid;
@@ -34,7 +34,7 @@ pub fn gen_api_key() -> String {
 /// Generates a new API key after checking that it is not currently in the Store.
 pub async fn gen_api_key_with_check(store: &Store) -> String {
   loop {
-    let api_key = Uuid::new_v4().to_string();
+    let api_key = gen_api_key();
     match store.api_keys.lock().await.get(&api_key.clone()) {
       Some(_) => {},
       None => {

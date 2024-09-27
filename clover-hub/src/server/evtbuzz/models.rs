@@ -77,7 +77,8 @@ pub struct UserConfig {
   pub api_keys: Vec<ApiKeyWithKeyWithoutUID>
 }
 
-// TODO: Add serialization/deserialization functions.... ough.
+// TODO: Add serialization/deserialization functions...
+// TODO: Add options for making certain models ephemeral or persistent.
 #[derive(Debug, Clone)]
 pub struct Store {
   pub users: Arc<Mutex<HashMap<String, User>>>,

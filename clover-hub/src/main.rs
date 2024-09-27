@@ -5,9 +5,13 @@ mod server;
 mod tui;
 mod utils;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use env_logger;
+use signal_hook::consts::SIGINT;
+use signal_hook::iterator::Signals;
+use tokio::sync::mpsc;
 use std::env;
+use std::error::Error;
 use std::ffi::OsString;
 use std::num::ParseIntError;
 use std::sync::Arc;
@@ -64,46 +68,88 @@ fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
   env_logger::Builder::new()
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();
 
   info!("Starting Clover Hub.");
 
-  let matches = cli().get_matches();
+  // BLEHHHHHHHHHHH Seriously???? Anyways...
+  let matches = Box::leak(Box::new(cli().get_matches()));
+  let subcommand = matches.subcommand();
 
-  match matches.subcommand() {
+  match subcommand {
     Some(("run", sub_matches)) => {
       let run_command = sub_matches.subcommand().unwrap_or(("aio", sub_matches));
       match run_command {
         ("aio", sub_matches) => {
+          let mut signals = Signals::new([SIGINT])?;
+          let (server_signal_tx, server_signal_rx) = mpsc::unbounded_channel::<i32>();
+          let (tui_signal_tx, tui_signal_rx) = mpsc::unbounded_channel::<i32>();
+
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
 
           info!("Running Backend Server and Terminal UI (All-In-One)...");
 
           let server_port = Arc::new(port);
-          let server_handle = tokio::task::spawn(async move { server_main(*server_port.to_owned()).await; });
-          let tui_port = Arc::new(port);
-          let tui_handle = tokio::task::spawn(async move { 
-            let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok()).await; 
+          let server_handle = tokio::task::spawn(async move { 
+            server_main(*server_port.to_owned(), server_signal_rx).await; 
           });
 
-          futures::future::join_all(vec![tui_handle, server_handle]).await;
+          let tui_port = Arc::new(port);
+          let tui_handle = tokio::task::spawn(async move { 
+            let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_signal_rx).await; 
+          });
+
+          let signal_handle = tokio::task::spawn(async move {
+            for signal in signals.forever() {
+              info!("{}", signal);
+              let _ = server_signal_tx.send(signal.clone());
+              let _ = tui_signal_tx.send(signal.clone());
+            }
+          });
+
+          futures::future::join_all(vec![signal_handle, tui_handle, server_handle]).await;
         }
         ("server", sub_matches) => {
+          let mut signals = Signals::new([SIGINT])?;
+          let (server_signal_tx, server_signal_rx) = mpsc::unbounded_channel::<i32>();
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default provided in Clap.").parse::<u16>());
 
           info!("Running Backend Server...");
-          server_main(port).await;
+          let server_handle = tokio::task::spawn(async move { 
+            server_main(port, server_signal_rx).await; 
+          });
+          
+          let signal_handle = tokio::task::spawn(async move {
+            for signal in signals.forever() {
+              info!("{}", signal);
+              let _ = server_signal_tx.send(signal.clone());
+            }
+          });
+
+          futures::future::join_all(vec![server_handle, signal_handle]).await;
         }
         ("tui", sub_matches) => {
+          let mut signals = Signals::new([SIGINT])?;
+          let (tui_signal_tx, tui_signal_rx) = mpsc::unbounded_channel::<i32>();
           let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
 
+          let signal_handle = tokio::task::spawn(async move {
+            for signal in signals.forever() {
+              let _ = tui_signal_tx.send(signal);
+            }
+          });
+
           info!("Running Terminal UI...");
           let tui_host = Arc::new(host);
-          tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok()).await.err();
+          let tui_handle = tokio::task::spawn(async move { 
+            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_signal_rx).await.err();
+          });
+
+          futures::future::join_all(vec![tui_handle, signal_handle]).await;
         }
         (name, _) => {
           unreachable!("Unsupported subcommand `{name}`")
@@ -121,5 +167,5 @@ async fn main() {
     _ => unreachable!(), // If all subcommands are defined above, anything else is unreachable!()
   }
 
-  // Continued program logic goes here...
+  Ok(())
 }

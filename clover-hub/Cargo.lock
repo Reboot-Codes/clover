@@ -345,10 +345,12 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "signal-hook 0.3.17",
  "taurus",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tui",
  "url",
  "uuid",
@@ -419,7 +421,7 @@ dependencies = [
  "libc 0.2.155",
  "mio 0.7.14",
  "parking_lot 0.11.2",
- "signal-hook",
+ "signal-hook 0.1.17",
  "winapi",
 ]
 
@@ -436,7 +438,7 @@ dependencies = [
  "mio 0.7.14",
  "parking_lot 0.11.2",
  "serde",
- "signal-hook",
+ "signal-hook 0.1.17",
  "winapi",
 ]
 
@@ -1627,6 +1629,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
+dependencies = [
+ "libc 0.2.155",
+ "signal-hook-registry",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1837,9 +1849,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.11"
+version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cf6b47b3771c49ac75ad09a6162f53ad4b8088b76ac60e8ec1455b31a189fe1"
+checksum = "61e7c3654c13bcd040d4a03abee2c75b1d14a37b423cf5a813ceae1cc903ec6a"
 dependencies = [
  "bytes",
  "futures-core",
