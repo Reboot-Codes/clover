@@ -7,3 +7,7 @@ You can just use `cargo build` to build for your system. Reproducible docker env
 Installation can be done with `cargo install --git https://github.com/Reboot-Codes/clover.git`!
 
 Check [the docs](https://clover.reboot-codes.com/docs/clover-hub/intro) for a good breakdown.
+
+## To-Do
+
+- [ ] Check if using raylib and EGL binding crates are a better solution that using FFI directly.

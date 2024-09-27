@@ -345,6 +345,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "taurus",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -1730,6 +1731,11 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "taurus"
+version = "0.1.0"
+source = "git+https://github.com/Reboot-Codes/taurus#cf69cbbea98e9cb2a29515c3435f3fee73ea21e6"
 
 [[package]]
 name = "thiserror"
