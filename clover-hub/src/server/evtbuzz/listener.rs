@@ -2,7 +2,6 @@ use log::{debug, error, info, warn};
 use regex::Regex;
 use tokio::sync::Mutex;
 use url::Url;
-use uuid::Uuid;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -12,8 +11,9 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use warp::{Filter, http::StatusCode};
-use crate::utils::{gen_cid_with_check, gen_ipc_message, gen_message_id_with_check, iso8601};
-use crate::server::evtbuzz::models::{ApiKeyWithKey, Client, ClientWithId, CoreUserConfig, IPCMessageWithId, Session, Store, UserWithId};
+use crate::server::arbiter::models::{ApiKeyWithKey, UserWithId};
+use crate::utils::{gen_cid_with_check, gen_ipc_message, iso8601};
+use crate::server::evtbuzz::models::{Client, ClientWithId, CoreUserConfig, IPCMessageWithId, Session, Store};
 use crate::server::evtbuzz::websockets::handle_ws_client;
 
 // example error response

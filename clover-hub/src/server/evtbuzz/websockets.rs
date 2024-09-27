@@ -10,8 +10,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use futures::{SinkExt, StreamExt};
 use warp::filters::ws::{Message, WebSocket};
+use crate::server::arbiter::models::{ApiKeyWithKey, UserWithId};
 use crate::utils::iso8601;
-use crate::server::evtbuzz::models::{ApiKeyWithKey, Client, ClientWithId, IPCMessageWithId, Session, Store, UserWithId};
+use crate::server::evtbuzz::models::{Client, ClientWithId, IPCMessageWithId, Session, Store};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct WsIn {
