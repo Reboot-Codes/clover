@@ -39,4 +39,3 @@ futures = { version = "0.3", default-features = false }
 
 # Crypto
 rand = "0.8.5"
-
