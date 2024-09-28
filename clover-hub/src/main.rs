@@ -5,10 +5,8 @@ mod server;
 mod tui;
 mod utils;
 
-use log::{debug, info, warn};
+use log::{info, warn};
 use env_logger;
-use signal_hook::consts::SIGINT;
-use signal_hook::iterator::Signals;
 use tokio_util::sync::CancellationToken;
 use std::env;
 use std::error::Error;
@@ -68,15 +66,72 @@ fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
   }
 }
 
+fn get_signal_handle(cancellation_token: CancellationToken) -> tokio::task::JoinHandle<()> {
+  tokio::task::spawn(async move {
+    tokio::select! {
+      _ = wait_for_signal_impl() => {
+        info!("Shutting down...");
+
+        cancellation_token.cancel();
+        
+        tokio::select! {
+          _ = wait_for_signal_impl() => {
+            warn!("Forcibly exiting!");
+            exit(1);
+          },
+          _ = cancellation_token.cancelled() => {}
+        } 
+      }
+    }
+  })
+}
+
+// taken from https://stackoverflow.com/questions/77585473/rust-tokio-how-to-handle-more-signals-than-just-sigint-i-e-sigquit#77591939
+/// Waits for a signal that requests a graceful shutdown, like SIGTERM or SIGINT.
+#[cfg(unix)]
+async fn wait_for_signal_impl() {
+  use log::debug;
+  use tokio::signal::unix::{signal, SignalKind};
+
+  // Infos here:
+  // https://www.gnu.org/software/libc/manual/html_node/Termination-Signals.html
+  let mut signal_terminate = signal(SignalKind::terminate()).unwrap();
+  let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
+
+  tokio::select! {
+    _ = signal_terminate.recv() => debug!("Received SIGTERM."),
+    _ = signal_interrupt.recv() => debug!("Received SIGINT."),
+  };
+}
+
+/// Waits for a signal that requests a graceful shutdown, Ctrl-C (SIGINT).
+#[cfg(windows)]
+async fn wait_for_signal_impl() {
+  use tokio::signal::windows;
+
+  // Infos here:
+  // https://learn.microsoft.com/en-us/windows/console/handlerroutine
+  let mut signal_c = windows::ctrl_c().unwrap();
+  let mut signal_break = windows::ctrl_break().unwrap();
+  let mut signal_close = windows::ctrl_close().unwrap();
+  let mut signal_shutdown = windows::ctrl_shutdown().unwrap();
+
+  tokio::select! {
+    _ = signal_c.recv() => debug!("Received CTRL_C."),
+    _ = signal_break.recv() => debug!("Received CTRL_BREAK."),
+    _ = signal_close.recv() => debug!("Received CTRL_CLOSE."),
+    _ = signal_shutdown.recv() => debug!("Received CTRL_SHUTDOWN."),
+  };
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
   env_logger::Builder::new()
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();
 
-  info!("Starting Clover Hub.");
+  info!("Starting CloverHub!");
 
-  // BLEHHHHHHHHHHH Seriously???? Anyways...
   let matches = Box::leak(Box::new(cli().get_matches()));
   let subcommand = matches.subcommand();
 
@@ -85,7 +140,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
       let run_command = sub_matches.subcommand().unwrap_or(("aio", sub_matches));
       match run_command {
         ("aio", sub_matches) => {
-          let mut signals = Signals::new([SIGINT])?;
           let cancellation_token = CancellationToken::new();
 
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
@@ -104,19 +158,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_token).await; 
           });
 
-          let signal_handle = tokio::task::spawn(async move {
-            for signal in signals.forever() {
-              if signal == 2 {
-                if cancellation_token.is_cancelled() {
-                  warn!("Forcibly exiting...");
-                  exit(1);
-                } else { 
-                  info!("Shutting down due to SIGINT");
-                  cancellation_token.cancel(); 
-                }
-              }
-            }
-          });
+          let signal_handle = get_signal_handle(cancellation_token);
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle, server_handle]) => {
             info!("Exiting...");
@@ -133,26 +175,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             server_main(port, server_token).await; 
           });
           
-          let signal_handle = tokio::task::spawn(async move {
-            use tokio::signal::unix::{signal, SignalKind};
-            let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
-
-            tokio::select! {
-              _ = signal_interrupt.recv() => {
-                cancellation_token.cancel();
-                
-                tokio::select! {
-                  _ = signal_interrupt.recv() => {
-                    warn!("Forcibly exiting...");
-                    exit(1);
-                  },
-                  _ = cancellation_token.cancelled() => {}
-                } 
-              }
-            }
-
-            debug!("Signal dispatch done.");
-          });
+          let signal_handle = get_signal_handle(cancellation_token);
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
             info!("Exiting...");
@@ -160,7 +183,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
           }}
         }
         ("tui", sub_matches) => {
-          let mut signals = Signals::new([SIGINT])?;
           let cancellation_token = CancellationToken::new();
           let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
@@ -172,19 +194,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
           });
 
-          let signal_handle = tokio::task::spawn(async move {
-            for signal in signals.forever() {
-              if signal == 2 {
-                if cancellation_token.is_cancelled() {
-                  warn!("Forcibly exiting...");
-                  exit(1);
-                } else { 
-                  info!("Shutting down due to SIGINT");
-                  cancellation_token.cancel(); 
-                }
-              }
-            }
-          });
+          let signal_handle = get_signal_handle(cancellation_token);
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle]) => {
             info!("Exiting...");
