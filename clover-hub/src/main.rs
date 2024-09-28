@@ -10,10 +10,12 @@ use env_logger;
 use signal_hook::consts::SIGINT;
 use signal_hook::iterator::Signals;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
 use std::num::ParseIntError;
+use std::process::exit;
 use std::sync::Arc;
 use clap::{Arg, Command};
 
@@ -85,71 +87,98 @@ async fn main() -> Result<(), Box<dyn Error>> {
       match run_command {
         ("aio", sub_matches) => {
           let mut signals = Signals::new([SIGINT])?;
-          let (server_signal_tx, server_signal_rx) = mpsc::unbounded_channel::<i32>();
-          let (tui_signal_tx, tui_signal_rx) = mpsc::unbounded_channel::<i32>();
+          let cancellation_token = CancellationToken::new();
 
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
 
           info!("Running Backend Server and Terminal UI (All-In-One)...");
 
           let server_port = Arc::new(port);
+          let server_token = cancellation_token.clone();
           let server_handle = tokio::task::spawn(async move { 
-            server_main(*server_port.to_owned(), server_signal_rx).await; 
+            server_main(*server_port.to_owned(), server_token).await; 
           });
 
           let tui_port = Arc::new(port);
+          let tui_token = cancellation_token.clone();
           let tui_handle = tokio::task::spawn(async move { 
-            let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_signal_rx).await; 
+            let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_token).await; 
           });
 
+          let signal_token = cancellation_token.clone();
           let signal_handle = tokio::task::spawn(async move {
             for signal in signals.forever() {
-              info!("{}", signal);
-              let _ = server_signal_tx.send(signal.clone());
-              let _ = tui_signal_tx.send(signal.clone());
+              if signal == 2 {
+                if signal_token.is_cancelled() {
+                  warn!("Forcibly exiting...");
+                  exit(1);
+                } else { signal_token.cancel(); }
+              }
             }
           });
 
-          futures::future::join_all(vec![signal_handle, tui_handle, server_handle]).await;
+          tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle, server_handle]) => {
+            info!("Exiting...");
+            exit(0);
+          }}
         }
         ("server", sub_matches) => {
           let mut signals = Signals::new([SIGINT])?;
-          let (server_signal_tx, server_signal_rx) = mpsc::unbounded_channel::<i32>();
+          let cancellation_token = CancellationToken::new();
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default provided in Clap.").parse::<u16>());
 
           info!("Running Backend Server...");
+          let server_token = cancellation_token.clone();
           let server_handle = tokio::task::spawn(async move { 
-            server_main(port, server_signal_rx).await; 
+            server_main(port, server_token).await; 
           });
           
+          let signal_token = cancellation_token.clone();
           let signal_handle = tokio::task::spawn(async move {
             for signal in signals.forever() {
-              info!("{}", signal);
-              let _ = server_signal_tx.send(signal.clone());
+              if signal == 2 {
+                if signal_token.is_cancelled() {
+                  warn!("Forcibly exiting...");
+                  exit(1);
+                } else { signal_token.cancel(); }
+              }
             }
           });
 
-          futures::future::join_all(vec![server_handle, signal_handle]).await;
+          tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
+            info!("Exiting...");
+            exit(0);
+          }}
         }
         ("tui", sub_matches) => {
           let mut signals = Signals::new([SIGINT])?;
-          let (tui_signal_tx, tui_signal_rx) = mpsc::unbounded_channel::<i32>();
+          let cancellation_token = CancellationToken::new();
           let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
 
+          let signal_token = cancellation_token.clone();
           let signal_handle = tokio::task::spawn(async move {
             for signal in signals.forever() {
-              let _ = tui_signal_tx.send(signal);
+              if signal == 2 {
+                if signal_token.is_cancelled() {
+                  warn!("Forcibly exiting...");
+                  exit(1);
+                } else { signal_token.cancel(); }
+              }
             }
           });
 
           info!("Running Terminal UI...");
           let tui_host = Arc::new(host);
+          let tui_token = cancellation_token.clone();
           let tui_handle = tokio::task::spawn(async move { 
-            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_signal_rx).await.err();
+            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
           });
 
-          futures::future::join_all(vec![tui_handle, signal_handle]).await;
+          tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle]) => {
+            info!("Exiting...");
+            exit(0);
+          }}
         }
         (name, _) => {
           unreachable!("Unsupported subcommand `{name}`")

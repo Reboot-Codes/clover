@@ -13,6 +13,7 @@ in
       rustup
       nodejs_22
       yarn-berry
+      xorg.libX11
     ];
     RUSTC_VERSION = overrides.toolchain.channel;
     # https://github.com/rust-lang/rust-bindgen#environment-variables
@@ -32,12 +33,14 @@ in
     (builtins.map (a: ''-I"${a}/include"'') [
       # add dev libraries here (e.g. pkgs.libvmi.dev)
       pkgs.glibc.dev
+      pkgs.xorg.libX11.dev
     ])
     # Includes with special directory paths
     ++ [
       ''-I"${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include"''
       ''-I"${pkgs.glib.dev}/include/glib-2.0"''
       ''-I${pkgs.glib.out}/lib/glib-2.0/include/''
+      ''-I${pkgs.xorg.libX11.out}/lib/''
     ];
   }
 

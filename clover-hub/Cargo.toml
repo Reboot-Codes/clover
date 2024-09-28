@@ -28,8 +28,8 @@ fast_websocket_client = "0.2.0"
 warp = "0.3"
 
 # Graphics
-raylib = "5.0.2"
-egl = "0.2.7"
+#raylib = "5.0.2"
+#egl = "0.2.7"
 
 # Adding stuff to rust that shoulda been there in the first place.
 async-recursion = "1.1.1"
