@@ -38,12 +38,8 @@ pub async fn renderer_main(
     _ = cleanup_token.cancelled() => {
       info!("Cleaning up displays...");
       // TODO: Clean up registered displays when server is shutting down.
-
-      cleanup_token.cancel();
     }
   }
 
-  tokio::select! {_ = futures::future::join_all(vec![ipc_recv_handle]) => {
-    info!("Renderer has stopped!");
-  }}
+  info!("Renderer has stopped!");
 }

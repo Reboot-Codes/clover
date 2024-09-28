@@ -38,12 +38,8 @@ pub async fn inference_engine_main(
     _ = cleanup_token.cancelled() => {
       info!("Cleaning up networks...");
       // TODO: Clean up registered networks when server is shutting down.
-
-      cleanup_token.cancel();
     }
   }
 
-  tokio::select! {_ = futures::future::join_all(vec![ipc_recv_handle]) => {
-    info!("Inference Engine has stopped!");
-  }}
+  info!("Inference Engine has stopped!");
 }

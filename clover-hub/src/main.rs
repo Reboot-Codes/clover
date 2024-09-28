@@ -9,7 +9,6 @@ use log::{debug, info, warn};
 use env_logger;
 use signal_hook::consts::SIGINT;
 use signal_hook::iterator::Signals;
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use std::env;
 use std::error::Error;
@@ -94,25 +93,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
           info!("Running Backend Server and Terminal UI (All-In-One)...");
 
           let server_port = Arc::new(port);
-          let server_token = cancellation_token.clone();
+          let server_token = cancellation_token.child_token();
           let server_handle = tokio::task::spawn(async move { 
             server_main(*server_port.to_owned(), server_token).await; 
           });
 
           let tui_port = Arc::new(port);
-          let tui_token = cancellation_token.clone();
+          let tui_token = cancellation_token.child_token();
           let tui_handle = tokio::task::spawn(async move { 
             let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_token).await; 
           });
 
-          let signal_token = cancellation_token.clone();
           let signal_handle = tokio::task::spawn(async move {
             for signal in signals.forever() {
               if signal == 2 {
-                if signal_token.is_cancelled() {
+                if cancellation_token.is_cancelled() {
                   warn!("Forcibly exiting...");
                   exit(1);
-                } else { signal_token.cancel(); }
+                } else { 
+                  info!("Shutting down due to SIGINT");
+                  cancellation_token.cancel(); 
+                }
               }
             }
           });
@@ -123,26 +124,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
           }}
         }
         ("server", sub_matches) => {
-          let mut signals = Signals::new([SIGINT])?;
           let cancellation_token = CancellationToken::new();
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default provided in Clap.").parse::<u16>());
 
           info!("Running Backend Server...");
-          let server_token = cancellation_token.clone();
+          let server_token = cancellation_token.child_token();
           let server_handle = tokio::task::spawn(async move { 
             server_main(port, server_token).await; 
           });
           
-          let signal_token = cancellation_token.clone();
           let signal_handle = tokio::task::spawn(async move {
-            for signal in signals.forever() {
-              if signal == 2 {
-                if signal_token.is_cancelled() {
-                  warn!("Forcibly exiting...");
-                  exit(1);
-                } else { signal_token.cancel(); }
+            use tokio::signal::unix::{signal, SignalKind};
+            let mut signal_interrupt = signal(SignalKind::interrupt()).unwrap();
+
+            tokio::select! {
+              _ = signal_interrupt.recv() => {
+                cancellation_token.cancel();
+                
+                tokio::select! {
+                  _ = signal_interrupt.recv() => {
+                    warn!("Forcibly exiting...");
+                    exit(1);
+                  },
+                  _ = cancellation_token.cancelled() => {}
+                } 
               }
             }
+
+            debug!("Signal dispatch done.");
           });
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
@@ -156,23 +165,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
           let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
 
-          let signal_token = cancellation_token.clone();
+          info!("Running Terminal UI...");
+          let tui_host = Arc::new(host);
+          let tui_token = cancellation_token.child_token();
+          let tui_handle = tokio::task::spawn(async move { 
+            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
+          });
+
           let signal_handle = tokio::task::spawn(async move {
             for signal in signals.forever() {
               if signal == 2 {
-                if signal_token.is_cancelled() {
+                if cancellation_token.is_cancelled() {
                   warn!("Forcibly exiting...");
                   exit(1);
-                } else { signal_token.cancel(); }
+                } else { 
+                  info!("Shutting down due to SIGINT");
+                  cancellation_token.cancel(); 
+                }
               }
             }
-          });
-
-          info!("Running Terminal UI...");
-          let tui_host = Arc::new(host);
-          let tui_token = cancellation_token.clone();
-          let tui_handle = tokio::task::spawn(async move { 
-            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
           });
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle]) => {

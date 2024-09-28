@@ -46,7 +46,5 @@ pub async fn appd_main(
     }
   }
 
-  tokio::select! {_ = futures::future::join_all(vec![ipc_recv_handle]) => {
-    info!("AppD has stopped!");
-  }}
+  info!("AppD has stopped!");
 }

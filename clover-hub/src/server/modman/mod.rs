@@ -90,47 +90,43 @@ pub async fn modman_main(
     }
   });
 
-  // let mod_clean_token = cancellation_token.clone();
-  // tokio::select! {
-  //   _ = mod_clean_token.cancelled() => {
-  //     // Clean up all modules on shutdown.
-  //     info!("Cleaning up modules...");
-  //     let modules = store.modules.lock().await;
-  //     if modules.len() > 0 {
-  //       for (id, module) in modules.iter() {
-  //         if module.initialized {
-  //           info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
-  //           // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
-  //           let de_initialized = true;
-            
-  //           // Update the store with new state of the module.
-  //           if de_initialized {
-  //             store.modules.lock().await.insert(id.clone(), Module {
-  //               module_type: module.module_type.clone(),
-  //               pretty_name: module.pretty_name.clone(),
-  //               initialized: false,
-  //               components: module.components.clone()
-  //             });
-  //           }
-  //         }
-  //       }
-  //     } else {
-  //       debug!("No modules to de-init.");
-  //     }
-  //   }
-  // }
-
-  let cleanup_token = cancellation_token.clone();
+  let mod_clean_token = cancellation_token.clone();
   tokio::select! {
-    _ = cleanup_token.cancelled() => {
-      info!("Cleaning up modules...");
-      // TODO: Clean up registered modules when server is shutting down.
+    _ = mod_clean_token.cancelled() => {
+      ipc_recv_handle.abort();
 
-      cleanup_token.cancel();
+      // Clean up all modules on shutdown.
+      info!("Cleaning up modules...");
+
+      // TODO: Figure out why locking the store's modules makes this thread hang...
+      // tokio::select! {
+      //   modules = store.modules.lock() => {
+      //     debug!("done waiting for lock");
+      //     if modules.len() > 0 {
+      //       for (id, module) in modules.iter() {
+      //         if module.initialized {
+      //           info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
+      //           // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
+      //           let de_initialized = true;
+                
+      //           // Update the store with new state of the module.
+      //           if de_initialized {
+      //             store.modules.lock().await.insert(id.clone(), Module {
+      //               module_type: module.module_type.clone(),
+      //               pretty_name: module.pretty_name.clone(),
+      //               initialized: false,
+      //               components: module.components.clone()
+      //             });
+      //           }
+      //         }
+      //       }
+      //     } else {
+      //       debug!("No modules to de-init.");
+      //     }
+      //   }
+      // }
     }
   }
 
-  tokio::select! {_ = futures::future::join_all(vec![ipc_recv_handle]) => {
-    info!("ModMan has stopped!");
-  }}
+  info!("ModMan has stopped!");
 }
