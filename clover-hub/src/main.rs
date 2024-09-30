@@ -130,8 +130,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();
 
-  info!("Starting CloverHub!");
-
   let matches = Box::leak(Box::new(cli().get_matches()));
   let subcommand = matches.subcommand();
 
@@ -140,6 +138,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
       let run_command = sub_matches.subcommand().unwrap_or(("aio", sub_matches));
       match run_command {
         ("aio", sub_matches) => {
+          info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
 
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
@@ -166,6 +165,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
           }}
         }
         ("server", sub_matches) => {
+          info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default provided in Clap.").parse::<u16>());
 
@@ -183,6 +183,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
           }}
         }
         ("tui", sub_matches) => {
+          info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
           let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
           let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());

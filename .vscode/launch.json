@@ -1,7 +1,56 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-  "version": "0.2.0",
-  "configurations": []
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "CloverHub: Server",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=clover-hub",
+                    "--package=clover-hub"
+                ],
+                "filter": {
+                    "name": "clover-hub",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "run",
+                "server"
+            ],
+            "env": {
+                "CLOVER_LOG": "clover=debug",
+                "CLOVER_MASTER_PRINT": "true"
+            },
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Unit Tests: CloverHub: Server",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=clover-hub",
+                    "--package=clover-hub"
+                ],
+                "filter": {
+                    "name": "clover-hub",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "run",
+                "server"
+            ],
+            "env": {
+                "CLOVER_LOG": "clover=debug",
+                "CLOVER_MASTER_PRINT": "true"
+            },
+            "cwd": "${workspaceFolder}"
+        }
+    ]
 }
