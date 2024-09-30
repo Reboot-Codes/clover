@@ -99,7 +99,7 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'GitHub',
+              label: 'Source',
               href: `https://github.com/${organizationName}/${projectName}`,
             },
           ],
