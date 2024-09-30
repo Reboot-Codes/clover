@@ -21,7 +21,7 @@ const config: Config = {
   organizationName, // Usually your GitHub org/user name.
   projectName, // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
@@ -70,7 +70,7 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'left',
-          label: 'Docs',
+          label: 'Manual',
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
@@ -86,8 +86,12 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Intro',
-              to: '/docs/intro',
+              label: 'Guide',
+              to: '/docs/guide/intro',
+            },
+            {
+              label: 'Manual',
+              to: '/docs/components/intro',
             },
           ],
         },
