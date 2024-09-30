@@ -62,13 +62,19 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'guideSidebar',
+          position: 'left',
+          label: 'Guide',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Docs',
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
-          label: 'GitHub',
+          label: 'Source',
           position: 'right',
         },
       ],
