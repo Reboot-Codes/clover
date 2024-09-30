@@ -7,7 +7,7 @@ CloverHub uses [env_logger](https://docs.rs/env_logger/0.11.3/env_logger/) to pr
 ## Run the Server
 
 ```bash
-clover run server
+clover-hub run server
 ```
 
 See: [Server Component](/docs/components/clover-hub/server/intro)
@@ -15,7 +15,7 @@ See: [Server Component](/docs/components/clover-hub/server/intro)
 ## Run the TUI
 
 ```bash
-clover run tui
+clover-hub run tui
 ```
 
 See: [TUI Component](/docs/components/clover-hub/tui/intro)
@@ -24,5 +24,5 @@ See: [TUI Component](/docs/components/clover-hub/tui/intro)
 
 ```bash
 # you may also specify `aio`
-clover run
+clover-hub run
 ```
