@@ -5,8 +5,9 @@ Cross platform configuration application for Clover.
 ## To-Do
 
 - [ ] Create spanner library in rust
+  - [x] Lib template
 - [ ] Create desktop app template
-  - [ ] Tauri desktop config
+  - [x] Tauri desktop config
 - [ ] Create mobile app template
   - [ ] React native base
   - [ ] Android native modules

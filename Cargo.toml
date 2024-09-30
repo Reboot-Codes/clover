@@ -1,5 +1,8 @@
 [workspace]
+resolver = "1"
 
 members = [
   "clover-hub",
+  "./spanner/spanner-desktop/src-tauri",
+  "./spanner/spanner-lib"
 ]
