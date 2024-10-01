@@ -101,7 +101,6 @@ pub async fn modman_main(
       // Clean up all modules on shutdown.
       info!("Cleaning up modules...");
 
-      // TODO: Figure out why locking the store's modules makes this thread hang...
       tokio::select! {
         modules = store.modules.lock() => {
           debug!("done waiting for lock");
