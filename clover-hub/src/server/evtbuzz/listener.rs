@@ -478,6 +478,8 @@ pub async fn evtbuzz_listener(
     _ = cleanup_token.cancelled() => {
       info!("Cleaning and saving store...");
       // TODO: Clean up registered sessions when server is shutting down.
+
+      std::mem::drop(store);
     }
   }
 

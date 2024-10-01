@@ -38,6 +38,8 @@ pub async fn inference_engine_main(
     _ = cleanup_token.cancelled() => {
       info!("Cleaning up networks...");
       // TODO: Clean up registered networks when server is shutting down.
+
+      std::mem::drop(store);
     }
   }
 

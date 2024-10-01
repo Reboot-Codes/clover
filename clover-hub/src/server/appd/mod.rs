@@ -42,7 +42,7 @@ pub async fn appd_main(
       info!("Cleaning up applications...");
       // TODO: Clean up registered applications when server is shutting down.
 
-      cleanup_token.cancel();
+      std::mem::drop(store);
     }
   }
 

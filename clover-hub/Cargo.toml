@@ -24,15 +24,15 @@ tokio-util = "0.7.12"
 api_key = "0.1.0"
 url = "2.5.0"
 fast_websocket_client = "0.2.0"
-warp = "0.3"
+warp = "0.3.6"
 
 # Graphics
 #raylib = "5.0.2"
 #egl = "0.2.7"
 
 # Adding stuff to rust that shoulda been there in the first place.
-tokio = { version = "1.37.0", features = ["signal", "macros", "sync", "rt-multi-thread"] }
-tokio-stream = "0.1.14"
+tokio = { version = "1.40.0", features = ["signal", "macros", "sync", "rt-multi-thread"] }
+tokio-stream = "0.1.15"
 serde = {version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 futures = { version = "0.3", default-features = false }

@@ -50,26 +50,29 @@ pub async fn modman_main(
 ) {
   info!("Starting ModMan...");
 
-  let modules = store.modules.lock().await;
-  if modules.len() > 0 {
-    // Initialize modules that were registered already via persistence.
-    for (id, module) in modules.iter() {
-      info!("Initializing pre configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
-      let (initialized, _components_initialized) = init_module(&store, id.clone(), module.clone()).await;
+  let init_store = Arc::new(store.clone());
+  cancellation_token.run_until_cancelled(async move {
+    let modules = init_store.modules.lock().await;
+    if modules.len() > 0 {
+      // Initialize modules that were registered already via persistence.
+      for (id, module) in modules.iter() {
+        info!("Initializing pre configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
+        let (initialized, _components_initialized) = init_module(&init_store, id.clone(), module.clone()).await;
 
-      // Update the store with new state of the module.
-      if initialized {
-        store.modules.lock().await.insert(id.clone(), Module {
-          module_type: module.module_type.clone(),
-          pretty_name: module.pretty_name.clone(),
-          initialized: true,
-          components: module.components.clone()
-        });
+        // Update the store with new state of the module.
+        if initialized {
+          init_store.modules.lock().await.insert(id.clone(), Module {
+            module_type: module.module_type.clone(),
+            pretty_name: module.pretty_name.clone(),
+            initialized: true,
+            components: module.components.clone()
+          });
+        }
       }
+    } else {
+      debug!("No pre-configured modules to initialize.");
     }
-  } else {
-    debug!("No pre-configured modules to initialize.");
-  }
+  }).await;
 
   let ipc_recv_token = cancellation_token.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
@@ -99,32 +102,34 @@ pub async fn modman_main(
       info!("Cleaning up modules...");
 
       // TODO: Figure out why locking the store's modules makes this thread hang...
-      // tokio::select! {
-      //   modules = store.modules.lock() => {
-      //     debug!("done waiting for lock");
-      //     if modules.len() > 0 {
-      //       for (id, module) in modules.iter() {
-      //         if module.initialized {
-      //           info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
-      //           // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
-      //           let de_initialized = true;
+      tokio::select! {
+        modules = store.modules.lock() => {
+          debug!("done waiting for lock");
+          if modules.len() > 0 {
+            for (id, module) in modules.iter() {
+              if module.initialized {
+                info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
+                // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
+                let de_initialized = true;
                 
-      //           // Update the store with new state of the module.
-      //           if de_initialized {
-      //             store.modules.lock().await.insert(id.clone(), Module {
-      //               module_type: module.module_type.clone(),
-      //               pretty_name: module.pretty_name.clone(),
-      //               initialized: false,
-      //               components: module.components.clone()
-      //             });
-      //           }
-      //         }
-      //       }
-      //     } else {
-      //       debug!("No modules to de-init.");
-      //     }
-      //   }
-      // }
+                // Update the store with new state of the module.
+                if de_initialized {
+                  store.modules.lock().await.insert(id.clone(), Module {
+                    module_type: module.module_type.clone(),
+                    pretty_name: module.pretty_name.clone(),
+                    initialized: false,
+                    components: module.components.clone()
+                  });
+                }
+              }
+            }
+          } else {
+            debug!("No modules to de-init.");
+          }
+        }
+      }
+
+      std::mem::drop(store);
     }
   }
 
