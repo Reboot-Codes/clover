@@ -21,7 +21,7 @@ use modman::modman_main;
 use inference_engine::inference_engine_main;
 use tokio_util::sync::CancellationToken;
 
-async fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: IPCMessageWithId, user_config: &CoreUserConfig, store: &Store) {
+async fn handle_ipc_send(sender: mpsc::UnboundedSender<IPCMessageWithId>, msg: IPCMessageWithId, user_config: &CoreUserConfig, store: &Store) {
   let users_mutex = &store.users.to_owned();
   let users = users_mutex.lock().await;
   let user_conf = users.get(&user_config.id.clone()).expect(&format!("ERROR: Core user not found: {}", user_config.id.clone()));
@@ -136,36 +136,6 @@ pub async fn server_main(port: u16, cancellation_token: CancellationToken) {
     appd_main(appd_from_tx, appd_to_rx, appd_store.clone(), appd_uca.clone(), appd_token_clone).await;
   });
 
-  // Get messages from EvtBuzz (incl ones from the other threads), and pass them around. Yes, this does include looping events back into EvtBuzz.
-  let (evtbuzz_from_tx, mut evtbuzz_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
-  let (evtbuzz_to_tx, evtbuzz_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
-  let ipc_listener_dispatch_store = Arc::new(store.clone());
-  let ipc_evtbuzz_user_config = Arc::new(evtbuzz_user_config.clone());
-  let ipc_arbiter_user_config = Arc::new(arbiter_user_config.clone());
-  let ipc_renderer_user_config = Arc::new(renderer_user_config.clone());
-  let ipc_modman_user_config = Arc::new(modman_user_config.clone());
-  let ipc_appd_user_config = Arc::new(appd_user_config.clone());
-  let ipc_inference_engine_user_config = Arc::new(inference_engine_user_config.clone());
-  let ipc_from_listener_dispatch_token = CancellationToken::new();
-  let ipc_from_listener_dispatch_token_clone = ipc_from_listener_dispatch_token.child_token();
-  let ipc_from_listener_dispatch_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_from_listener_dispatch_token_clone.cancelled() => {
-        debug!("ipc_from_listener_dispatch exited");
-      }
-      _ = async move {
-        while let Some(msg) = evtbuzz_from_rx.recv().await {
-          handle_ipc_send(&evtbuzz_to_tx, msg.clone(), &ipc_evtbuzz_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-          handle_ipc_send(&arbiter_to_tx, msg.clone(), &ipc_arbiter_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-          handle_ipc_send(&renderer_to_tx, msg.clone(), &ipc_renderer_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-          handle_ipc_send(&modman_to_tx, msg.clone(), &ipc_modman_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-          handle_ipc_send(&inference_engine_to_tx, msg.clone(), &ipc_inference_engine_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-          handle_ipc_send(&appd_to_tx, msg.clone(), &ipc_appd_user_config.clone(), &ipc_listener_dispatch_store.clone()).await;
-        }
-      } => {}
-    }
-  });
-
   let evtbuzz_port = Arc::new(port);
   let evtbuzz_store = Arc::new(store.clone());
   let evtbuzz_uca = Arc::new(evtbuzz_user_config.clone());
@@ -179,14 +149,12 @@ pub async fn server_main(port: u16, cancellation_token: CancellationToken) {
   let evtbuzz_handle = tokio::task::spawn(async move {
     evtbuzz_listener(
       *evtbuzz_port.to_owned(), 
-      evtbuzz_from_tx, 
-      evtbuzz_to_rx, 
       evtbuzz_store.clone(), 
-      (&evtbuzz_arbiter_user_config_arc.clone(), arbiter_from_rx),
-      (&evtbuzz_renderer_user_config_arc.clone(), renderer_from_rx), 
-      (&evtbuzz_modman_user_config_arc.clone(), modman_from_rx),
-      (&evtbuzz_inference_engine_user_config_arc.clone(), inference_engine_from_rx),
-      (&evtbuzz_appd_user_config_arc.clone(), appd_from_rx),
+      (&evtbuzz_arbiter_user_config_arc.clone(), arbiter_from_rx, arbiter_to_tx),
+      (&evtbuzz_renderer_user_config_arc.clone(), renderer_from_rx, renderer_to_tx), 
+      (&evtbuzz_modman_user_config_arc.clone(), modman_from_rx, modman_to_tx),
+      (&evtbuzz_inference_engine_user_config_arc.clone(), inference_engine_from_rx, inference_engine_to_tx),
+      (&evtbuzz_appd_user_config_arc.clone(), appd_from_rx, appd_to_tx),
       evtbuzz_token_clone,
       evtbuzz_uca.clone()
     ).await;
@@ -215,14 +183,8 @@ pub async fn server_main(port: u16, cancellation_token: CancellationToken) {
                         arbiter_token.cancel();
                         tokio::select! {
                           _ = arbiter_token.cancelled() => {
-                            debug!("Shutting down IPC From Listener");
-                            ipc_from_listener_dispatch_token.cancel();
-                            tokio::select! {
-                              _ = ipc_from_listener_dispatch_token.cancelled() => {
-                                debug!("Shutting down EvtBuzz");
-                                evtbuzz_token.cancel();
-                              }
-                            }
+                            debug!("Shutting down EvtBuzz");
+                            evtbuzz_token.cancel();
                           }
                         }
                       }
@@ -240,7 +202,6 @@ pub async fn server_main(port: u16, cancellation_token: CancellationToken) {
   tokio::select! {_ = futures::future::join_all(vec![
     cleanup_handle,
     evtbuzz_handle,
-    ipc_from_listener_dispatch_handle,
     arbiter_handle, 
     renderer_handle,
     modman_handle,

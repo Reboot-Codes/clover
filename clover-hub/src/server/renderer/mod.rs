@@ -1,9 +1,9 @@
 use log::{debug, info};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 use std::sync::Arc;
-use crate::server::evtbuzz::models::{IPCMessageWithId, Store, CoreUserConfig};
+use crate::{server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store}, utils::send_ipc_message};
 
 pub async fn renderer_main(
   ipc_tx: UnboundedSender<IPCMessageWithId>, 
@@ -13,7 +13,20 @@ pub async fn renderer_main(
   cancellation_token: CancellationToken
 ) {
   info!("Starting Renderer...");
-  // TODO: Setup EGL ctx for each display we're handling.
+
+  let init_store = Arc::new(store.clone());
+  let init_user = Arc::new(user_config.clone());
+  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
+  cancellation_token.run_until_cancelled(async move {
+    let _ = send_ipc_message(
+      &init_store, 
+      &init_user, 
+      init_from_tx, 
+      "clover://renderer.clover.reboot-codes.com/status".to_string(), 
+      "finished-init".to_string()
+    ).await;
+  }).await;
+
   let ipc_recv_token = cancellation_token.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
@@ -25,7 +38,8 @@ pub async fn renderer_main(
           let kind = Url::parse(&msg.kind.clone()).unwrap();
 
           // Verify that we care about this event.
-          if kind.host().unwrap() == url::Host::Domain("arbiter.clover.reboot-codes.com") {
+          if kind.host().unwrap() == url::Host::Domain("renderer.clover.reboot-codes.com") {
+            // TODO: Setup EGL ctx for each display we're handling.
             debug!("Processing: {}", msg.kind.clone());
           }
         }
@@ -33,9 +47,32 @@ pub async fn renderer_main(
     }
   });
 
+  let ipc_trans_token = cancellation_token.clone();
+  let ipc_trans_tx = Arc::new(ipc_tx.clone());
+  let ipc_trans_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = async move {
+        while let Some(msg) = init_from_rx.recv().await {
+          match ipc_trans_tx.send(msg) {
+            Ok(_) => {},
+            Err(_) => {
+              debug!("Failed to send message to IPC bus!");
+            }
+          }
+        }
+      } => {},
+      _ = ipc_trans_token.cancelled() => {
+        debug!("ipc_trans exited");
+      }
+    }
+  });
+
   let cleanup_token = cancellation_token.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
+      ipc_recv_handle.abort();
+      ipc_trans_handle.abort();
+
       info!("Cleaning up displays...");
       // TODO: Clean up registered displays when server is shutting down.
 

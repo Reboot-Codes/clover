@@ -139,12 +139,13 @@ pub struct ServerHealth {
   up_since: String
 }
 
-async fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: IPCMessageWithId, user_config: &Arc<CoreUserConfig>, store: &Store) {
+async fn handle_ipc_send(sender: Arc<mpsc::UnboundedSender<IPCMessageWithId>>, msg: IPCMessageWithId, user_config: &Arc<CoreUserConfig>, store: &Store) {
   let users_mutex = &store.users.to_owned();
   let users = users_mutex.lock().await;
   let user_conf = users.get(&user_config.id.clone()).expect(&format!("ERROR: Core user not found: {}", user_config.id.clone()));
   let keys_mutex = &store.api_keys.to_owned();
   let keys = keys_mutex.lock().await;
+
   let api_key_conf = keys.get(&user_config.api_key.clone()).expect(&format!("ERROR: Core user api_key not found: {}", user_config.api_key.clone()));
   let mut event_sent = false;
 
@@ -175,14 +176,12 @@ async fn handle_ipc_send(sender: &mpsc::UnboundedSender<IPCMessageWithId>, msg: 
 
 pub async fn evtbuzz_listener(
   port: u16, 
-  ipc_tx: UnboundedSender<IPCMessageWithId>, 
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
   store: Arc<Store>,
-  mut arbiter_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
-  mut renderer_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
-  mut modman_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
-  mut inference_engine_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
-  mut appd_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>),
+  mut arbiter_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
+  mut renderer_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
+  mut modman_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
+  mut inference_engine_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
+  mut appd_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   cancellation_token: CancellationToken,
   evtbuzz_user_config: Arc<CoreUserConfig>
 ) {
@@ -190,26 +189,33 @@ pub async fn evtbuzz_listener(
   let clients_tx: Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>> = Arc::new(Mutex::new(HashMap::new()));
 
   let arbiter_cfg = arbiter_ipc.0;
+  let arbiter_tx = arbiter_ipc.2;
   let renderer_cfg = renderer_ipc.0;
+  let renderer_tx = renderer_ipc.2;
   let modman_cfg = modman_ipc.0;
+  let modman_tx = modman_ipc.2;
   let inference_engine_cfg = inference_engine_ipc.0;
+  let inference_engine_tx = inference_engine_ipc.2;
   let appd_cfg = appd_ipc.0;
+  let appd_tx = appd_ipc.2;
   for client in vec![
-    arbiter_cfg,
-    renderer_cfg,
-    modman_cfg,
-    inference_engine_cfg,
-    appd_cfg
+    (arbiter_cfg, arbiter_tx),
+    (renderer_cfg, renderer_tx),
+    (modman_cfg, modman_tx),
+    (inference_engine_cfg, inference_engine_tx),
+    (appd_cfg, appd_tx)
   ] {
     let cid = gen_cid_with_check(&store).await;
     store.clients.lock().await.insert(
-      cid, 
+      cid.clone(), 
       Client { 
-        api_key: client.api_key.clone(), 
-        user_id: client.id.clone(),
-        active: true 
+        api_key: client.0.api_key.clone(), 
+        user_id: client.0.id.clone(),
+        active: true,
       }
     );
+
+    clients_tx.lock().await.insert(cid.clone(), client.1);
   }
 
   let (from_client_tx, mut from_client_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
@@ -274,115 +280,95 @@ pub async fn evtbuzz_listener(
         debug!("ipc_dispatch exited");
       },
       _ = async move {
-        match ipc_rx.recv().await {
-          Some(message) => {
-            debug!("Got message type: {}, with data:\n  {}", message.kind.clone(), message.message.clone());
-            for client in ipc_dispatch_store.clients.lock().await.clone().into_iter() {
-              let client_id = Arc::new(client.0);
-              let mutex = &ipc_dispatch_clients_tx.to_owned();
-              let client_senders = mutex.lock();
-              let hash_map = &client_senders.await;
-              let mut message_sent = false;
+        while let Some(message) = from_client_rx.recv().await {
+          debug!("Got message type: {}, with data:\n  {}", message.kind.clone(), message.message.clone());
+          match Url::parse(&message.kind.clone()) {
+            Ok (_kind) => {
+              for client in ipc_dispatch_store.clients.lock().await.clone().into_iter() {
+                let client_id = Arc::new(client.0);
+                let mutex = &ipc_dispatch_clients_tx.to_owned();
+                let client_senders = mutex.lock();
+                let hash_map = &client_senders.await;
+                let mut message_sent = false;
 
-              match hash_map.get(&client_id.to_string()) {
-                Some(client_sender) => {
-                  if client.1.active {
-                    match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
-                      Some(api_key) => {
-                        for allowed_event_regex in &api_key.allowed_events_to {
-                          match Regex::new(&allowed_event_regex) {
-                            Ok(regex) => {
-                              if regex.is_match(&allowed_event_regex) && !(message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
-                                debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                                match client_sender.send(message.clone()) {
-                                  Ok(_) => {
-                                    message_sent = true;
-                                  },
-                                  Err(e) => {
-                                    error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
-                                  }
-                                };
-                                
-                                break;
+                match hash_map.get(&client_id.to_string()) {
+                  Some(client_sender) => {
+                    if client.1.active {
+                      match ipc_dispatch_store.clone().api_keys.lock().await.get(&client.1.api_key) {
+                        Some(api_key) => {
+                          for allowed_event_regex in &api_key.allowed_events_to {
+                            match Regex::new(&allowed_event_regex) {
+                              Ok(regex) => {
+                                // TODO: Generate an internal CID in CoreUserConfig!
+                                if regex.is_match(&allowed_event_regex) { // && !(message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
+                                  debug!("Sending event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                                  match client_sender.send(message.clone()) {
+                                    Ok(_) => {
+                                      message_sent = true;
+                                    },
+                                    Err(e) => {
+                                      error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                                    }
+                                  };
+                                  
+                                  break;
+                                }
+                              },
+                              Err(e) => {
+                                error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
                               }
-                            },
-                            Err(e) => {
-                              error!("Message: \"{}\", failed, allowed event regular expression for client: {}, errored with: {}", message.kind, client_id.clone(), e);
                             }
                           }
+
+                          if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
+                            debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                            match client_sender.send(message.clone()) {
+                              Ok(_) => {
+                                message_sent = true;
+                              },
+                              Err(e) => {
+                                error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                              }
+
+                            };
+                          }
+                        },
+                        None => {
+                          error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
+
+                          let kind = Url::parse("clover://evtbuzz.clover.reboot-codes.com/clients/unauthorize")
+                            .unwrap()
+                            .query_pairs_mut()
+                            .append_pair("id", &client_id.clone())
+                            .finish()
+                            .to_string();
+
+                          let generated_message = gen_ipc_message(
+                            &ipc_dispatch_store.clone(),
+                            &ipc_dispatch_user_config.clone(), 
+                            kind, 
+                            "api key removed from store".to_string()
+                          ).await;
+                          ipc_dispatch_store.messages.lock().await.insert(generated_message.id.clone(), generated_message.clone().into());
+
+                          let _ = client_sender.send(generated_message.clone());
                         }
-
-                        if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
-                          debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                          match client_sender.send(message.clone()) {
-                            Ok(_) => {
-                              message_sent = true;
-                            },
-                            Err(e) => {
-                              error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
-                            }
-
-                          };
-                        }
-                      },
-                      None => {
-                        error!("DANGER! Client: {}, had API key removed from store without closing connection on removal, THIS IS BAD; please report this! Closing connection...", client_id.clone());
-
-                        let kind = Url::parse("clover://evtbuzz.clover.reboot-codes.com/clients/unauthorize")
-                          .unwrap()
-                          .query_pairs_mut()
-                          .append_pair("id", &client_id.clone())
-                          .finish()
-                          .to_string();
-
-                        let generated_message = gen_ipc_message(
-                          &ipc_dispatch_store.clone(),
-                          &ipc_dispatch_user_config.clone(), 
-                          kind, 
-                          "api key removed from store".to_string()
-                        ).await;
-                        ipc_dispatch_store.messages.lock().await.insert(generated_message.id.clone(), generated_message.clone().into());
-
-                        let _ = client_sender.send(generated_message.clone());
                       }
                     }
+                  },
+                  None => {
+                    error!("Client: {}, does not exist in the client map!", client_id.clone());
                   }
-                },
-                None => {
-                  error!("Client: {}, does not exist in the client map!", client_id.clone());
                 }
-              }
 
-              if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind.clone(), client_id.clone()); }
+                if !message_sent { debug!("Message: \"{}\", not sent to client: {}", message.kind.clone(), client_id.clone()); }
+              }
+            },
+            Err(e) => {
+              error!("Message: {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, error parsing `kind`: {}", message.id.clone(), message.kind.clone(), message.message.clone(), e);
             }
-          },
-          None => {}
+          }
         } 
-      } => {}
-    }
-  });
-
-  // IPC Handle for data from WS clients.
-  let ipc_recv_token = cancellation_token.clone();
-  let ipc_recv_tx = ipc_tx.clone();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = async move {
-        match from_client_rx.recv().await {
-          Some(msg) => {
-            debug!("Got message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}", msg.author.clone(), msg.kind.clone(), msg.message.clone());
-            match ipc_recv_tx.send(msg.clone()) {
-              Ok(_) => {},
-              Err(e) => {
-                error!("Failed to send message: {{ \"author\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, due to:\n{}", msg.author.clone(), msg.kind.clone(), msg.message.clone(), e);
-              }
-            };
-          },
-          None => {}
-        }
       } => {}
     }
   });
@@ -399,7 +385,7 @@ pub async fn evtbuzz_listener(
       },
       _ = async move {
         while let Some(msg) = arbiter_ipc.1.recv().await {
-          handle_ipc_send(&from_arbiter_tx, msg, &from_arbiter_cfg.clone(), &from_arbiter_store.clone()).await;
+          handle_ipc_send(from_arbiter_tx.clone(), msg, &from_arbiter_cfg.clone(), &from_arbiter_store.clone()).await;
         }
       } => {}
     }
@@ -416,7 +402,7 @@ pub async fn evtbuzz_listener(
       },
       _ = async move {
         while let Some(msg) = renderer_ipc.1.recv().await {
-          handle_ipc_send(&from_renderer_tx, msg, &from_renderer_cfg.clone(), &from_renderer_store.clone()).await;
+          handle_ipc_send(from_renderer_tx.clone(), msg, &from_renderer_cfg.clone(), &from_renderer_store.clone()).await;
         }
       } => {}
     }
@@ -433,7 +419,7 @@ pub async fn evtbuzz_listener(
       },
       _ = async move {
         while let Some(msg) = modman_ipc.1.recv().await {
-          handle_ipc_send(&from_modman_tx, msg, &from_modman_cfg.clone(), &from_modman_store.clone()).await;
+          handle_ipc_send(from_modman_tx.clone(), msg, &from_modman_cfg.clone(), &from_modman_store.clone()).await;
         }
       } => {}
     }
@@ -450,7 +436,7 @@ pub async fn evtbuzz_listener(
       },
       _ = async move {
         while let Some(msg) = inference_engine_ipc.1.recv().await {
-          handle_ipc_send(&from_inference_engine_tx, msg, &from_inference_engine_cfg.clone(), &from_inference_engine_store.clone()).await;
+          handle_ipc_send(from_inference_engine_tx.clone(), msg, &from_inference_engine_cfg.clone(), &from_inference_engine_store.clone()).await;
         }
       } => {}
     }
@@ -467,7 +453,7 @@ pub async fn evtbuzz_listener(
       },
       _ = async move {
         while let Some(msg) = appd_ipc.1.recv().await {
-          handle_ipc_send(&from_appd_tx, msg, &from_appd_cfg.clone(), &from_appd_store.clone()).await;
+          handle_ipc_send(from_appd_tx.clone(), msg, &from_appd_cfg.clone(), &from_appd_store.clone()).await;
         }
       } => {}
     }
@@ -486,7 +472,6 @@ pub async fn evtbuzz_listener(
   tokio::select! {_ = futures::future::join_all(vec![
     http_handle,
     ipc_dispatch_handle,
-    ipc_recv_handle,
     from_arbiter_handle,
     from_renderer_handle,
     from_modman_handle,

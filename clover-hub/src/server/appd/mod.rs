@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use log::{debug, info};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
+use crate::utils::send_ipc_message;
+
 use super::evtbuzz::models::{IPCMessageWithId, CoreUserConfig, Store};
 
 // TODO: Create application manifest schema/models
@@ -15,6 +17,20 @@ pub async fn appd_main(
   cancellation_token: CancellationToken
 ) {
   info!("Starting AppDaemon...");
+
+  let init_store = Arc::new(store.clone());
+  let init_user = Arc::new(user_config.clone());
+  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
+  cancellation_token.run_until_cancelled(async move {
+    let _ = send_ipc_message(
+      &init_store, 
+      &init_user, 
+      init_from_tx, 
+      "clover://appd.clover.reboot-codes.com/status".to_string(), 
+      "finished-init".to_string()
+    ).await;
+  }).await;
+
   // TODO: Add docker crate to manage applications.
 
   let ipc_recv_token = cancellation_token.clone();
@@ -36,9 +52,32 @@ pub async fn appd_main(
     }
   });
 
+  let ipc_trans_token = cancellation_token.clone();
+  let ipc_trans_tx = Arc::new(ipc_tx.clone());
+  let ipc_trans_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = async move {
+        while let Some(msg) = init_from_rx.recv().await {
+          match ipc_trans_tx.send(msg) {
+            Ok(_) => {},
+            Err(_) => {
+              debug!("Failed to send message to IPC bus!");
+            }
+          }
+        }
+      } => {},
+      _ = ipc_trans_token.cancelled() => {
+        debug!("ipc_trans exited");
+      }
+    }
+  });
+
   let cleanup_token = cancellation_token.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
+      ipc_recv_handle.abort();
+      ipc_trans_handle.abort();
+      
       info!("Cleaning up applications...");
       // TODO: Clean up registered applications when server is shutting down.
 

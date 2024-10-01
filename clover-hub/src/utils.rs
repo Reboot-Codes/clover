@@ -1,9 +1,9 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
 use chrono::prelude::{DateTime, Utc};
+use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 use crate::server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store};
-use tokio;
 
 /// formats like "2001-07-08T00:34:60.026490+09:30"
 pub fn iso8601(st: &std::time::SystemTime) -> String {
@@ -11,6 +11,7 @@ pub fn iso8601(st: &std::time::SystemTime) -> String {
   format!("{}", dt.format("%+"))
 }
 
+#[allow(dead_code)]
 pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
   let mut s = DefaultHasher::new();
   t.hash(&mut s);
@@ -92,4 +93,12 @@ pub async fn gen_cid_with_check(store: &Store) -> String {
   }
 }
 
-// TODO: Create a Util function for core users to send messages with their MasterUserConfig
+pub async fn send_ipc_message(
+  store: &Store, 
+  user_config: &CoreUserConfig, 
+  ipc_tx: UnboundedSender<IPCMessageWithId>, 
+  kind: String, 
+  message: String
+) -> Result<(), tokio::sync::mpsc::error::SendError<IPCMessageWithId>> {
+  ipc_tx.send(gen_ipc_message(store, user_config, kind, message).await)
+}

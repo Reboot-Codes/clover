@@ -1,4 +1,5 @@
 use std::{collections::HashMap, sync::Arc};
+use log::debug;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -112,6 +113,7 @@ impl Store {
   pub async fn add_user(self, user_config: UserConfig) {
     let mut key_ids: Vec<String> = vec![];
     for key_config in user_config.api_keys.iter() { key_ids.push(key_config.key.clone()); };
+
     self.users.lock().await.insert(user_config.id.clone(), User { 
       pretty_name: user_config.pretty_name, 
       user_type: user_config.user_type, 
@@ -132,7 +134,6 @@ impl Store {
   pub async fn create_master_user(self) -> CoreUserConfig {
     let master_user_id = gen_uid_with_check(&self).await;
     let master_api_key = gen_api_key_with_check(&self).await;
-
     
     self.add_user(UserConfig {
       id: master_user_id.clone(), 
@@ -165,6 +166,7 @@ impl Store {
     // EvtBuzz
     let evtbuzz_uid = gen_uid_with_check(&self).await;
     let evtbuzz_key = gen_api_key_with_check(&self).await;
+    debug!("{}", evtbuzz_key);
     self.clone().add_user(UserConfig {
       user_type: "com.reboot-codes.clover.evtbuzz".to_string(),
       pretty_name: "EvtBuzz".to_string(),
@@ -263,7 +265,7 @@ impl Store {
       },
       CoreUserConfig {
         id: renderer_uid.clone(),
-        api_key: renderer_uid.clone()
+        api_key: renderer_key.clone()
       },
       CoreUserConfig {
         id: appd_uid.clone(),
