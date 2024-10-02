@@ -1,10 +1,12 @@
 pub mod models;
 pub mod displays;
+pub mod movement;
 
 use std::sync::Arc;
-use displays::init_display;
+use displays::init_display_component;
 use log::{debug, error, info, warn};
 use models::Module;
+use movement::init_movement_component;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -23,7 +25,11 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
     } else {
       for (component_id, component) in module.components.iter() {
         if component.component_type.clone().starts_with(&"com.reboot-codes.clover.display".to_string()) {
-          if init_display(&store, module.clone(), component_id.clone(), component.clone()) { initialized_module_components += 1; }
+          if init_display_component(&store, module.clone(), component_id.clone(), component.clone()) { initialized_module_components += 1; }
+        }
+
+        if component.component_type.clone().starts_with(&"com.reboot-codes.clover.movement".to_string()) {
+          if init_movement_component(&store, module.clone(), component_id.clone(), component.clone()) { initialized_module_components += 1; }
         }
   
         // TODO: Add init functions for other component types.
@@ -37,6 +43,19 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
           error!("Module: {}, failed to initialize!", id.clone());
         }
       }
+    }
+  }
+
+  if initialized_module {
+    // Update the store with new state of the module.
+    if initialized_module {
+      store.modules.lock().await.insert(id.clone(), Module {
+        module_type: module.module_type.clone(),
+        pretty_name: module.pretty_name.clone(),
+        initialized: true,
+        components: module.components.clone()
+      });
+      info!("Module: {} ({}), Initialized!", module.pretty_name.clone(), id.clone());
     }
   }
 
@@ -61,17 +80,7 @@ pub async fn modman_main(
       // Initialize modules that were registered already via persistence.
       for (id, module) in modules.iter() {
         info!("Initializing pre configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
-        let (initialized, _components_initialized) = init_module(&init_store, id.clone(), module.clone()).await;
-
-        // Update the store with new state of the module.
-        if initialized {
-          init_store.modules.lock().await.insert(id.clone(), Module {
-            module_type: module.module_type.clone(),
-            pretty_name: module.pretty_name.clone(),
-            initialized: true,
-            components: module.components.clone()
-          });
-        }
+        let _components_initialized = init_module(&init_store, id.clone(), module.clone()).await;
       }
     } else {
       info!("No pre-configured modules to initialize.");
