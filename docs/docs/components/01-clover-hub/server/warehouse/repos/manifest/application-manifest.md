@@ -1,4 +1,4 @@
-# Application Manifest
+# Applications
 
 The application manifest is used by [arbiter](/docs/components/clover-hub/server/arbiter/intro) to provide permission consent, and for the application daemon to know how to interface with the application in a higher level manner.
 
@@ -11,13 +11,17 @@ The simplest application manifest for an app that only takes [basic input] and d
   "version": "1.0.0",
   "applications": {
     "com.reboot-codes.clover.tutorial": {
-      "source": {
-        "source-type": "docker",
-        "dockerfile": "./Dockerfile"
-      },
       "name": "Tutorial Application",
       "intents": {
-        "com.reboot-codes.clover.from-launcher": "ws-intent://./from-launcher"
+        "com.reboot-codes.clover.from-launcher": "ws-intent://@self/from-launcher"
+      },
+      "containers": {
+        "main": {
+          "interface": true,
+          "build": {
+            "url": "@here/Dockerfile"
+          }
+        }
       }
     }
   }

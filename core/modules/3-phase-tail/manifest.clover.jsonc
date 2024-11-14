@@ -1,0 +1,39 @@
+{
+  // Display name when running through config flows
+  "name": "C.O.R.E. 3-Phase Tail",
+  "location": [
+    "hips",
+    "external"
+  ],
+  // define all components. they will be available as the next url segment after com.reboot-codes.clover.CORE.3-phase-tail.components
+  "components": {
+    // EG: com.reboot-codes.clover.CORE.3-phase-tail.components.phase-1-motor-1 for this component
+    "phase-1": {
+      // Permission model grouping and optimizations
+      "type": "movement",
+      // Data type, in this case, each message must contain 2 floats.
+      "input": "vec2d",
+      // Data type, this phase has a position reporting function and will send a 2D vector back regularly
+      "output": "vec2d"
+    },
+    "phase-2": {
+      "type": "movement",
+      "input": "vec2d",
+      "output": "vec2d"
+    },
+    "phase-3": {
+      "type": "movement",
+      "input": "vec2d",
+      "output": "vec2d"
+    },
+    "tip-light": {
+      "type": "sensor",
+      "input": "RGBA",
+      "output": {
+        // Clover has to request updates for this output from the module explicitly.
+        "timing": "on-request",
+        "format": "RGBA"
+      }
+    }
+  }
+}

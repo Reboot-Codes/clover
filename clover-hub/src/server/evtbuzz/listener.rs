@@ -320,17 +320,21 @@ pub async fn evtbuzz_listener(
                             }
                           }
 
-                          if (!message_sent) && api_key.echo && (message.author.clone().split("?client=").collect::<Vec<_>>()[1] == *client_id.clone()) {
-                            debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
-                            match client_sender.send(message.clone()) {
-                              Ok(_) => {
-                                message_sent = true;
-                              },
-                              Err(e) => {
-                                error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
-                              }
+                          let message_author = message.author.clone();
+                          let message_client_vec = message_author.split("?client=").collect::<Vec<_>>();
+                          if message_client_vec.len() > 1 {
+                            if (!message_sent) && api_key.echo && (message_client_vec[1] == *client_id.clone()) {
+                              debug!("Echoing event: \"{}\", to client: {}...", message.kind.clone(), client_id.clone());
+                              match client_sender.send(message.clone()) {
+                                Ok(_) => {
+                                  message_sent = true;
+                                },
+                                Err(e) => {
+                                  error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
+                                }
 
-                            };
+                              };
+                            }
                           }
                         },
                         None => {

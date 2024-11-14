@@ -1,9 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
-use log::debug;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
 
-use crate::{server::{arbiter::models::{ApiKey, ApiKeyWithKeyWithoutUID, User}, modman::models::Module}, utils::{gen_api_key_with_check, gen_uid_with_check}};
+use crate::{server::{arbiter::models::{ApiKey, ApiKeyWithKeyWithoutUID, User}, warehouse::{config::models::Config, manifest::models::Manifest}, modman::models::Module, appd::models::Application}, utils::{gen_api_key_with_check, gen_uid_with_check}};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IPCMessage {
@@ -63,7 +62,6 @@ pub struct Session {
 }
 
 // TODO: Move User and API Key models to Arbiter.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreUserConfig {
   pub id: String,
@@ -82,26 +80,42 @@ pub struct UserConfig {
 // TODO: Add options for making certain models ephemeral or persistent.
 #[derive(Debug, Clone)]
 pub struct Store {
+  pub config: Arc<Config>,
   pub users: Arc<Mutex<HashMap<String, User>>>,
   pub api_keys: Arc<Mutex<HashMap<String, ApiKey>>>,
   pub clients: Arc<Mutex<HashMap<String, Client>>>,
   pub messages: Arc<Mutex<HashMap<String, IPCMessage>>>,
   pub modules: Arc<Mutex<HashMap<String, Module>>>,
+  pub applications: Arc<Mutex<HashMap<String, Application>>>,
+  pub repos: Arc<Mutex<HashMap<String, Manifest>>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CoreUserConfigs {
+  pub evtbuzz: CoreUserConfig, 
+  pub arbiter: CoreUserConfig, 
+  pub renderer: CoreUserConfig, 
+  pub appd: CoreUserConfig, 
+  pub modman: CoreUserConfig, 
+  pub inference_engine: CoreUserConfig
 }
 
 impl Store {
   pub fn new() -> Self {
     Store {
+      config: Arc::new(Config { docker_daemon: "/run/user/1000/podman/podman.sock".to_string() }),
       users: Arc::new(Mutex::new(HashMap::new())),
       api_keys: Arc::new(Mutex::new(HashMap::new())),
       clients: Arc::new(Mutex::new(HashMap::new())),
       messages: Arc::new(Mutex::new(HashMap::new())),
       modules: Arc::new(Mutex::new(HashMap::new())),
+      applications: Arc::new(Mutex::new(HashMap::new())),
+      repos: Arc::new(Mutex::new(HashMap::new())),
     }
   }
 
   // Create a new store with a set master user.
-  pub async fn new_configured_store() -> (Store, CoreUserConfig, (CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig)) {
+  pub async fn new_configured_store() -> (Store, CoreUserConfig, CoreUserConfigs) {
     let ret = Store::new();
 
     let master_user_config = ret.clone().create_master_user().await;
@@ -153,20 +167,11 @@ impl Store {
     }
   }
 
-  // TODO: Turn this tuple into a type!!!!!
-  /// Adds all the core user accounts, returns their configurations in the following order:
-  /// 
-  /// - EvtBuzz
-  /// - Arbiter
-  /// - Renderer
-  /// - AppD
-  /// - ModMan
-  /// - and Inference Engine
-  pub async fn add_all_core_users(self) -> (CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig, CoreUserConfig) {
+  /// Adds all the core user accounts, returns their configurations.
+  pub async fn add_all_core_users(self) -> CoreUserConfigs {
     // EvtBuzz
     let evtbuzz_uid = gen_uid_with_check(&self).await;
     let evtbuzz_key = gen_api_key_with_check(&self).await;
-    debug!("{}", evtbuzz_key);
     self.clone().add_user(UserConfig {
       user_type: "com.reboot-codes.clover.evtbuzz".to_string(),
       pretty_name: "EvtBuzz".to_string(),
@@ -254,31 +259,31 @@ impl Store {
       }]
     }).await;
 
-    (
-      CoreUserConfig {
+    CoreUserConfigs {
+      evtbuzz: CoreUserConfig {
         id: evtbuzz_uid.clone(),
         api_key: evtbuzz_key.clone()
       },
-      CoreUserConfig {
+      arbiter: CoreUserConfig {
         id: arbiter_uid.clone(),
         api_key: arbiter_key.clone()
       },
-      CoreUserConfig {
+      renderer: CoreUserConfig {
         id: renderer_uid.clone(),
         api_key: renderer_key.clone()
       },
-      CoreUserConfig {
+      appd: CoreUserConfig {
         id: appd_uid.clone(),
         api_key: appd_key.clone()
       },
-      CoreUserConfig {
+      modman: CoreUserConfig {
         id: modman_uid.clone(),
         api_key: modman_key.clone()
       },
-      CoreUserConfig {
+      inference_engine: CoreUserConfig {
         id: inference_engine_uid.clone(),
         api_key: inference_engine_key.clone()
       }
-    )
+    }
   }
 }

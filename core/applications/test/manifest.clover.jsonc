@@ -1,0 +1,13 @@
+{
+  "name": "Test",
+  "version": "1.0.0",
+  "containers": {
+    "main": {
+      "interface": true,
+      "build": {
+        /// @here basically translates to where this file is located
+        "url": "@here/Dockerfile"
+      }
+    }
+  }
+}

@@ -53,7 +53,8 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
         module_type: module.module_type.clone(),
         pretty_name: module.pretty_name.clone(),
         initialized: true,
-        components: module.components.clone()
+        components: module.components.clone(),
+        registered_by: module.registered_by.clone()
       });
       info!("Module: {} ({}), Initialized!", module.pretty_name.clone(), id.clone());
     }
@@ -159,7 +160,8 @@ pub async fn modman_main(
                     module_type: module.module_type.clone(),
                     pretty_name: module.pretty_name.clone(),
                     initialized: false,
-                    components: module.components.clone()
+                    components: module.components.clone(),
+                    registered_by: module.registered_by.clone()
                   });
                 }
               }

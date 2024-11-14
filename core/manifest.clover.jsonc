@@ -1,0 +1,10 @@
+{
+  // Each configuration needs a unique reverse domain type associated
+  "modules": {
+    // @import() imports a file. Globs are enabled. The first glob is used as the name.
+    "com.reboot-codes.clover.CORE.*": "@import('./modules/*/manifest.clover.jsonc')"
+  },
+  "applications": {
+    "com.reboot-codes.clover.CORE.*": "!@import('./applications/*/manifest.clover.jsonc')"
+  }
+}
