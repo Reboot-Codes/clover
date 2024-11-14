@@ -80,7 +80,7 @@ pub struct UserConfig {
 // TODO: Add options for making certain models ephemeral or persistent.
 #[derive(Debug, Clone)]
 pub struct Store {
-  pub config: Arc<Config>,
+  pub config: Arc<Mutex<Config>>,
   pub users: Arc<Mutex<HashMap<String, User>>>,
   pub api_keys: Arc<Mutex<HashMap<String, ApiKey>>>,
   pub clients: Arc<Mutex<HashMap<String, Client>>>,
@@ -103,7 +103,7 @@ pub struct CoreUserConfigs {
 impl Store {
   pub fn new() -> Self {
     Store {
-      config: Arc::new(Config { docker_daemon: "/run/user/1000/podman/podman.sock".to_string() }),
+      config: Arc::new(Mutex::new(Default::default())),
       users: Arc::new(Mutex::new(HashMap::new())),
       api_keys: Arc::new(Mutex::new(HashMap::new())),
       clients: Arc::new(Mutex::new(HashMap::new())),

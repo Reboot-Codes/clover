@@ -8,7 +8,7 @@ The Rust-based nerve centre for all communication between modules, their compone
 
 ## CORE
 
-Sensible default applications, lovingly designed parts, and dynamic expression packs to get you started. All parts are build using best-practices, and are considered to be fully supported and used as an immutable fallback when it comes to software.
+Sensible default applications, lovingly designed parts, and dynamic expression packs to get you started. All parts are built using best-practices, and are considered to be fully supported and used as an immutable fallback when it comes to software.
 
 ## Spanner
 

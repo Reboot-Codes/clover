@@ -159,6 +159,7 @@ async fn wait_for_signal_impl() {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+  // TODO:: Create a logger that will send logs to a FIFO buffer to send over WS via EvtBuzz
   env_logger::Builder::new()
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();

@@ -24,8 +24,9 @@ pub async fn appd_main(
 ) {
   info!("Starting AppDaemon...");
 
+  let docker_path = store.config.lock().await.docker_daemon.clone();
   // TODO: Move to parameterized config from store!
-  match Docker::connect_with_unix(&store.config.docker_daemon.clone(), 120, API_DEFAULT_VERSION) {
+  match Docker::connect_with_unix(&docker_path, 120, API_DEFAULT_VERSION) {
     Ok(docker_conn) => {
       let docker = Arc::new(docker_conn);
 
