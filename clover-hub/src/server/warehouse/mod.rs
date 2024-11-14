@@ -1,14 +1,14 @@
 pub mod config;
-pub mod manifest;
+pub mod repos;
 
 use config::models::Config;
+use repos::{download_repo_updates, update_repo_dir_structure};
 use os_path::OsPath;
 use std::io::{Read, Write};
 use std::sync::Arc;
 use std::fs;
 use log::{debug, info};
 use simple_error::SimpleError;
-
 use crate::server::evtbuzz::models::Store;
 
 // TODO: Move to snafu crate.
@@ -18,9 +18,6 @@ pub enum Error {
     error: SimpleError
   },
   FailedToCreateDataDir {
-    error: SimpleError
-  },
-  FailedToCheckConfigFile {
     error: SimpleError
   },
   FailedToOpenConfigFile {
@@ -42,34 +39,22 @@ pub enum Error {
 
 pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), Error> {
   let mut err: Option<Result<(), Error>> = None;
+  let mut data_dir_path = OsPath::new().join(data_dir.clone());
+  data_dir_path.resolve();
 
   debug!("Setting up Warehouse in {}...", data_dir.clone());
 
   // Ensure that the data dir is valid.
-  match fs::exists(data_dir.clone()) {
-    Ok(data_dir_exists) => {
-      if !data_dir_exists {
-        match fs::create_dir_all(data_dir.clone()) {
-          Ok(_) => {
-            match fs::exists(data_dir.clone()) {
-              Ok(exists) => {
-                if !exists {
-                  err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::new("Check failed after creation!") }));
-                }
-              },
-              Err(e) => {
-                err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::from(e) }));
-              }
-            }
-          },
-          Err(e) => {
-            err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::from(e) }));
-          }
+  if !data_dir_path.exists() {
+    match fs::create_dir_all(data_dir.clone()) {
+      Ok(_) => {
+        if !data_dir_path.exists() {
+          err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::new("Check failed after creation!") }));
         }
+      },
+      Err(e) => {
+        err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::from(e) }));
       }
-    },
-    Err(e) => {
-      err = Some(Err(Error::FailedToCheckDataDir { error: SimpleError::from(e) }));
     }
   }
 
@@ -80,28 +65,21 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   match err {
     Some(_) => {},
     None => {
-      match fs::exists(config_file_path.clone()) {
-        Ok(config_file_exists) => {
-          if !config_file_exists {
-            match fs::File::create(config_file_path.clone()) {
-              Ok(mut file) => {
-                match file.write_all(serde_jsonc::to_string::<Config>(&Default::default()).unwrap().as_bytes()) {
-                  Ok(_) => {
-                    info!("Wrote default config!");
-                  },
-                  Err(e) => {
-                    err = Some(Err(Error::FailedToWriteToConfigFile { error: SimpleError::from(e) }))
-                  }
-                }
+      if !config_file_path.exists() {
+        match fs::File::create(config_file_path.clone()) {
+          Ok(mut file) => {
+            match file.write_all(serde_jsonc::to_string::<Config>(&Default::default()).unwrap().as_bytes()) {
+              Ok(_) => {
+                info!("Wrote default config!");
               },
               Err(e) => {
-                err = Some(Err(Error::FailedToCreateConfigFile { error: SimpleError::from(e) }))
+                err = Some(Err(Error::FailedToWriteToConfigFile { error: SimpleError::from(e) }))
               }
             }
+          },
+          Err(e) => {
+            err = Some(Err(Error::FailedToCreateConfigFile { error: SimpleError::from(e) }))
           }
-        },
-        Err(e) => {
-          err = Some(Err(Error::FailedToCheckConfigFile { error: SimpleError::from(e) }));
         }
       }
     }
@@ -140,8 +118,43 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   }
 
   // Read repo data and load into applicable areas in the store.
+  let repo_dir_path = warehouse_path.join("/repos/");
+  match err {
+    Some(_) => {},
+    None => {
+      if !repo_dir_path.exists() {
+        match fs::create_dir(repo_dir_path.clone()) {
+          Ok(_) => {},
+          Err(e) => {
+            
+          }
+        }
+      }
+    }
+  }
 
+  match err {
+    Some(_) => {},
+    None => {
+      match update_repo_dir_structure(store.config.lock().await.repos.clone()).await {
+        Ok(_) => {
+          match download_repo_updates(store.config.lock().await.repos.clone(), store.clone(), repo_dir_path.clone()).await {
+            Ok(_) => {
 
+            },
+            Err(e) => {
+              
+            }
+          }
+        },
+        Err(e) => {
+          
+        }
+      }
+    }
+  }
+
+  // Return any errors if they occurred
   match err {
     Some(e) => {
       match e {

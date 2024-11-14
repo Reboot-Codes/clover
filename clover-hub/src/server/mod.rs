@@ -189,9 +189,6 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
         warehouse::Error::FailedToCreateDataDir { error } => {
           error!("Failed to create data directory! Please create `{}` and set the proper permissions manually, then re-run the server. Failed due to:\n{}", data_dir.clone(), error);
         },
-        warehouse::Error::FailedToCheckConfigFile { error } => {
-          error!("Failed to check existence of config file, due to:\n{}", error);
-        },
         warehouse::Error::FailedToCreateConfigFile { error } => {
           error!("Failed to create the configuration file, due to:\n{}", error);
         },

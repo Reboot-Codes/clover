@@ -1,5 +1,6 @@
 #![feature(stmt_expr_attributes)]
 #![feature(let_chains)]
+#![feature(ascii_char)]
 
 mod server;
 mod tui;
