@@ -113,6 +113,8 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
       match fs::File::open(config_file_path) {
         Ok(mut config_file) => {
           let mut contents = String::new();
+
+          // TODO: Add repair option to fix broken config files.
           match config_file.read_to_string(&mut contents) {
             Ok(_) => {
               match serde_jsonc::from_str::<Config>(&contents) {

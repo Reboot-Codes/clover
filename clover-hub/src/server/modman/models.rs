@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+// TODO: Define defaults via `Default` trait impl.
+
 #[derive(Debug, Clone)]
 pub struct Module {
   pub module_type: String,

@@ -1,9 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
-
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-
 use crate::server::evtbuzz::models::Session;
+
+// TODO: Define defaults via `Default` trait impl.
 
 #[derive(Debug, Clone)]
 pub struct User {

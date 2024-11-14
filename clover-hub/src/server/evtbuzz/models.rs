@@ -1,8 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
-
 use crate::{server::{arbiter::models::{ApiKey, ApiKeyWithKeyWithoutUID, User}, warehouse::{config::models::Config, manifest::models::Manifest}, modman::models::Module, appd::models::Application}, utils::{gen_api_key_with_check, gen_uid_with_check}};
+
+// TODO: Define defaults via `Default` trait impl.
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IPCMessage {
