@@ -1,6 +1,8 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{fs::{self, DirEntry}, hash::{DefaultHasher, Hash, Hasher}, io::Read};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
 use chrono::prelude::{DateTime, Utc};
+use os_path::OsPath;
+use simple_error::SimpleError;
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 use crate::server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store};
@@ -101,4 +103,42 @@ pub async fn send_ipc_message(
   message: String
 ) -> Result<(), tokio::sync::mpsc::error::SendError<IPCMessageWithId>> {
   ipc_tx.send(gen_ipc_message(store, user_config, kind, message).await)
+}
+
+pub fn read_file(path: OsPath) -> Result<String, SimpleError> {
+  let mut err = None;
+  let mut ret = None;
+  let mut contents = String::new();
+
+  if path.exists() {
+    match fs::File::open(path.to_path()) {
+      Ok(mut file) => {
+        match file.read_to_string(&mut contents) {
+          Ok(_) => {
+            ret = Some(contents);
+          },
+          Err(e) => {
+            err = Some(SimpleError::from(e));
+          }
+        }
+      },
+      Err(e) => {
+        err = Some(SimpleError::from(e))
+      }
+    }
+  } else {
+    err = Some(SimpleError::new("Path does not exist!"));
+  }
+
+  match err {
+    Some(e) => { Err(e) },
+    None => {
+      match ret {
+        Some(val) => { Ok(val) },
+        None => {
+          Err(SimpleError::new("Impossible state, no error reported but return value is missing!"))
+        }
+      }
+    }
+  }
 }
