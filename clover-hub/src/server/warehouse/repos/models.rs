@@ -23,14 +23,14 @@ pub enum OptionalSingleManifestSpecEntry<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OptionalListManifestSpecEntry<T> {
-  Some(HashMap<String, ManifestEntry<T>>),
+  Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String),
   None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RequiredListManifestSpecEntry<T> {
-  Some(HashMap<String, ManifestEntry<T>>),
+  Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String)
 }
 
@@ -105,6 +105,55 @@ pub struct ModuleSpec {
   pub name: Option<String>,
 }
 
+impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
+  fn compile(spec: RawModuleSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+    let mut err = None;
+
+    let name = match spec.name.clone() {
+      Some(raw_name) => {
+        match resolve_entry_value(raw_name, resolution_ctx.clone()) {
+          Ok(resolution) => {
+            match resolution {
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("Glob import not supported at this level!"));
+                None
+              },
+              Resolution::ImportedSingle(imported) => {
+                match serde_jsonc::from_str::<String>(&imported) {
+                  Ok(val) => {
+                    Some(val)
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    None
+                  }
+                }
+              },
+              Resolution::NoImport(val) => {
+                Some(val)
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      None => { None }
+    };
+
+    match err {
+      Some(e) => { Err(e) },
+      None => {
+        Ok(Self {
+          name
+        })
+      }
+    }
+  }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationSpec {
   pub intents: Option<HashMap<String, String>>,
@@ -140,12 +189,8 @@ trait ManifestCompilationFrom<T> {
   fn compile(spec: T, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized;
 }
 
-pub enum KeyToResolve {
-  Import
-}
-
 impl Manifest {
-  fn resolve_list_entry<T, K>(raw_list: HashMap<String, String>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
+  fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
     where K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
   {
     let mut err = None;
@@ -156,38 +201,59 @@ impl Manifest {
       let is_glob = glob_import_key_re.is_match(&key);
       let mut entry_err = None;
 
-      match resolve_entry_value(raw_entry, resolution_ctx) {
-        Ok(resolution) => {
-          match resolution {
-            Resolution::ImportedSingle(raw_obj) => {
-              if is_glob {
-                err = Some(SimpleError::new("Resolved only one file for glob key import, import the root key instead!"));
-              } else {
-                match serde_jsonc::from_str::<T>(&raw_obj) {
-                  Ok(obj_spec) => {
-                    match K::compile(obj_spec, resolution_ctx.clone()) {
-                      Ok(obj) => {
-                        entries.insert(key.clone(), obj);
+      match raw_entry {
+        RequiredSingleManifestEntry::ImportString(str) => {
+          match resolve_entry_value(str, resolution_ctx.clone()) {
+            Ok(resolution) => {
+              match resolution {
+                Resolution::ImportedSingle(raw_obj) => {
+                  if is_glob {
+                    err = Some(SimpleError::new("Resolved only one file for glob key import, import the root key instead!"));
+                  } else {
+                    match serde_jsonc::from_str::<T>(&raw_obj) {
+                      Ok(obj_spec) => {
+                        match K::compile(obj_spec, resolution_ctx.clone()) {
+                          Ok(obj) => {
+                            entries.insert(key.clone(), obj);
+                          },
+                          Err(e) => {
+                            entry_err = Some(e);
+                          }
+                        } 
                       },
                       Err(e) => {
-                        entry_err = Some(e);
+                        entry_err = Some(SimpleError::from(e));
                       }
-                    } 
-                  },
-                  Err(e) => {
-                    entry_err = Some(SimpleError::from(e));
+                    }
                   }
-                }
-              }
-            },
-            Resolution::ImportedMultiple(raw_objs) => {
-              if is_glob {
-                for (obj_key_seg, raw_obj) in raw_objs {
+                },
+                Resolution::ImportedMultiple(raw_objs) => {
+                  if is_glob {
+                    for (obj_key_seg, raw_obj) in raw_objs {
+                      match serde_jsonc::from_str::<T>(&raw_obj) {
+                        Ok(obj_spec) => {
+                          match K::compile(obj_spec, resolution_ctx.clone()) {
+                            Ok(obj) => {
+                              entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
+                            },
+                            Err(e) => {
+                              entry_err = Some(e);
+                            }
+                          }
+                        },
+                        Err(e) => {
+                          entry_err = Some(SimpleError::from(e));
+                        }
+                      }
+                    }
+                  }
+                },
+                Resolution::NoImport(raw_obj) => {
                   match serde_jsonc::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
                       match K::compile(obj_spec, resolution_ctx.clone()) {
                         Ok(obj) => {
-                          entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
+                          entries.insert(key.clone(), obj);
                         },
                         Err(e) => {
                           entry_err = Some(e);
@@ -200,11 +266,21 @@ impl Manifest {
                   }
                 }
               }
+            },
+            Err(e) => {
+              err = Some(e);
             }
           }
         },
-        Err(e) => {
-          err = Some(e);
+        RequiredSingleManifestEntry::Some(obj_spec) => {
+          match K::compile(obj_spec, resolution_ctx.clone()) {
+            Ok(obj) => {
+              entries.insert(key.clone(), obj);
+            },
+            Err(e) => {
+              entry_err = Some(e);
+            }
+          }
         }
       }
     }
@@ -217,10 +293,11 @@ impl Manifest {
 
   pub fn compile(spec: ManifestSpec, spec_path: OsPath) -> Result<Manifest, SimpleError> {
     let mut err = None;
+    let resolution_ctx = ResolutionCtx { base: spec.base.clone(), here: spec_path.clone() };
     
     let name: Option<String> = match spec.name {
       Some(raw_spec_val) => {
-        match resolve_entry_value(raw_spec_val, ResolutionCtx { base: spec.base.clone(), here: spec_path.clone()}) {
+        match resolve_entry_value(raw_spec_val, resolution_ctx.clone()) {
           Ok(name) => {
             match name {
               Resolution::ImportedSingle(val) => {
@@ -246,7 +323,7 @@ impl Manifest {
 
     let base: Option<String> = match spec.base {
       Some(raw_spec_val) => {
-        match resolve_entry_value(raw_spec_val, ResolutionCtx { base: spec.base.clone(), here: spec_path.clone()}) {
+        match resolve_entry_value(raw_spec_val, resolution_ctx.clone()) {
           Ok(name) => {
             match name {
               Resolution::ImportedSingle(val) => {
@@ -272,16 +349,32 @@ impl Manifest {
 
     let modules: Option<HashMap<String, ModuleSpec>> = match spec.modules {
       OptionalListManifestSpecEntry::Some(raw_spec_val) => {
-        
+        match Manifest::resolve_list_entry(raw_spec_val, resolution_ctx.clone()) {
+          Ok(spec_val) => {
+            Some(spec_val)
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
       },
       OptionalListManifestSpecEntry::ImportString(import_str) => {
         match resolve_entry_value(import_str, ResolutionCtx { base: spec.base.clone(), here: spec_path.clone()}) {
           Ok(name) => {
             match name {
               Resolution::ImportedSingle(val) => {
-                match serde_jsonc::from_str::<HashMap<String, RawModuleSpec>>(&val) {
-                  Ok(module_specs) => {
-
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawModuleSpec>>>(&val) {
+                  Ok(raw_module_specs) => {
+                    match Manifest::resolve_list_entry::<RawModuleSpec, ModuleSpec>(raw_module_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
                   },
                   Err(e) => {
                     err = Some(SimpleError::from(e));
@@ -294,9 +387,17 @@ impl Manifest {
                 None
               },
               Resolution::NoImport(val) => {
-                match serde_jsonc::from_str::<HashMap<String, ModuleSpec>>(&val) {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawModuleSpec>>>(&val) {
                   Ok(module_specs) => {
-
+                    match Manifest::resolve_list_entry::<RawModuleSpec, ModuleSpec>(module_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
                   },
                   Err(e) => {
                     err = Some(SimpleError::from(e));
@@ -315,7 +416,6 @@ impl Manifest {
       OptionalListManifestSpecEntry::None => { None }
     };
 
-    // pub modules: OptionalListManifestSpecEntry<ModuleSpec>,
     // pub applications: OptionalListManifestSpecEntry<ApplicationSpec>,
     // #[cfg(feature = "core")]
     // pub expression_packs: OptionalListManifestSpecEntry<ExpressionPackSpec>
