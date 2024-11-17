@@ -43,6 +43,13 @@ pub enum ManifestEntry<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OptionalStringListManifestSpecEntry {
+  Some(HashMap<String, String>),
+  ImportString(String),
+  None
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifestSpec {
   pub name: Option<String>,
   pub version: String,
@@ -60,7 +67,7 @@ pub struct RawModuleSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawApplicationSpec {
-  pub intents: OptionalListManifestSpecEntry<String>,
+  pub intents: OptionalStringListManifestSpecEntry,
   pub containers: OptionalListManifestSpecEntry<RawContainerSpec>,
 }
 
@@ -158,6 +165,70 @@ impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
 pub struct ApplicationSpec {
   pub intents: Option<HashMap<String, String>>,
   pub containers: Option<HashMap<String, ContainerSpec>>,
+}
+
+impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
+  fn compile(spec: RawApplicationSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+    let mut err = None;
+
+    let intents = match spec.intents.clone() {
+      OptionalListManifestSpecEntry::Some(raw_intents) => {
+        for (intent_id, raw_intent) in raw_intents {
+          match resolve_entry_value(raw_intent.try_into().unwrap(), resolution_ctx.clone()) {
+            Ok(resolution) => {
+              match resolution {
+                Resolution::ImportedMultiple(_) => {
+                  err = Some(SimpleError::new("Glob import not supported at this level!"));
+                  None
+                },
+                Resolution::ImportedSingle(imported) => {
+                  match serde_jsonc::from_str::<HashMap<String, String>>(&imported) {
+                    Ok(val) => {
+                      Some(val)
+                    },
+                    Err(e) => {
+                      err = Some(SimpleError::from(e));
+                      None
+                    }
+                  }
+                },
+                Resolution::NoImport(val) => {
+                  Some(val)
+                }
+              }
+            },
+            Err(e) => {
+              err = Some(e);
+              None
+            }
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::ImportString(import_str) => {
+        match resolve_entry_value(import_str, resolution_ctx.clone()) {
+          Ok(resolution) => {
+            match resolution {
+              
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::None => { None }
+    };
+
+    match err {
+      Some(e) => { Err(e) },
+      None => {
+        Ok(Self {
+          name
+        })
+      }
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,7 +420,7 @@ impl Manifest {
 
     let modules: Option<HashMap<String, ModuleSpec>> = match spec.modules {
       OptionalListManifestSpecEntry::Some(raw_spec_val) => {
-        match Manifest::resolve_list_entry(raw_spec_val, resolution_ctx.clone()) {
+        match Manifest::resolve_list_entry::<RawModuleSpec, ModuleSpec>(raw_spec_val, resolution_ctx.clone()) {
           Ok(spec_val) => {
             Some(spec_val)
           },
@@ -416,9 +487,144 @@ impl Manifest {
       OptionalListManifestSpecEntry::None => { None }
     };
 
-    // pub applications: OptionalListManifestSpecEntry<ApplicationSpec>,
-    // #[cfg(feature = "core")]
-    // pub expression_packs: OptionalListManifestSpecEntry<ExpressionPackSpec>
+    let applications: Option<HashMap<String, ApplicationSpec>> = match spec.applications {
+      OptionalListManifestSpecEntry::Some(raw_spec_val) => {
+        match Manifest::resolve_list_entry::<RawApplicationSpec, ApplicationSpec>(raw_spec_val, resolution_ctx.clone()) {
+          Ok(spec_val) => {
+            Some(spec_val)
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::ImportString(import_str) => {
+        match resolve_entry_value(import_str, ResolutionCtx { base: spec.base.clone(), here: spec_path.clone()}) {
+          Ok(name) => {
+            match name {
+              Resolution::ImportedSingle(val) => {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawApplicationSpec>>>(&val) {
+                  Ok(raw_app_specs) => {
+                    match Manifest::resolve_list_entry::<RawApplicationSpec, ApplicationSpec>(raw_app_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    None
+                  }
+                }
+              },
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("This field does not support glob imports."));
+                None
+              },
+              Resolution::NoImport(val) => {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawApplicationSpec>>>(&val) {
+                  Ok(app_specs) => {
+                    match Manifest::resolve_list_entry::<RawApplicationSpec, ApplicationSpec>(app_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    None
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::None => { None }
+    };
+
+    #[cfg(feature = "core")]
+    let expression_packs: Option<HashMap<String, ExpressionPackSpec>> = match spec.expression_packs.clone() {
+      OptionalListManifestSpecEntry::Some(raw_spec_val) => {
+        match Manifest::resolve_list_entry::<RawExpressionPackSpec, ExpressionPackSpec>(raw_spec_val, resolution_ctx.clone()) {
+          Ok(spec_val) => {
+            Some(spec_val)
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::ImportString(import_str) => {
+        match resolve_entry_value(import_str, ResolutionCtx { base: spec.base.clone(), here: spec_path.clone()}) {
+          Ok(name) => {
+            match name {
+              Resolution::ImportedSingle(val) => {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawExpressionPackSpec>>>(&val) {
+                  Ok(raw_app_specs) => {
+                    match Manifest::resolve_list_entry::<RawExpressionPackSpec, ExpressionPackSpec>(raw_app_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    None
+                  }
+                }
+              },
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("This field does not support glob imports."));
+                None
+              },
+              Resolution::NoImport(val) => {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<RawExpressionPackSpec>>>(&val) {
+                  Ok(app_specs) => {
+                    match Manifest::resolve_list_entry::<RawExpressionPackSpec, ExpressionPackSpec>(app_specs, resolution_ctx.clone()) {
+                      Ok(list) => {
+                        Some(list)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    None
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            None
+          }
+        }
+      },
+      OptionalListManifestSpecEntry::None => { None }
+    };
 
     match err {
       Some(e) => { Err(e) },
@@ -427,7 +633,10 @@ impl Manifest {
           name,
           version: spec.version.clone(),
           base,
-          modules
+          modules,
+          applications,
+          #[cfg(feature = "core")]
+          expression_packs
         })
       }
     }
