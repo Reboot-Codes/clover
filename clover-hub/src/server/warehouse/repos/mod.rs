@@ -1,11 +1,13 @@
 pub mod models;
+pub mod impls;
 
 use std::{collections::HashMap, fs, io::Read, sync::Arc};
 use git2::{BranchType, FileFavor, MergeOptions, Repository};
-use log::{debug, info, warn};
-use models::{Manifest, ManifestSpec};
+use log::{debug, error, info, warn};
+use models::{Manifest, ManifestCompilationFrom, ManifestSpec, OptionalString, RequiredSingleManifestEntry, Resolution, ResolutionCtx};
 use os_path::OsPath;
 use regex::Regex;
+use serde::Deserialize;
 use simple_error::SimpleError;
 use crate::{server::evtbuzz::models::Store, utils::read_file};
 use super::config::models::RepoSpec;
@@ -15,28 +17,119 @@ enum RepoDirTreeEntry {
   HashMap(String, Box<RepoDirTreeEntry>)
 }
 
-pub enum Resolution {
-  /// Raw file content from a resolved `@import`. Should be deserialized prior to use!
-  ImportedSingle(String),
-  /// Multiple files were read from a resolved, glob `@import`, and the resolved glob is the key, while the value is the raw file content.
-  /// Should be deserialized prior to use!
-  ImportedMultiple(HashMap<String, String>),
-  /// Every other case in which there was no `@import`.
-  /// If there were other directives, they've been replaced with the correct value if provided in the ResolutionCtx.
-  NoImport(String)
-}
-#[derive(Debug, Clone)]
-pub struct ResolutionCtx {
-  /// Used for the `@base` directive, if configured in the repo manifest, the base RFQDN for this repo.
-  pub base: Option<String>,
-  /// Used for the `@here` directive, should contain the FS path to the manifest file being currently parsed, **NOT** to the repo.
-  pub here: OsPath
-}
 pub struct Error(SimpleError);
 
 impl From<git2::Error> for Error {
   fn from(value: git2::Error) -> Self {
     Error(SimpleError::from(value))
+  }
+}
+
+pub fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
+  where K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
+{
+  let mut err = None;
+  let mut entries = HashMap::new();
+  let glob_import_key_re = Regex::new("^(?<base>[^\\*\\n\\r]+)(\\*)$").unwrap();
+
+  for (key, raw_entry) in raw_list {
+    let is_glob = glob_import_key_re.is_match(&key);
+    let mut entry_err = None;
+
+    match raw_entry {
+      RequiredSingleManifestEntry::ImportString(str) => {
+        match resolve_entry_value(str, resolution_ctx.clone()) {
+          Ok(resolution) => {
+            match resolution {
+              Resolution::ImportedSingle(raw_obj) => {
+                if is_glob {
+                  err = Some(SimpleError::new("Resolved only one file for glob key import, import the root key instead!"));
+                } else {
+                  match serde_jsonc::from_str::<T>(&raw_obj) {
+                    Ok(obj_spec) => {
+                      match K::compile(obj_spec, resolution_ctx.clone()) {
+                        Ok(obj) => {
+                          entries.insert(key.clone(), obj);
+                        },
+                        Err(e) => {
+                          entry_err = Some(e);
+                        }
+                      } 
+                    },
+                    Err(e) => {
+                      entry_err = Some(SimpleError::from(e));
+                    }
+                  }
+                }
+              },
+              Resolution::ImportedMultiple(raw_objs) => {
+                if is_glob {
+                  for (obj_key_seg, raw_obj) in raw_objs {
+                    match serde_jsonc::from_str::<T>(&raw_obj) {
+                      Ok(obj_spec) => {
+                        match K::compile(obj_spec, resolution_ctx.clone()) {
+                          Ok(obj) => {
+                            entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
+                          },
+                          Err(e) => {
+                            entry_err = Some(e);
+                          }
+                        }
+                      },
+                      Err(e) => {
+                        entry_err = Some(SimpleError::from(e));
+                      }
+                    }
+                  }
+                }
+              },
+              Resolution::NoImport(raw_obj) => {
+                match serde_jsonc::from_str::<T>(&raw_obj) {
+                  Ok(obj_spec) => {
+                    match K::compile(obj_spec, resolution_ctx.clone()) {
+                      Ok(obj) => {
+                        entries.insert(key.clone(), obj);
+                      },
+                      Err(e) => {
+                        entry_err = Some(e);
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    entry_err = Some(SimpleError::from(e));
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+          }
+        }
+      },
+      RequiredSingleManifestEntry::Some(obj_spec) => {
+        match K::compile(obj_spec, resolution_ctx.clone()) {
+          Ok(obj) => {
+            entries.insert(key.clone(), obj);
+          },
+          Err(e) => {
+            entry_err = Some(e);
+          }
+        }
+      }
+    }
+
+    match entry_err {
+      Some(e) => {
+        error!("Error while parsing entry \"{}\", in {}:\n{}", key.clone(), resolution_ctx.here.to_string(), e);
+      },
+      None => {}
+    }
+  }
+
+  match err {
+    Some(e) => { Err(e) },
+    None => { Ok(entries) }
   }
 }
 
@@ -313,15 +406,15 @@ pub async fn download_repo_updates(repos: HashMap<String, RepoSpec>, store: Arc<
                         Ok(manifest) => {
                           let manifest_str;
                           match manifest.name.clone() {
-                            Some(name) => {
-                              manifest_str = format!("{} ({})", name, manifest.id.clone());
+                            OptionalString::Some(name) => {
+                              manifest_str = format!("{} ({})", name, repo_id.clone());
                             },
-                            None => {
-                              manifest_str = manifest.id.clone();
+                            OptionalString::None => {
+                              manifest_str = repo_id.clone();
                             }
                           }
 
-                          store.repos.lock().await.insert(manifest.id.clone(), manifest.clone());
+                          store.repos.lock().await.insert(repo_id.clone(), manifest.clone());
                           debug!("Loaded {}'s manifest!", manifest_str);
                         },
                         Err(e) => {

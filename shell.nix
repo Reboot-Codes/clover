@@ -14,6 +14,8 @@ in
       nodejs_22
       yarn-berry
       xorg.libX11
+      openssl
+      pkg-config
     ];
     RUSTC_VERSION = overrides.toolchain.channel;
     # https://github.com/rust-lang/rust-bindgen#environment-variables
