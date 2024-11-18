@@ -4,9 +4,9 @@ pub mod repos;
 use config::models::Config;
 use repos::{download_repo_updates, update_repo_dir_structure};
 use os_path::OsPath;
-use std::io::{Read, Write};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::sync::Arc;
-use std::fs;
+use tokio::fs;
 use log::{debug, info};
 use simple_error::SimpleError;
 use crate::server::evtbuzz::models::Store;
@@ -34,11 +34,14 @@ pub enum Error {
   },
   FailedToReadConfigFile {
     error: SimpleError
-  }
+  },
+  FailedToCreateReposDir {
+    error: SimpleError
+  },
 }
 
 pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), Error> {
-  let mut err: Option<Result<(), Error>> = None;
+  let mut err = None;
   let mut data_dir_path = OsPath::new().join(data_dir.clone());
   data_dir_path.resolve();
 
@@ -46,14 +49,14 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
 
   // Ensure that the data dir is valid.
   if !data_dir_path.exists() {
-    match fs::create_dir_all(data_dir.clone()) {
+    match fs::create_dir_all(data_dir.clone()).await {
       Ok(_) => {
         if !data_dir_path.exists() {
-          err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::new("Check failed after creation!") }));
+          err = Some(Error::FailedToCreateDataDir { error: SimpleError::new("Check failed after creation!") });
         }
       },
       Err(e) => {
-        err = Some(Err(Error::FailedToCreateDataDir { error: SimpleError::from(e) }));
+        err = Some(Error::FailedToCreateDataDir { error: SimpleError::from(e) });
       }
     }
   }
@@ -66,19 +69,19 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
     Some(_) => {},
     None => {
       if !config_file_path.exists() {
-        match fs::File::create(config_file_path.clone()) {
+        match fs::File::create(config_file_path.clone()).await {
           Ok(mut file) => {
-            match file.write_all(serde_jsonc::to_string::<Config>(&Default::default()).unwrap().as_bytes()) {
+            match file.write_all(serde_jsonc::to_string::<Config>(&Default::default()).unwrap().as_bytes()).await {
               Ok(_) => {
                 info!("Wrote default config!");
               },
               Err(e) => {
-                err = Some(Err(Error::FailedToWriteToConfigFile { error: SimpleError::from(e) }))
+                err = Some(Error::FailedToWriteToConfigFile { error: SimpleError::from(e) })
               }
             }
           },
           Err(e) => {
-            err = Some(Err(Error::FailedToCreateConfigFile { error: SimpleError::from(e) }))
+            err = Some(Error::FailedToCreateConfigFile { error: SimpleError::from(e) })
           }
         }
       }
@@ -88,12 +91,12 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   match err {
     Some(_) => {},
     None => {    
-      match fs::File::open(config_file_path) {
+      match fs::File::open(config_file_path).await {
         Ok(mut config_file) => {
           let mut contents = String::new();
 
           // TODO: Add repair option to fix broken config files.
-          match config_file.read_to_string(&mut contents) {
+          match config_file.read_to_string(&mut contents).await {
             Ok(_) => {
               match serde_jsonc::from_str::<Config>(&contents) {
                 Ok(config_values) => {
@@ -101,17 +104,17 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
                   debug!("Loaded config!");
                 },
                 Err(e) => {
-                  err = Some(Err(Error::FailedToParseConfigFile { error: SimpleError::from(e) }))
+                  err = Some(Error::FailedToParseConfigFile { error: SimpleError::from(e) })
                 }
               }
             },
             Err(e) => {
-              err = Some(Err(Error::FailedToReadConfigFile { error: SimpleError::from(e) }))
+              err = Some(Error::FailedToReadConfigFile { error: SimpleError::from(e) })
             }
           }
         },
         Err(e) => {
-          err = Some(Err(Error::FailedToOpenConfigFile { error: SimpleError::from(e) }))
+          err = Some(Error::FailedToOpenConfigFile { error: SimpleError::from(e) })
         }
       }
     }
@@ -123,10 +126,10 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
     Some(_) => {},
     None => {
       if !repo_dir_path.exists() {
-        match fs::create_dir(repo_dir_path.clone()) {
+        match fs::create_dir(repo_dir_path.clone()).await {
           Ok(_) => {},
           Err(e) => {
-            
+            err = Some(Error::FailedToCreateReposDir { error: SimpleError::from(e) });
           }
         }
       }
@@ -140,7 +143,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
         Ok(_) => {
           match download_repo_updates(store.config.lock().await.repos.clone(), store.clone(), repo_dir_path.clone()).await {
             Ok(_) => {
-
+              
             },
             Err(e) => {
               
@@ -157,12 +160,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   // Return any errors if they occurred
   match err {
     Some(e) => {
-      match e {
-        Err(error) => {
-          Err(error)
-        },
-        Ok(_) => { Err(Error::FailedToCheckDataDir { error: SimpleError::new("This state shouldn't be possible (error set with an ok value!)") }) }
-      }
+      Err(e)
     },
     None => { Ok(()) }
   }

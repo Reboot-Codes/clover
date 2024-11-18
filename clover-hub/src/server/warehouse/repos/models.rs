@@ -44,6 +44,21 @@ pub enum OptionalStrTHashMap<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequiredStrTHashMap<T>(pub HashMap<String, RequiredSingleManifestEntry<T>>);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OptionalBoolean {
+  Some(bool),
+  None
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RequiredBoolean {
+  Some(bool),
+  ImportString(String)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OptionalListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String),
@@ -84,6 +99,12 @@ pub enum OptionalString {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Optional<T> {
+  Some(T),
+  ImportString(String),
+  None
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RequiredString(pub String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,14 +134,30 @@ pub struct RawApplicationSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawContainerSpec {
   pub interface: OptionalSingleManifestSpecEntry<bool>,
-  pub build: OptionalSingleManifestSpecEntry<BuildConfig>,
+  pub build: OptionalSingleManifestSpecEntry<RawBuildConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawBuildConfig {
+  /// Url to either container repo, or source git repo
+  pub url: String,
+  /// Optional repository creds
+  pub creds: OptionalSingleManifestSpecEntry<RawRepoCreds>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawRepoCreds {
+  /// Optional username if the login scheme requires it.
+  pub username: Option<String>,
+  /// Either API key or password.
+  pub key: String,
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawExpressionPackSpec {
   pub name: Option<String>,
-  pub expressions: RequiredListManifestSpecEntry<RawExpressionSpec>
+  pub expressions: OptionalListManifestSpecEntry<RawExpressionSpec>
 }
 
 #[cfg(feature = "core")]
@@ -161,29 +198,29 @@ pub struct ApplicationSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContainerSpec {
-  pub interface: Option<bool>,
-  pub build: Option<BuildConfig>,
+  pub interface: OptionalBoolean,
+  pub build: Optional<BuildConfig>,
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpressionPackSpec {
-  pub name: Option<String>,
-  pub expressions: HashMap<String, ExpressionSpec>
+  pub name: OptionalString,
+  pub expressions: OptionalStrTHashMap<ExpressionSpec>
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExpressionSpec {
-  StaticExpressionSpec,
+  StaticExpressionSpec(StaticExpressionSpec),
 }
 
 #[cfg(feature = "core")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StaticExpressionSpec {
-  pub static_url: String
+  pub static_url: RequiredString
 }
 
 pub trait ManifestCompilationFrom<T> {
-  fn compile(spec: T, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized;
+  async fn compile(spec: T, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, T: for<'a> Deserialize<'a>;
 }

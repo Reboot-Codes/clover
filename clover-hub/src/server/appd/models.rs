@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use bollard::container;
 use serde::{Deserialize, Serialize};
+use crate::server::warehouse::repos::models::{Optional, OptionalString, RequiredString};
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -45,15 +46,15 @@ pub struct ContainerConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfig {
   /// Url to either container repo, or source git repo
-  pub url: String,
+  pub url: RequiredString,
   /// Optional repository creds
-  pub creds: Option<RepoCreds>
+  pub creds: Optional<RepoCreds>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoCreds {
   /// Optional username if the login scheme requires it.
-  pub username: Option<String>,
+  pub username: OptionalString,
   /// Either API key or password.
-  pub key: String,
+  pub key: RequiredString,
 }

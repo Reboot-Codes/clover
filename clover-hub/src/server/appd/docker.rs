@@ -37,7 +37,7 @@ pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Appli
         info!("{}, Building image: {}...", container_str.clone(), image_tag.clone());
 
         let mut build_progress = docker.build_image(BuildImageOptions {
-          dockerfile: build_config.url.clone(),
+          dockerfile: build_config.url.0.clone(),
           t: image_tag.clone(),
           ..Default::default()
         }, None, None);

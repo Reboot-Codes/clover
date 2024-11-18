@@ -1,7 +1,7 @@
 pub mod models;
 pub mod impls;
 
-use std::{collections::HashMap, fs, io::Read, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use git2::{BranchType, FileFavor, MergeOptions, Repository};
 use log::{debug, error, info, warn};
 use models::{Manifest, ManifestCompilationFrom, ManifestSpec, OptionalString, RequiredSingleManifestEntry, Resolution, ResolutionCtx};
@@ -9,6 +9,7 @@ use os_path::OsPath;
 use regex::Regex;
 use serde::Deserialize;
 use simple_error::SimpleError;
+use tokio::{fs, io::AsyncReadExt};
 use crate::{server::evtbuzz::models::Store, utils::read_file};
 use super::config::models::RepoSpec;
 
@@ -25,7 +26,7 @@ impl From<git2::Error> for Error {
   }
 }
 
-pub fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
+pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
   where K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
 {
   let mut err = None;
@@ -38,7 +39,7 @@ pub fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifest
 
     match raw_entry {
       RequiredSingleManifestEntry::ImportString(str) => {
-        match resolve_entry_value(str, resolution_ctx.clone()) {
+        match resolve_entry_value(str, resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedSingle(raw_obj) => {
@@ -139,8 +140,15 @@ pub async fn update_repo_dir_structure(repos: HashMap<String, RepoSpec>) -> Resu
 
   // Build the tree where strings are the source url (and therefore during dir creation, create a directory called `@repo` under it), and hashmaps are more directories to create
   for (repo_id, repo_spec) in repos {
-    for id_segment in repo_id.split(".") {
+    let repo_id_segments = OsPath::from(repo_id.split(".").collect::<Vec<&str>>().join("/")).join("@repo");
 
+    match fs::create_dir_all(repo_id_segments.to_string()).await {
+      Ok(_) => {
+
+      },
+      Err(e) => {
+
+      }
     }
   }
 
@@ -153,7 +161,7 @@ pub async fn update_repo_dir_structure(repos: HashMap<String, RepoSpec>) -> Resu
 }
 
 /// Used to resolve repo manifest entry **values** that may have directives (`@import`, `@base`, `@here`) in them.
-pub fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -> Result<Resolution, SimpleError> {
+pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -> Result<Resolution, SimpleError> {
   let import_re = Regex::new("^\\@import\\(('|\"|`)(?<src>.+)('|\"|`)\\)$").unwrap();
   let base_re = Regex::new("(?<directive>\\@base)").unwrap();
   let here_re = Regex::new("(?<directive>\\@here)").unwrap();
@@ -170,7 +178,7 @@ pub fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -> Resu
       let import_path_str = import_path.clone().to_string();
       let import_captures = glob_import_re.captures(&import_path_str).unwrap();
 
-      match fs::read_dir(&OsPath::new().join(import_captures.name("base").unwrap().as_str()).to_path()) {
+      match fs::read_dir(&OsPath::new().join(import_captures.name("base").unwrap().as_str()).to_path()).await {
         Ok(dir) => {
           let mut entries = HashMap::new();
           let mut failed_entries = Vec::new();
@@ -394,11 +402,11 @@ pub async fn download_repo_updates(repos: HashMap<String, RepoSpec>, store: Arc<
         // Build manifest object and load it into the store.
         let manifest_path = repo_path.join("/manifest.clover.jsonc");
         if manifest_path.exists() {
-          match fs::File::open(manifest_path.clone()) {
+          match fs::File::open(manifest_path.clone()).await {
             Ok(mut manifest_file) => {
               let mut contents = String::new();
 
-              match manifest_file.read_to_string(&mut contents) {
+              match manifest_file.read_to_string(&mut contents).await {
                 Ok(_) => {
                   match serde_jsonc::from_str::<ManifestSpec>(&contents) {
                     Ok(raw_manifest_values) => {

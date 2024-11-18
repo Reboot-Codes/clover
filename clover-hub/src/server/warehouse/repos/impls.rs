@@ -2,15 +2,17 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use simple_error::SimpleError;
 use os_path::OsPath;
+use crate::server::appd::models::{BuildConfig, RepoCreds};
+
 use super::{models::*, resolve_entry_value, resolve_list_entry};
 
 impl ManifestCompilationFrom<Option<String>> for OptionalString {
-  fn compile(spec: Option<String>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: Option<String>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
     let res = match spec.clone() {
       Some(raw_str) => {
-        match resolve_entry_value(raw_str, resolution_ctx.clone()) {
+        match resolve_entry_value(raw_str, resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedMultiple(_) => {
@@ -49,6 +51,86 @@ impl ManifestCompilationFrom<Option<String>> for OptionalString {
   }
 }
 
+impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> ManifestCompilationFrom<OptionalSingleManifestSpecEntry<T>> for Optional<K> {
+  async fn compile(spec: OptionalSingleManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+    let mut err = None;
+
+    let res = match spec.clone() {
+      OptionalSingleManifestSpecEntry::Some(raw_val) => {
+        match K::compile(raw_val, resolution_ctx.clone()).await {
+          Ok(val) => {
+            Optional::Some(val)
+          },
+          Err(e) => {
+            err = Some(e);
+            Optional::None
+          }
+        }
+      },
+      OptionalSingleManifestSpecEntry::ImportString(raw_str) => {
+        match resolve_entry_value(raw_str, resolution_ctx.clone()).await {
+          Ok(resolution) => {
+            match resolution {
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("Glob import not supported at this level!"));
+                Optional::None
+              },
+              Resolution::ImportedSingle(imported) => {
+                match serde_jsonc::from_str(&imported) {
+                  Ok(raw_val) => {
+                    match K::compile(raw_val, resolution_ctx.clone()).await {
+                      Ok(val) => {
+                        Optional::Some(val)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        Optional::None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    Optional::None
+                  }
+                }
+              },
+              Resolution::NoImport(val_str) => {
+                match serde_jsonc::from_str(&val_str) {
+                  Ok(raw_val) => {
+                    match K::compile(raw_val, resolution_ctx) {
+                      Ok(val) => {
+                        Optional::Some(val)
+                      },
+                      Err(e) => {
+                        err = Some(e);
+                        Optional::None
+                      }
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    Optional::None
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            Optional::None
+          }
+        }
+      },
+      OptionalSingleManifestSpecEntry::None => { Optional::None }
+    };
+
+    match err {
+      Some(e) => { Err(e) },
+      None => { Ok(res) }
+    }
+  }
+}
+
 impl ManifestCompilationFrom<String> for RequiredString {
   fn compile(spec: String, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
@@ -58,7 +140,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
         match resolution {
           Resolution::ImportedMultiple(_) => {
             err = Some(SimpleError::new("Glob import not supported at this level!"));
-            RequiredString(String::new())
+            Default::default()
           },
           Resolution::ImportedSingle(imported) => {
             match serde_jsonc::from_str::<String>(&imported) {
@@ -67,7 +149,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
               },
               Err(e) => {
                 err = Some(SimpleError::from(e));
-                RequiredString(String::new())
+                Default::default()
               }
             }
           },
@@ -78,7 +160,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
       },
       Err(e) => {
         err = Some(e);
-        RequiredString(String::new())
+        Default::default()
       }
     };
 
@@ -250,6 +332,285 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
   }
 }
 
+impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a> Deserialize<'a>> ManifestCompilationFrom<RequiredListManifestSpecEntry<T>> for RequiredStrTHashMap<K> {
+  fn compile(spec: RequiredListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+    let mut err = None;
+
+    let res = match spec.clone() {
+      RequiredListManifestSpecEntry::ImportString(spec_str) => {
+        match resolve_entry_value(spec_str.clone(), resolution_ctx.clone()) {
+          Ok(resolution) => {
+            match resolution {
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("Glob import not supported at this level!"));
+                RequiredStrTHashMap(HashMap::new())
+              },
+              Resolution::ImportedSingle(imported) => {
+                match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(&imported) {
+                  Ok(spec_list) => {
+                    let mut entries = HashMap::new();
+
+                    for (entry_id, raw_entry) in spec_list {
+                      match raw_entry {
+                        RequiredSingleManifestEntry::Some(raw_entry_obj) => {
+                          match K::compile(raw_entry_obj, resolution_ctx.clone()) {
+                            Ok(val) => {
+                              entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                            },
+                            Err(e) => {
+                              err = Some(e);
+                            }
+                          }
+                        },
+                        RequiredSingleManifestEntry::ImportString(raw_entry_str) => {
+                          match resolve_entry_value(raw_entry_str, resolution_ctx.clone()) {
+                            Ok(resolution) => {
+                              match resolution {
+                                Resolution::ImportedSingle(val_str) => {
+                                  match serde_jsonc::from_str(&val_str) {
+                                    Ok(raw_val) => {
+                                      match K::compile(raw_val, resolution_ctx.clone()) {
+                                        Ok(val) => {
+                                          entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                                        },
+                                        Err(e) => {
+                                          err = Some(e);
+                                        }
+                                      }
+                                    },
+                                    Err(e) => {
+                                      err = Some(SimpleError::from(e));
+                                    }
+                                  }
+                                },
+                                Resolution::ImportedMultiple(hash_map) => {
+                                  for (val_id, val_str) in hash_map {
+                                    match serde_jsonc::from_str(&val_str) {
+                                      Ok(raw_val) => {
+                                        match K::compile(raw_val, resolution_ctx.clone()) {
+                                          Ok(val) => {
+                                            entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
+                                          },
+                                          Err(e) => {
+                                            err = Some(e);
+                                          }
+                                        }
+                                      },
+                                      Err(e) => {
+                                        err = Some(SimpleError::from(e));
+                                      }
+                                    }
+                                  }
+                                },
+                                Resolution::NoImport(val_str) => {
+                                  match serde_jsonc::from_str(&val_str) {
+                                    Ok(raw_val) => {
+                                      match K::compile(raw_val, resolution_ctx.clone()) {
+                                        Ok(val) => {
+                                          entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                                        },
+                                        Err(e) => {
+                                          err = Some(e);
+                                        }
+                                      }
+                                    },
+                                    Err(e) => {
+                                      err = Some(SimpleError::from(e));
+                                    }
+                                  }
+                                },
+                              }
+                            },
+                            Err(e) => {
+                              err = Some(e);
+                            }
+                          }
+                        },
+                      }
+                    }
+
+                    if err != None {
+                      RequiredStrTHashMap(HashMap::new())
+                    } else {
+                      RequiredStrTHashMap(entries)
+                    }
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    RequiredStrTHashMap(HashMap::new())
+                  }
+                }
+              },
+              Resolution::NoImport(raw_val) => {
+                match serde_jsonc::from_str(&raw_val) {
+                  Ok(val) => {
+                    RequiredStrTHashMap(val)
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    RequiredStrTHashMap(HashMap::new())
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            RequiredStrTHashMap(HashMap::new())
+          }
+        }
+      },
+      RequiredListManifestSpecEntry::Some(spec_list) => {
+        let mut entries = HashMap::new();
+
+        for (entry_id, raw_entry) in spec_list {
+          match raw_entry {
+            RequiredSingleManifestEntry::Some(raw_entry_obj) => {
+              match K::compile(raw_entry_obj, resolution_ctx.clone()) {
+                Ok(val) => {
+                  entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                },
+                Err(e) => {
+                  err = Some(e);
+                }
+              }
+            },
+            RequiredSingleManifestEntry::ImportString(raw_entry_str) => {
+              match resolve_entry_value(raw_entry_str, resolution_ctx.clone()) {
+                Ok(resolution) => {
+                  match resolution {
+                    Resolution::ImportedSingle(val_str) => {
+                      match serde_jsonc::from_str(&val_str) {
+                        Ok(raw_val) => {
+                          match K::compile(raw_val, resolution_ctx.clone()) {
+                            Ok(val) => {
+                              entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                            },
+                            Err(e) => {
+                              err = Some(e);
+                            }
+                          }
+                        },
+                        Err(e) => {
+                          err = Some(SimpleError::from(e));
+                        }
+                      }
+                    },
+                    Resolution::ImportedMultiple(hash_map) => {
+                      for (val_id, val_str) in hash_map {
+                        match serde_jsonc::from_str(&val_str) {
+                          Ok(raw_val) => {
+                            match K::compile(raw_val, resolution_ctx.clone()) {
+                              Ok(val) => {
+                                entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
+                              },
+                              Err(e) => {
+                                err = Some(e);
+                              }
+                            }
+                          },
+                          Err(e) => {
+                            err = Some(SimpleError::from(e));
+                          }
+                        }
+                      }
+                    },
+                    Resolution::NoImport(val_str) => {
+                      match serde_jsonc::from_str(&val_str) {
+                        Ok(raw_val) => {
+                          match K::compile(raw_val, resolution_ctx.clone()) {
+                            Ok(val) => {
+                              entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
+                            },
+                            Err(e) => {
+                              err = Some(e);
+                            }
+                          }
+                        },
+                        Err(e) => {
+                          err = Some(SimpleError::from(e));
+                        }
+                      }
+                    },
+                  }
+                },
+                Err(e) => {
+                  err = Some(e);
+                }
+              }
+            },
+          }
+        }
+
+        if err != None {
+          RequiredStrTHashMap(HashMap::new())
+        } else {
+          RequiredStrTHashMap(entries)
+        }
+      }
+    };
+
+    match err {
+      Some(e) => { Err(e) },
+      None => { Ok(res) }
+    }
+  }
+}
+
+impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for OptionalBoolean {
+  fn compile(spec: OptionalSingleManifestSpecEntry<bool>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, Option<bool>: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let ret = match spec {
+      OptionalSingleManifestSpecEntry::Some(val) => OptionalBoolean::Some(val),
+      OptionalSingleManifestSpecEntry::ImportString(raw_spec) => {
+        match resolve_entry_value(raw_spec, resolution_ctx.clone()) {
+          Ok(resolution) => {
+            match resolution {
+              Resolution::ImportedMultiple(_) => {
+                err = Some(SimpleError::new("Glob imports are not supported at this level"));
+                OptionalBoolean::None
+              },
+              Resolution::ImportedSingle(val_str) => {
+                match serde_jsonc::from_str(&val_str) {
+                  Ok(val) => {
+                    OptionalBoolean::Some(val)
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    OptionalBoolean::None
+                  }
+                }
+              },
+              Resolution::NoImport(val_str) => {
+                match serde_jsonc::from_str(&val_str) {
+                  Ok(val) => {
+                    OptionalBoolean::Some(val)
+                  },
+                  Err(e) => {
+                    err = Some(SimpleError::from(e));
+                    OptionalBoolean::None
+                  }
+                }
+              }
+            }
+          },
+          Err(e) => {
+            err = Some(e);
+            OptionalBoolean::None
+          }
+        }
+      },
+      OptionalSingleManifestSpecEntry::None => OptionalBoolean::None
+    };
+
+    match err {
+      Some(e) => Err(e),
+      None => Ok(ret)
+    }
+  }
+}
+
 //* ----------------------------
 
 impl Manifest {
@@ -284,7 +645,7 @@ impl Manifest {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
-        RequiredString(String::new())
+        Default::default()
       }
     };
 
@@ -344,7 +705,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
-        RequiredString(String::new())
+        Default::default()
       }
     };
 
@@ -352,7 +713,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
-        RequiredString(String::new())
+        Default::default()
       }
     };
 
@@ -390,6 +751,102 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
   }
 }
 
+impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
+  fn compile(spec: RawContainerSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawContainerSpec: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let interface = match OptionalBoolean::compile(spec.interface.clone(), resolution_ctx.clone()) {
+      Ok(val) => {
+        val
+      },
+      Err(e) => {
+        err = Some(e);
+        OptionalBoolean::None
+      }
+    };
+
+    let build = match Optional::compile(spec.build.clone(), resolution_ctx.clone()) {
+      Ok(val) => {
+        val
+      },
+      Err(e) => {
+        err = Some(e);
+        Optional::None
+      }
+    };
+
+    match err {
+      Some(e) => { Err(e) },
+      None => {
+        Ok(ContainerSpec {
+          interface,
+          build
+        })
+      }
+    }
+  }
+}
+
+impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
+  fn compile(spec: RawBuildConfig, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawBuildConfig: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let url_field = match RequiredString::compile(spec.url.clone(), resolution_ctx.clone()) {
+      Ok(val) => val,
+      Err(e) => {
+        err = Some(e);
+        Default::default()
+      }
+    };
+
+    let creds = match Optional::compile(spec.creds.clone(), resolution_ctx.clone()) {
+      Ok(val) => val,
+      Err(e) => {
+        err = Some(e);
+        Optional::None
+      }
+    };
+
+    match err {
+      Some(e) => Err(e),
+      None => Ok(BuildConfig {
+        url: url_field,
+        creds
+      })
+    }
+  }
+}
+
+impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
+  fn compile(spec: RawRepoCreds, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawRepoCreds: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let username = match OptionalString::compile(spec.username.clone(), resolution_ctx.clone()) {
+      Ok(val) => val,
+      Err(e) => {
+        err = Some(e);
+        OptionalString::None
+      }
+    };
+
+    let key = match RequiredString::compile(spec.key.clone(), resolution_ctx.clone()) {
+      Ok(val) => val,
+      Err(e) => {
+        err = Some(e);
+        Default::default()
+      }
+    };
+
+    match err {
+      Some(e) => Err(e),
+      None => Ok(RepoCreds {
+        username,
+        key
+      })
+    }
+  }
+}
+
 impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
   fn compile(spec: RawModuleSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
@@ -411,6 +868,86 @@ impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
           name
         })
       }
+    }
+  }
+}
+
+impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
+  fn compile(spec: RawExpressionPackSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+    let mut err = None;
+
+    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()) {
+      Ok(val) => {
+        val
+      },
+      Err(e) => {
+        err = Some(e);
+        OptionalString::None
+      }
+    };
+
+    let expressions = match OptionalStrTHashMap::compile(spec.expressions.clone(), resolution_ctx.clone()) {
+      Ok(val) => {
+        val
+      },
+      Err(e) => {
+        err = Some(e);
+        OptionalStrTHashMap::None
+      }
+    };
+    
+    match err {
+      Some(e) => { Err(e) },
+      None => {
+        Ok(ExpressionPackSpec {
+          name,
+          expressions
+        })
+      }
+    }
+  }
+}
+
+impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
+  fn compile(spec: RawExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawExpressionSpec: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let ret = match spec {
+      RawExpressionSpec::RawStaticExpressionSpec(raw_expression_spec) => {
+        match StaticExpressionSpec::compile(raw_expression_spec, resolution_ctx.clone()) {
+          Ok(val) => { let static_expression_spec = Self::StaticExpressionSpec(val); static_expression_spec },
+          Err(e) => {
+            err = Some(e);
+            Self::StaticExpressionSpec(StaticExpressionSpec { static_url: RequiredString(String::from("bleh")) })
+          }
+        }
+      },
+    };
+
+    match err {
+      Some(e) => Err(e),
+      None => Ok(ret)
+    }
+  }
+}
+
+impl ManifestCompilationFrom<RawStaticExpressionSpec> for StaticExpressionSpec {
+  fn compile(spec: RawStaticExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawStaticExpressionSpec: for<'a> Deserialize<'a> {
+    let mut err = None;
+
+    let static_url = match RequiredString::compile(spec.static_url.clone(), resolution_ctx.clone()) {
+      Ok(val) => val,
+      Err(e) => {
+        err = Some(e);
+        Default::default()
+      }
+    };
+
+    match err {
+      Some(e) => Err(e),
+      None => Ok(Self {
+        static_url
+      })
     }
   }
 }
