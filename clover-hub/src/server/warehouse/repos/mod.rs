@@ -3,7 +3,7 @@ pub mod impls;
 
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use std::{collections::HashMap, sync::Arc};
-use git2::{BranchType, FileFavor, MergeOptions, Repository};
+use git2::{build::CheckoutBuilder, BranchType, FileFavor, Index, MergeOptions, Repository};
 use log::{debug, error, info, warn};
 use models::{Manifest, ManifestCompilationFrom, ManifestSpec, OptionalString, RequiredSingleManifestEntry, Resolution, ResolutionCtx};
 use os_path::OsPath;
@@ -324,10 +324,9 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
                         if remote_branch.is_head() && (remote_branch.get().resolve()?.target().unwrap() == repo.head().unwrap().resolve()?.target().unwrap()) {
 
                         } else {
-                          match repo.merge(
-                            &[&repo.find_annotated_commit(remote_branch.into_reference().resolve()?.target().unwrap())?], 
-                            Some(MergeOptions::new().file_favor(FileFavor::Theirs)), 
-                            None
+                          match repo.checkout_tree(
+                            &remote_branch.get().peel_to_tree().unwrap().as_object(), 
+                            Some(CheckoutBuilder::new().conflict_style_merge(true).force()), 
                           ) {
                             Ok(_) => {
                               match repo.cleanup_state() {

@@ -619,7 +619,10 @@ impl Manifest {
 
     debug!("Resolving manifest.base");
     let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, here: spec_path.clone() }).await {
-      Ok(val) => { val },
+      Ok(val) => { 
+        debug!("Resolved manifest.base");
+        val 
+      },
       Err(e) => {
         err = Some(e);
         OptionalString::None
@@ -636,7 +639,10 @@ impl Manifest {
     
     debug!("Resolving manifest.name");
     let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
-      Ok(val) => { val },
+      Ok(val) => { 
+        debug!("Resolved manifest.name");
+        val 
+      },
       Err(e) => {
         err = Some(e);
         OptionalString::None
@@ -645,7 +651,10 @@ impl Manifest {
 
     debug!("Resolving manifest.version");
     let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()).await {
-      Ok(val) => { val },
+      Ok(val) => { 
+        debug!("Resolved manifest.version");
+        val 
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
@@ -655,6 +664,7 @@ impl Manifest {
     debug!("Resolving manifest.modules");
     let modules = match OptionalStrTHashMap::compile(spec.modules.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved manifest.modules");
         val
       },
       Err(e) => {
@@ -666,6 +676,7 @@ impl Manifest {
     debug!("Resolving manifest.applications");
     let applications = match OptionalStrTHashMap::compile(spec.applications.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved manifest.applications");
         val
       },
       Err(e) => {
@@ -678,6 +689,7 @@ impl Manifest {
     #[cfg(feature = "core")]
     let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved manifest.expression-packs");
         val
       },
       Err(e) => {
@@ -709,7 +721,10 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
 
     debug!("Resolving application.name");
     let name = match RequiredString::compile(spec.name.clone(), resolution_ctx.clone()).await {
-      Ok(val) => { val },
+      Ok(val) => { 
+        debug!("Resolved application.name");
+        val 
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
@@ -718,7 +733,10 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
 
     debug!("Resolving application.version");
     let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()).await {
-      Ok(val) => { val },
+      Ok(val) => { 
+        debug!("Resolved application.version");
+        val 
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
@@ -728,6 +746,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
     debug!("Resolving application.intents");
     let intents = match OptionalStrStrHashMap::compile(spec.intents.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved application.intents");
         val
       },
       Err(e) => {
@@ -739,6 +758,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
     debug!("Resolving application.containers");
     let containers  = match OptionalStrTHashMap::compile(spec.containers.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved application.containers");
         val
       },
       Err(e) => {
@@ -768,6 +788,7 @@ impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
     debug!("Resolving container.interface");
     let interface = match OptionalBoolean::compile(spec.interface.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved container.interface");
         val
       },
       Err(e) => {
@@ -779,6 +800,7 @@ impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
     debug!("Resolving container.build-config");
     let build = match Optional::compile(spec.build.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved container.build-config");
         val
       },
       Err(e) => {
@@ -805,7 +827,10 @@ impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
 
     debug!("Resolving build-config.url");
     let url_field = match RequiredString::compile(spec.url.clone(), resolution_ctx.clone()).await {
-      Ok(val) => val,
+      Ok(val) => {
+        debug!("Resolved build-config.url");
+        val
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
@@ -814,7 +839,10 @@ impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
 
     debug!("Resolving build-config.creds");
     let creds = match Optional::compile(spec.creds.clone(), resolution_ctx.clone()).await {
-      Ok(val) => val,
+      Ok(val) => {
+        debug!("Resolved build-config.creds");
+        val
+      },
       Err(e) => {
         err = Some(e);
         Optional::None
@@ -837,7 +865,10 @@ impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
 
     debug!("Resolving repo-creds.username");
     let username = match OptionalString::compile(spec.username.clone(), resolution_ctx.clone()).await {
-      Ok(val) => val,
+      Ok(val) => {
+        debug!("Resolved repo-creds.username");
+        val
+      },
       Err(e) => {
         err = Some(e);
         OptionalString::None
@@ -846,7 +877,10 @@ impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
 
     debug!("Resolving repo-creds.key");
     let key = match RequiredString::compile(spec.key.clone(), resolution_ctx.clone()).await {
-      Ok(val) => val,
+      Ok(val) => {
+        debug!("Resolved repo-creds.key");
+        val
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
@@ -871,6 +905,7 @@ impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
     debug!("Resolving module.name");
     let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved module.name");
         val
       },
       Err(e) => {
@@ -897,6 +932,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
     debug!("Resolving expression-pack.name");
     let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved expression-pack.name");
         val
       },
       Err(e) => {
@@ -908,6 +944,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
     debug!("Resolving expression-pack.expressions");
     let expressions = match OptionalStrTHashMap::compile(spec.expressions.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
+        debug!("Resolved expression-pack.expressions");
         val
       },
       Err(e) => {
@@ -936,7 +973,10 @@ impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
     let ret = match spec {
       RawExpressionSpec::RawStaticExpressionSpec(raw_expression_spec) => {
         match StaticExpressionSpec::compile(raw_expression_spec, resolution_ctx.clone()).await {
-          Ok(val) => { let static_expression_spec = Self::StaticExpressionSpec(val); static_expression_spec },
+          Ok(val) => { 
+            debug!("Resolved raw-expression-pack");
+            Self::StaticExpressionSpec(val)
+          },
           Err(e) => {
             err = Some(e);
             Self::StaticExpressionSpec(StaticExpressionSpec { static_url: RequiredString(String::from("bleh")) })
@@ -958,7 +998,10 @@ impl ManifestCompilationFrom<RawStaticExpressionSpec> for StaticExpressionSpec {
 
     debug!("Resolving static-expression-pack.static-url");
     let static_url = match RequiredString::compile(spec.static_url.clone(), resolution_ctx.clone()).await {
-      Ok(val) => val,
+      Ok(val) => {
+        debug!("Resolved static-expression-pack.static-url");
+        val
+      },
       Err(e) => {
         err = Some(e);
         Default::default()
