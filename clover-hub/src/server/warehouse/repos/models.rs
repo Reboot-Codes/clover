@@ -8,10 +8,10 @@ use crate::server::appd::models::BuildConfig;
 
 pub enum Resolution {
   /// Raw file content from a resolved `@import`. Should be deserialized prior to use!
-  ImportedSingle(String),
+  ImportedSingle((OsPath, String)),
   /// Multiple files were read from a resolved, glob `@import`, and the resolved glob is the key, while the value is the raw file content.
   /// Should be deserialized prior to use!
-  ImportedMultiple(HashMap<String, String>),
+  ImportedMultiple((OsPath, HashMap<String, String>)),
   /// Every other case in which there was no `@import`.
   /// If there were other directives, they've been replaced with the correct value if provided in the ResolutionCtx.
   NoImport(String)
@@ -183,6 +183,7 @@ pub enum RawExpressionSpec {
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawStaticExpressionSpec {
+  #[serde(rename = "static-url")]
   pub static_url: String
 }
 

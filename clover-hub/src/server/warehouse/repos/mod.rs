@@ -29,7 +29,10 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
   let mut entries = HashMap::new();
   let glob_import_key_re = Regex::new("^(?<base>[^\\*\\n\\r]+)(\\*)$").unwrap();
 
-  for (key, raw_entry) in raw_list {
+  for (raw_key, raw_entry) in raw_list {
+    let base_re = Regex::new("(?<directive>\\@base)").unwrap();
+    let key = base_re.replace_all(&raw_key, "").to_string();
+
     let is_glob = glob_import_key_re.is_match(&key);
     let mut entry_err = None;
 
@@ -38,13 +41,13 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
         match resolve_entry_value(str, resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
-              Resolution::ImportedSingle(raw_obj) => {
+              Resolution::ImportedSingle((here, raw_obj)) => {
                 if is_glob {
                   err = Some(SimpleError::new("Resolved only one file for glob key import, import the root key instead!"));
                 } else {
                   match serde_jsonc::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
-                      match K::compile(obj_spec, resolution_ctx.clone()).await {
+                      match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here }).await {
                         Ok(obj) => {
                           entries.insert(key.clone(), obj);
                         },
@@ -59,12 +62,12 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                   }
                 }
               },
-              Resolution::ImportedMultiple(raw_objs) => {
+              Resolution::ImportedMultiple((here, raw_objs)) => {
                 if is_glob {
                   for (obj_key_seg, raw_obj) in raw_objs {
                     match serde_jsonc::from_str::<T>(&raw_obj) {
                       Ok(obj_spec) => {
-                        match K::compile(obj_spec, resolution_ctx.clone()).await {
+                        match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }).await {
                           Ok(obj) => {
                             entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
                           },
@@ -174,8 +177,9 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
     if glob_import_re.is_match(&import_path.clone().to_string()) {
       let import_path_str = import_path.clone().to_string();
       let import_captures = glob_import_re.captures(&import_path_str).unwrap();
+      let here = OsPath::new().join(import_captures.name("base").unwrap().as_str());
 
-      match fs::read_dir(&OsPath::new().join(import_captures.name("base").unwrap().as_str()).to_path()).await {
+      match fs::read_dir(&here.clone().to_path()).await {
         Ok(dir) => {
           let mut entries = HashMap::new();
           let mut failed_entries = Vec::new();
@@ -211,7 +215,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
             }
           }
 
-          ret = Resolution::ImportedMultiple(entries);
+          ret = Resolution::ImportedMultiple((here, entries));
         },
         Err(e) => {
           err = Some(SimpleError::from(e));
@@ -224,7 +228,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
     if import_path.exists() {
       match read_file(import_path.clone()).await {
         Ok(contents) => {
-          ret = Resolution::ImportedSingle(contents);
+          ret = Resolution::ImportedSingle((import_path.clone(), contents));
         },
         Err(e) => {
           err = Some(e);

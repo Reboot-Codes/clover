@@ -36,6 +36,7 @@ in
       # add dev libraries here (e.g. pkgs.libvmi.dev)
       pkgs.glibc.dev
       pkgs.xorg.libX11.dev
+      pkgs.openssl.dev
     ])
     # Includes with special directory paths
     ++ [
