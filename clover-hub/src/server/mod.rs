@@ -183,9 +183,6 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
     },
     Err(e) => {
       match e {
-        warehouse::Error::FailedToCheckDataDir { error } => {
-          error!("Failed to check if data directory is valid, failed due to:\n{}", error);
-        },
         warehouse::Error::FailedToCreateDataDir { error } => {
           error!("Failed to create data directory! Please create `{}` and set the proper permissions manually, then re-run the server. Failed due to:\n{}", data_dir.clone(), error);
         },
@@ -204,6 +201,15 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
         warehouse::Error::FailedToWriteToConfigFile { error } => {
           error!("Failed to write to the configuration file, due to:\n{}", error);
         }
+        warehouse::Error::FailedToCreateReposDir { error } => {
+          error!("Failed to create the repository storage dir, due to:\n{}", error);
+        },
+        warehouse::Error::FailedToDownloadAndRegisterRepos { error } => {
+          error!("Failed to download and/or register all repositories, due to:\n{}", error);
+        },
+        warehouse::Error::FailedToUpdateRepoDirectoryStructure { error } => {
+          error!("Failed to update the repo directory structure, due to:\n{}", error);
+        },
       }
 
       server_token.cancel();

@@ -1,4 +1,5 @@
-use std::{fs::{self, DirEntry}, hash::{DefaultHasher, Hash, Hasher}, io::Read};
+use std::hash::{DefaultHasher, Hash, Hasher};
+use tokio::{fs, io::AsyncReadExt};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
 use chrono::prelude::{DateTime, Utc};
 use os_path::OsPath;
@@ -105,15 +106,15 @@ pub async fn send_ipc_message(
   ipc_tx.send(gen_ipc_message(store, user_config, kind, message).await)
 }
 
-pub fn read_file(path: OsPath) -> Result<String, SimpleError> {
+pub async fn read_file(path: OsPath) -> Result<String, SimpleError> {
   let mut err = None;
   let mut ret = None;
   let mut contents = String::new();
 
   if path.exists() {
-    match fs::File::open(path.to_path()) {
+    match fs::File::open(path.to_path()).await {
       Ok(mut file) => {
-        match file.read_to_string(&mut contents) {
+        match file.read_to_string(&mut contents).await {
           Ok(_) => {
             ret = Some(contents);
           },

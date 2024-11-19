@@ -1,6 +1,7 @@
 pub mod models;
 pub mod impls;
 
+use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use std::{collections::HashMap, sync::Arc};
 use git2::{BranchType, FileFavor, MergeOptions, Repository};
 use log::{debug, error, info, warn};
@@ -11,14 +12,9 @@ use serde::Deserialize;
 use simple_error::SimpleError;
 use tokio::{fs, io::AsyncReadExt};
 use crate::{server::evtbuzz::models::Store, utils::read_file};
-use super::config::models::RepoSpec;
 
-enum RepoDirTreeEntry {
-  String,
-  HashMap(String, Box<RepoDirTreeEntry>)
-}
-
-pub struct Error(SimpleError);
+#[derive(PartialEq)]
+pub struct Error(pub SimpleError);
 
 impl From<git2::Error> for Error {
   fn from(value: git2::Error) -> Self {
@@ -48,7 +44,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                 } else {
                   match serde_jsonc::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
-                      match K::compile(obj_spec, resolution_ctx.clone()) {
+                      match K::compile(obj_spec, resolution_ctx.clone()).await {
                         Ok(obj) => {
                           entries.insert(key.clone(), obj);
                         },
@@ -68,7 +64,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                   for (obj_key_seg, raw_obj) in raw_objs {
                     match serde_jsonc::from_str::<T>(&raw_obj) {
                       Ok(obj_spec) => {
-                        match K::compile(obj_spec, resolution_ctx.clone()) {
+                        match K::compile(obj_spec, resolution_ctx.clone()).await {
                           Ok(obj) => {
                             entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
                           },
@@ -87,7 +83,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
               Resolution::NoImport(raw_obj) => {
                 match serde_jsonc::from_str::<T>(&raw_obj) {
                   Ok(obj_spec) => {
-                    match K::compile(obj_spec, resolution_ctx.clone()) {
+                    match K::compile(obj_spec, resolution_ctx.clone()).await {
                       Ok(obj) => {
                         entries.insert(key.clone(), obj);
                       },
@@ -109,7 +105,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
         }
       },
       RequiredSingleManifestEntry::Some(obj_spec) => {
-        match K::compile(obj_spec, resolution_ctx.clone()) {
+        match K::compile(obj_spec, resolution_ctx.clone()).await {
           Ok(obj) => {
             entries.insert(key.clone(), obj);
           },
@@ -134,25 +130,26 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
   }
 }
 
-pub async fn update_repo_dir_structure(repos: HashMap<String, RepoSpec>) -> Result<(), Error> {
+pub async fn update_repo_dir_structure(store: Arc<Store>) -> Result<(), Error> {
   let mut err = None;
-  let mut repo_dir_tree: HashMap<String, RepoDirTreeEntry> = HashMap::new();
+  let repos = store.config.lock().await.repos.clone();
 
-  // Build the tree where strings are the source url (and therefore during dir creation, create a directory called `@repo` under it), and hashmaps are more directories to create
-  for (repo_id, repo_spec) in repos {
+  for (repo_id, _repo_spec) in repos {
     let repo_id_segments = OsPath::from(repo_id.split(".").collect::<Vec<&str>>().join("/")).join("@repo");
 
-    match fs::create_dir_all(repo_id_segments.to_string()).await {
-      Ok(_) => {
-
-      },
-      Err(e) => {
-
+    if !repo_id_segments.exists() {
+      match fs::create_dir_all(repo_id_segments.to_string()).await {
+        Ok(_) => {
+          debug!("Created directory: {}!", repo_id_segments.to_string());
+        },
+        Err(e) => {
+          err = Some(Error(SimpleError::from(e)));
+          error!("Failed to create repo directory: {}!", repo_id_segments.to_string());
+          break;
+        }
       }
     }
   }
-
-  // Recursively create directories following the tree structure
 
   match err {
     Some(e) => { Err(e) },
@@ -182,8 +179,9 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
         Ok(dir) => {
           let mut entries = HashMap::new();
           let mut failed_entries = Vec::new();
+          let mut dir_stream = ReadDirStream::new(dir);
 
-          for entry_res in dir {
+          while let Some(entry_res) = dir_stream.next().await {
             match entry_res {
               Ok(entry) => {
                 let mut file_path = OsPath::from(entry.path());
@@ -198,7 +196,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
                   }
                 }
 
-                match read_file(file_path.clone()) {
+                match read_file(file_path.clone()).await {
                   Ok(contents) => {
                     entries.insert(file_path.name().unwrap().clone(), contents);
                   },
@@ -224,7 +222,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
     import_path.resolve();
 
     if import_path.exists() {
-      match read_file(import_path.clone()) {
+      match read_file(import_path.clone()).await {
         Ok(contents) => {
           ret = Resolution::ImportedSingle(contents);
         },
@@ -255,11 +253,17 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
   }
 }
 
-pub async fn download_repo_updates(repos: HashMap<String, RepoSpec>, store: Arc<Store>, repo_dir_path: OsPath) -> Result<(), Error> {
+pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> Result<(), Error> {
   let mut err = None;
   let mut repos_updated = 0;
+  let repos = store.config.lock().await.repos.clone();
+  let mut repo_errors: Vec<Error> = Vec::new();
 
-  for (repo_id, repo_spec) in repos {
+  info!("Running updates on {} repo(s)...", repos.len());
+
+  for (repo_id, repo_spec) in repos.clone() {
+    let mut repo_err = None;
+
     let mut repo_path = OsPath::new().join(repo_dir_path.clone().to_string()).join("/@repo/");
     for id_segment in repo_id.split(".").collect::<Vec<&str>>() {
       repo_path.push(id_segment);
@@ -275,185 +279,214 @@ pub async fn download_repo_updates(repos: HashMap<String, RepoSpec>, store: Arc<
       }
     }
 
-    if repo_path.join("/.git/").exists() {
-      match Repository::open(repo_path.to_string()) {
-        Ok(repo) => {
-          match repo.remotes() {
-            Ok(remotes) => {
-              let mut main_remote = None;
-              for remote_name in remotes.into_iter() {
-                match remote_name {
-                  None => {},
-                  Some(remote_name_str) => {
-                    match repo.find_remote(remote_name_str) {
-                      Ok(remote) => {
-                        // Fetch the url 
-                        match remote.url() {
-                          Some(remote_url) => {
-                            if remote_url == repo_spec.src {
-                              main_remote = Some(remote);
-                              break;
+    debug!("Repo: {}, checking for updates...", repo_str.clone());
+
+    if err == None {
+      if repo_path.join("/.git/").exists() {
+        match Repository::open(repo_path.to_string()) {
+          Ok(repo) => {
+            match repo.remotes() {
+              Ok(remotes) => {
+                let mut main_remote = None;
+                for remote_name in remotes.into_iter() {
+                  match remote_name {
+                    None => {},
+                    Some(remote_name_str) => {
+                      match repo.find_remote(remote_name_str) {
+                        Ok(remote) => {
+                          // Fetch the url 
+                          match remote.url() {
+                            Some(remote_url) => {
+                              if remote_url == repo_spec.src {
+                                main_remote = Some(remote);
+                                break;
+                              }
+                            },
+                            None => {}
+                          }
+                        },
+                        Err(e) => {
+                          error!("Repo: {}, failed to get specified remote, due to:\n{}", repo_str.clone(), e);
+                          repo_err = Some(Error(SimpleError::from(e)));
+                        }
+                      }
+                    }
+                  }
+                }
+
+                match main_remote {
+                  Some(mut remote) => {
+                    match remote.fetch(&[repo_spec.branch.clone()], None, None) {
+                      Ok(_) => {
+                        let remote_branch = repo.find_branch(&repo_spec.branch.clone(), BranchType::Remote)?;
+                        if remote_branch.is_head() && (remote_branch.get().resolve()?.target().unwrap() == repo.head().unwrap().resolve()?.target().unwrap()) {
+
+                        } else {
+                          match repo.merge(
+                            &[&repo.find_annotated_commit(remote_branch.into_reference().resolve()?.target().unwrap())?], 
+                            Some(MergeOptions::new().file_favor(FileFavor::Theirs)), 
+                            None
+                          ) {
+                            Ok(_) => {
+                              match repo.cleanup_state() {
+                                Ok(_) => {
+                                  repos_updated += 1;
+                                  let comm = repo.head()?.peel_to_commit()?;
+                                  let comm_str;
+                                  match comm.message() {
+                                    Some(message) => {
+                                      comm_str = format!("{}, ({})", message, comm.id());
+                                    },
+                                    None => {
+                                      comm_str = comm.id().to_string();
+                                    }
+                                  }
+
+                                  info!("Repo: {}, Updated, now using commit: {}!", repo_str, comm_str);
+                                },
+                                Err(e) => {
+                                  repo_err = Some(Error(SimpleError::from(e)));
+                                }
+                              }
+                            },
+                            Err(e) => {
+                              error!("Repo: {}, Update failed, due to:\n{}", repo_str.clone(), e);
+
+                              match repo.cleanup_state() {
+                                Ok(_) => {
+                                  debug!("Repo: {}, Cleaned up.", repo_str.clone());
+                                },
+                                Err(e) => {
+                                  error!("Repo: {}, failed to clean up, due to:\n{}", repo_str.clone(), e);
+                                  repo_err = Some(Error(SimpleError::from(e)));
+                                }
+                              }
                             }
-                          },
-                          None => {}
+                          }
                         }
                       },
                       Err(e) => {
-    
+                        error!("Repo: {}, failed to fetch updates due to:\n{}", repo_str.clone(), e);
+                        repo_err = Some(Error(SimpleError::from(e)));
                       }
                     }
+                  },
+                  None => {
+                    warn!("Repo: {}, No remote source!", repo_str.clone());
                   }
                 }
+              },
+              Err(e) => {
+                error!("Repo: {}, Failed to get remotes, due to:\n{}", repo_str.clone(), e);
+                repo_err = Some(Error(SimpleError::from(e)));
               }
-
-              match main_remote {
-                Some(mut remote) => {
-                  match remote.fetch(&[repo_spec.branch.clone()], None, None) {
-                    Ok(_) => {
-                      let remote_branch = repo.find_branch(&repo_spec.branch.clone(), BranchType::Remote)?;
-                      if remote_branch.is_head() && (remote_branch.get().resolve()?.target().unwrap() == repo.head().unwrap().resolve()?.target().unwrap()) {
-
-                      } else {
-                        match repo.merge(
-                          &[&repo.find_annotated_commit(remote_branch.into_reference().resolve()?.target().unwrap())?], 
-                          Some(MergeOptions::new().file_favor(FileFavor::Theirs)), 
-                          None
-                        ) {
-                          Ok(_) => {
-                            match repo.cleanup_state() {
-                              Ok(_) => {
-                                repos_updated += 1;
-                                let comm = repo.head()?.peel_to_commit()?;
-                                let comm_str;
-                                match comm.message() {
-                                  Some(message) => {
-                                    comm_str = format!("{}, ({})", message, comm.id());
-                                  },
-                                  None => {
-                                    comm_str = comm.id().to_string();
-                                  }
-                                }
-
-                                info!("Updated {}, now using commit: {}!", repo_str, comm_str);
-                              },
-                              Err(e) => {
-
-                              }
-                            }
-                          },
-                          Err(e) => {
-                            match repo.cleanup_state() {
-                              Ok(_) => {
-
-                              },
-                              Err(e) => {
-
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    Err(e) => {
-
-                    }
-                  }
-                },
-                None => {
-                  warn!("No remote source for {}!", repo_str.clone());
-                }
-              }
-            },
-            Err(e) => {
-              
             }
+          },
+          Err(e) => {
+            error!("Repo: {}, failed to open git repository, due to:\n{}", repo_str.clone(),e);
+            repo_err = Some(Error(SimpleError::from(e)));
           }
-        },
-        Err(e) => {
-
         }
-      }
-    } else {
-      match Repository::clone_recurse(&repo_spec.src.clone(), repo_path.clone()) {
-        Ok(repo) => {
-          repos_updated += 1;
-          let comm = repo.head()?.peel_to_commit()?;
-          let comm_str;
-          match comm.message() {
-            Some(message) => {
-              comm_str = format!("{}, ({})", message, comm.id());
-            },
-            None => {
-              comm_str = comm.id().to_string();
+      } else {
+        match Repository::clone_recurse(&repo_spec.src.clone(), repo_path.clone()) {
+          Ok(repo) => {
+            repos_updated += 1;
+            let comm = repo.head()?.peel_to_commit()?;
+            let comm_str;
+            match comm.message() {
+              Some(message) => {
+                comm_str = format!("{}, ({})", message, comm.id());
+              },
+              None => {
+                comm_str = comm.id().to_string();
+              }
             }
+
+            info!("Repo: {}, Downloaded, now using commit: {}!", repo_str, comm_str);
+          },
+          Err(e) => {
+            error!("Repo: {}, failed to clone, due to:\n{}", repo_str, e);
+            repo_err = Some(Error(SimpleError::from(e)));
           }
-
-          info!("Downloaded {}, now using commit: {}!", repo_str, comm_str);
-        },
-        Err(e) => {
-
         }
       }
     }
 
-    match err {
-      Some(_) => {},
-      None => {
-        // Build manifest object and load it into the store.
-        let manifest_path = repo_path.join("/manifest.clover.jsonc");
-        if manifest_path.exists() {
-          match fs::File::open(manifest_path.clone()).await {
-            Ok(mut manifest_file) => {
-              let mut contents = String::new();
+    if (repo_err == None) && (err == None) {
+      // Build manifest object and load it into the store.
+      let manifest_path = repo_path.join("/manifest.clover.jsonc");
+      if manifest_path.exists() {
+        match fs::File::open(manifest_path.clone()).await {
+          Ok(mut manifest_file) => {
+            let mut contents = String::new();
 
-              match manifest_file.read_to_string(&mut contents).await {
-                Ok(_) => {
-                  match serde_jsonc::from_str::<ManifestSpec>(&contents) {
-                    Ok(raw_manifest_values) => {
-                      match Manifest::compile(raw_manifest_values, manifest_path.clone()) {
-                        Ok(manifest) => {
-                          let manifest_str;
-                          match manifest.name.clone() {
-                            OptionalString::Some(name) => {
-                              manifest_str = format!("{} ({})", name, repo_id.clone());
-                            },
-                            OptionalString::None => {
-                              manifest_str = repo_id.clone();
-                            }
+            match manifest_file.read_to_string(&mut contents).await {
+              Ok(_) => {
+                match serde_jsonc::from_str::<ManifestSpec>(&contents) {
+                  Ok(raw_manifest_values) => {
+                    match Manifest::compile(raw_manifest_values, manifest_path.clone()).await {
+                      Ok(manifest) => {
+                        let manifest_str;
+                        match manifest.name.clone() {
+                          OptionalString::Some(name) => {
+                            manifest_str = format!("{} ({})", name, repo_id.clone());
+                          },
+                          OptionalString::None => {
+                            manifest_str = repo_id.clone();
                           }
-
-                          store.repos.lock().await.insert(repo_id.clone(), manifest.clone());
-                          debug!("Loaded {}'s manifest!", manifest_str);
-                        },
-                        Err(e) => {
-
                         }
+
+                        store.repos.lock().await.insert(repo_id.clone(), manifest.clone());
+                        debug!("Loaded {}'s manifest!", manifest_str);
+                      },
+                      Err(e) => {
+                        error!("Repo: {}, failed to compile manifest, due to:\n{}", repo_str, e);
+                        repo_err = Some(Error(e));
                       }
-                    },
-                    Err(e) => {
-                      
                     }
+                  },
+                  Err(e) => {
+                    error!("Repo: {}, failed to parse manifest file, due to:\n{}", repo_str, e);
+                    repo_err = Some(Error(SimpleError::from(e)));
                   }
-                },
-                Err(e) => {
-                  
                 }
+              },
+              Err(e) => {
+                error!("Repo: {}, failed to read manifest file, due to:\n{}", repo_str, e);
+                repo_err = Some(Error(SimpleError::from(e)));
               }
-            },
-            Err(e) => {
-              
             }
+          },
+          Err(e) => {
+            error!("Repo: {}, failed to open manifest file, due to:\n{}", repo_str, e);
+            repo_err = Some(Error(SimpleError::from(e)));
           }
         }
       }
+    }
+
+    if repo_err != None {
+      repo_errors.push(repo_err.unwrap());
     }
   }
 
+  if (repo_errors.len() == repos.len()) && (repos.len() > 0) {
+    err = Some(Error(SimpleError::new("Failed to download/update all repos... this may point to a larger problem!")));
+  }
 
   match err {
     Some(e) => { Err(e) },
-    None => { 
-      if repos_updated > 0 { info!("Updated {} repo(s)!", repos_updated); }
+    None => {
+      if repo_errors.len() > 0 {
+        warn!("{} repos failed to check for updates and/or to upgrade!", repo_errors.len());
+      }
+
+      if repos_updated > 0 { 
+        info!("Updated {} repo(s)!", repos_updated);
+      }
+
+      info!("Finished repo update and upgrade check!");
+
       Ok(()) 
     }
   }

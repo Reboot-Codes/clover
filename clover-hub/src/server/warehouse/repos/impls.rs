@@ -3,7 +3,6 @@ use serde::Deserialize;
 use simple_error::SimpleError;
 use os_path::OsPath;
 use crate::server::appd::models::{BuildConfig, RepoCreds};
-
 use super::{models::*, resolve_entry_value, resolve_list_entry};
 
 impl ManifestCompilationFrom<Option<String>> for OptionalString {
@@ -97,7 +96,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
               Resolution::NoImport(val_str) => {
                 match serde_jsonc::from_str(&val_str) {
                   Ok(raw_val) => {
-                    match K::compile(raw_val, resolution_ctx) {
+                    match K::compile(raw_val, resolution_ctx).await {
                       Ok(val) => {
                         Optional::Some(val)
                       },
@@ -132,10 +131,10 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
 }
 
 impl ManifestCompilationFrom<String> for RequiredString {
-  fn compile(spec: String, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: String, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
-    let res = match resolve_entry_value(spec.clone(), resolution_ctx.clone()) {
+    let res = match resolve_entry_value(spec.clone(), resolution_ctx.clone()).await {
       Ok(resolution) => {
         match resolution {
           Resolution::ImportedMultiple(_) => {
@@ -172,7 +171,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
 }
 
 impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalStrStrHashMap {
-  fn compile(spec: OptionalStringListManifestSpecEntry, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: OptionalStringListManifestSpecEntry, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
     let ret: OptionalStrStrHashMap = match spec.clone() {
@@ -180,7 +179,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
         let mut entries = HashMap::new();
 
         for (intent_id, raw_intent) in raw_intents {
-          match resolve_entry_value(raw_intent.try_into().unwrap(), resolution_ctx.clone()) {
+          match resolve_entry_value(raw_intent.try_into().unwrap(), resolution_ctx.clone()).await {
             Ok(resolution) => {
               match resolution {
                 Resolution::ImportedMultiple(_) => {
@@ -220,7 +219,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
         }
       },
       OptionalStringListManifestSpecEntry::ImportString(import_str) => {
-        match resolve_entry_value(import_str, resolution_ctx.clone()) {
+        match resolve_entry_value(import_str, resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedSingle(raw_val) => {
@@ -290,13 +289,13 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
 impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for OptionalStrTHashMap<K> where
   K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
 {
-  fn compile(spec: OptionalListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: OptionalListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
     let mut entries = OptionalStrTHashMap::None;
 
     match spec {
         OptionalListManifestSpecEntry::Some(hash_map) => {
-          match resolve_list_entry(hash_map, resolution_ctx.clone()) {
+          match resolve_list_entry(hash_map, resolution_ctx.clone()).await {
             Ok(list) => {
               entries = OptionalStrTHashMap::Some(list);
             },
@@ -308,7 +307,7 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
         OptionalListManifestSpecEntry::ImportString(raw_str) => {
           match serde_jsonc::from_str(&raw_str) {
             Ok(hash_map) => {
-              match resolve_list_entry(hash_map, resolution_ctx.clone()) {
+              match resolve_list_entry(hash_map, resolution_ctx.clone()).await {
                 Ok(list) => {
                   entries = OptionalStrTHashMap::Some(list);
                 },
@@ -333,12 +332,12 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
 }
 
 impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a> Deserialize<'a>> ManifestCompilationFrom<RequiredListManifestSpecEntry<T>> for RequiredStrTHashMap<K> {
-  fn compile(spec: RequiredListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: RequiredListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
     let res = match spec.clone() {
       RequiredListManifestSpecEntry::ImportString(spec_str) => {
-        match resolve_entry_value(spec_str.clone(), resolution_ctx.clone()) {
+        match resolve_entry_value(spec_str.clone(), resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedMultiple(_) => {
@@ -353,7 +352,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     for (entry_id, raw_entry) in spec_list {
                       match raw_entry {
                         RequiredSingleManifestEntry::Some(raw_entry_obj) => {
-                          match K::compile(raw_entry_obj, resolution_ctx.clone()) {
+                          match K::compile(raw_entry_obj, resolution_ctx.clone()).await {
                             Ok(val) => {
                               entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                             },
@@ -363,13 +362,13 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         RequiredSingleManifestEntry::ImportString(raw_entry_str) => {
-                          match resolve_entry_value(raw_entry_str, resolution_ctx.clone()) {
+                          match resolve_entry_value(raw_entry_str, resolution_ctx.clone()).await {
                             Ok(resolution) => {
                               match resolution {
                                 Resolution::ImportedSingle(val_str) => {
                                   match serde_jsonc::from_str(&val_str) {
                                     Ok(raw_val) => {
-                                      match K::compile(raw_val, resolution_ctx.clone()) {
+                                      match K::compile(raw_val, resolution_ctx.clone()).await {
                                         Ok(val) => {
                                           entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                                         },
@@ -387,7 +386,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                   for (val_id, val_str) in hash_map {
                                     match serde_jsonc::from_str(&val_str) {
                                       Ok(raw_val) => {
-                                        match K::compile(raw_val, resolution_ctx.clone()) {
+                                        match K::compile(raw_val, resolution_ctx.clone()).await {
                                           Ok(val) => {
                                             entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
                                           },
@@ -405,7 +404,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                 Resolution::NoImport(val_str) => {
                                   match serde_jsonc::from_str(&val_str) {
                                     Ok(raw_val) => {
-                                      match K::compile(raw_val, resolution_ctx.clone()) {
+                                      match K::compile(raw_val, resolution_ctx.clone()).await {
                                         Ok(val) => {
                                           entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                                         },
@@ -466,7 +465,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
         for (entry_id, raw_entry) in spec_list {
           match raw_entry {
             RequiredSingleManifestEntry::Some(raw_entry_obj) => {
-              match K::compile(raw_entry_obj, resolution_ctx.clone()) {
+              match K::compile(raw_entry_obj, resolution_ctx.clone()).await {
                 Ok(val) => {
                   entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                 },
@@ -476,13 +475,13 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
               }
             },
             RequiredSingleManifestEntry::ImportString(raw_entry_str) => {
-              match resolve_entry_value(raw_entry_str, resolution_ctx.clone()) {
+              match resolve_entry_value(raw_entry_str, resolution_ctx.clone()).await {
                 Ok(resolution) => {
                   match resolution {
                     Resolution::ImportedSingle(val_str) => {
                       match serde_jsonc::from_str(&val_str) {
                         Ok(raw_val) => {
-                          match K::compile(raw_val, resolution_ctx.clone()) {
+                          match K::compile(raw_val, resolution_ctx.clone()).await {
                             Ok(val) => {
                               entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                             },
@@ -500,7 +499,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                       for (val_id, val_str) in hash_map {
                         match serde_jsonc::from_str(&val_str) {
                           Ok(raw_val) => {
-                            match K::compile(raw_val, resolution_ctx.clone()) {
+                            match K::compile(raw_val, resolution_ctx.clone()).await {
                               Ok(val) => {
                                 entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
                               },
@@ -518,7 +517,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     Resolution::NoImport(val_str) => {
                       match serde_jsonc::from_str(&val_str) {
                         Ok(raw_val) => {
-                          match K::compile(raw_val, resolution_ctx.clone()) {
+                          match K::compile(raw_val, resolution_ctx.clone()).await {
                             Ok(val) => {
                               entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                             },
@@ -558,13 +557,13 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
 }
 
 impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for OptionalBoolean {
-  fn compile(spec: OptionalSingleManifestSpecEntry<bool>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, Option<bool>: for<'a> Deserialize<'a> {
+  async fn compile(spec: OptionalSingleManifestSpecEntry<bool>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, Option<bool>: for<'a> Deserialize<'a> {
     let mut err = None;
 
     let ret = match spec {
       OptionalSingleManifestSpecEntry::Some(val) => OptionalBoolean::Some(val),
       OptionalSingleManifestSpecEntry::ImportString(raw_spec) => {
-        match resolve_entry_value(raw_spec, resolution_ctx.clone()) {
+        match resolve_entry_value(raw_spec, resolution_ctx.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedMultiple(_) => {
@@ -614,10 +613,10 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
 //* ----------------------------
 
 impl Manifest {
-  pub fn compile(spec: ManifestSpec, spec_path: OsPath) -> Result<Manifest, SimpleError> {
+  pub async fn compile(spec: ManifestSpec, spec_path: OsPath) -> Result<Manifest, SimpleError> {
     let mut err = None;
 
-    let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, here: spec_path.clone() }) {
+    let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, here: spec_path.clone() }).await {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
@@ -633,7 +632,7 @@ impl Manifest {
       here: spec_path.clone() 
     };
     
-    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()) {
+    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
@@ -641,7 +640,7 @@ impl Manifest {
       }
     };
 
-    let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()) {
+    let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()).await {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
@@ -649,7 +648,7 @@ impl Manifest {
       }
     };
 
-    let modules = match OptionalStrTHashMap::compile(spec.modules.clone(), resolution_ctx.clone()) {
+    let modules = match OptionalStrTHashMap::compile(spec.modules.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -659,7 +658,7 @@ impl Manifest {
       }
     };
 
-    let applications = match OptionalStrTHashMap::compile(spec.applications.clone(), resolution_ctx.clone()) {
+    let applications = match OptionalStrTHashMap::compile(spec.applications.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -670,7 +669,7 @@ impl Manifest {
     };
 
     #[cfg(feature = "core")]
-    let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), resolution_ctx.clone()) {
+    let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -698,10 +697,10 @@ impl Manifest {
 }
 
 impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
-  fn compile(spec: RawApplicationSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: RawApplicationSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
-    let name = match RequiredString::compile(spec.name.clone(), resolution_ctx.clone()) {
+    let name = match RequiredString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
@@ -709,7 +708,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
       }
     };
 
-    let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()) {
+    let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone()).await {
       Ok(val) => { val },
       Err(e) => {
         err = Some(e);
@@ -717,7 +716,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
       }
     };
 
-    let intents = match OptionalStrStrHashMap::compile(spec.intents.clone(), resolution_ctx.clone()) {
+    let intents = match OptionalStrStrHashMap::compile(spec.intents.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -727,7 +726,7 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
       }
     };
 
-    let containers  = match OptionalStrTHashMap::compile(spec.containers.clone(), resolution_ctx.clone()) {
+    let containers  = match OptionalStrTHashMap::compile(spec.containers.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -752,10 +751,10 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
 }
 
 impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
-  fn compile(spec: RawContainerSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawContainerSpec: for<'a> Deserialize<'a> {
+  async fn compile(spec: RawContainerSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawContainerSpec: for<'a> Deserialize<'a> {
     let mut err = None;
 
-    let interface = match OptionalBoolean::compile(spec.interface.clone(), resolution_ctx.clone()) {
+    let interface = match OptionalBoolean::compile(spec.interface.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -765,7 +764,7 @@ impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
       }
     };
 
-    let build = match Optional::compile(spec.build.clone(), resolution_ctx.clone()) {
+    let build = match Optional::compile(spec.build.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -788,10 +787,10 @@ impl ManifestCompilationFrom<RawContainerSpec> for ContainerSpec {
 }
 
 impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
-  fn compile(spec: RawBuildConfig, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawBuildConfig: for<'a> Deserialize<'a> {
+  async fn compile(spec: RawBuildConfig, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawBuildConfig: for<'a> Deserialize<'a> {
     let mut err = None;
 
-    let url_field = match RequiredString::compile(spec.url.clone(), resolution_ctx.clone()) {
+    let url_field = match RequiredString::compile(spec.url.clone(), resolution_ctx.clone()).await {
       Ok(val) => val,
       Err(e) => {
         err = Some(e);
@@ -799,7 +798,7 @@ impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
       }
     };
 
-    let creds = match Optional::compile(spec.creds.clone(), resolution_ctx.clone()) {
+    let creds = match Optional::compile(spec.creds.clone(), resolution_ctx.clone()).await {
       Ok(val) => val,
       Err(e) => {
         err = Some(e);
@@ -818,10 +817,10 @@ impl ManifestCompilationFrom<RawBuildConfig> for BuildConfig {
 }
 
 impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
-  fn compile(spec: RawRepoCreds, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawRepoCreds: for<'a> Deserialize<'a> {
+  async fn compile(spec: RawRepoCreds, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawRepoCreds: for<'a> Deserialize<'a> {
     let mut err = None;
 
-    let username = match OptionalString::compile(spec.username.clone(), resolution_ctx.clone()) {
+    let username = match OptionalString::compile(spec.username.clone(), resolution_ctx.clone()).await {
       Ok(val) => val,
       Err(e) => {
         err = Some(e);
@@ -829,7 +828,7 @@ impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
       }
     };
 
-    let key = match RequiredString::compile(spec.key.clone(), resolution_ctx.clone()) {
+    let key = match RequiredString::compile(spec.key.clone(), resolution_ctx.clone()).await {
       Ok(val) => val,
       Err(e) => {
         err = Some(e);
@@ -848,10 +847,10 @@ impl ManifestCompilationFrom<RawRepoCreds> for RepoCreds {
 }
 
 impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
-  fn compile(spec: RawModuleSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: RawModuleSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
-    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()) {
+    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -873,10 +872,10 @@ impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
 }
 
 impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
-  fn compile(spec: RawExpressionPackSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
+  async fn compile(spec: RawExpressionPackSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
 
-    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()) {
+    let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -886,7 +885,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
       }
     };
 
-    let expressions = match OptionalStrTHashMap::compile(spec.expressions.clone(), resolution_ctx.clone()) {
+    let expressions = match OptionalStrTHashMap::compile(spec.expressions.clone(), resolution_ctx.clone()).await {
       Ok(val) => {
         val
       },
@@ -909,12 +908,12 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
 }
 
 impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
-  fn compile(spec: RawExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawExpressionSpec: for<'a> Deserialize<'a> {
+  async fn compile(spec: RawExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawExpressionSpec: for<'a> Deserialize<'a> {
     let mut err = None;
 
     let ret = match spec {
       RawExpressionSpec::RawStaticExpressionSpec(raw_expression_spec) => {
-        match StaticExpressionSpec::compile(raw_expression_spec, resolution_ctx.clone()) {
+        match StaticExpressionSpec::compile(raw_expression_spec, resolution_ctx.clone()).await {
           Ok(val) => { let static_expression_spec = Self::StaticExpressionSpec(val); static_expression_spec },
           Err(e) => {
             err = Some(e);
@@ -932,10 +931,10 @@ impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
 }
 
 impl ManifestCompilationFrom<RawStaticExpressionSpec> for StaticExpressionSpec {
-  fn compile(spec: RawStaticExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawStaticExpressionSpec: for<'a> Deserialize<'a> {
+  async fn compile(spec: RawStaticExpressionSpec, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, RawStaticExpressionSpec: for<'a> Deserialize<'a> {
     let mut err = None;
 
-    let static_url = match RequiredString::compile(spec.static_url.clone(), resolution_ctx.clone()) {
+    let static_url = match RequiredString::compile(spec.static_url.clone(), resolution_ctx.clone()).await {
       Ok(val) => val,
       Err(e) => {
         err = Some(e);

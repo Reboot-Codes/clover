@@ -14,9 +14,6 @@ use crate::server::evtbuzz::models::Store;
 // TODO: Move to snafu crate.
 #[derive(Debug, Clone)]
 pub enum Error {
-  FailedToCheckDataDir {
-    error: SimpleError
-  },
   FailedToCreateDataDir {
     error: SimpleError
   },
@@ -38,6 +35,12 @@ pub enum Error {
   FailedToCreateReposDir {
     error: SimpleError
   },
+  FailedToDownloadAndRegisterRepos {
+    error: SimpleError
+  },
+  FailedToUpdateRepoDirectoryStructure {
+    error: SimpleError
+  }
 }
 
 pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), Error> {
@@ -120,6 +123,8 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
     }
   }
 
+  debug!("Running repo dir bootstrap...");
+
   // Read repo data and load into applicable areas in the store.
   let repo_dir_path = warehouse_path.join("/repos/");
   match err {
@@ -127,7 +132,9 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
     None => {
       if !repo_dir_path.exists() {
         match fs::create_dir(repo_dir_path.clone()).await {
-          Ok(_) => {},
+          Ok(_) => {
+            debug!("Created repo directory!");
+          },
           Err(e) => {
             err = Some(Error::FailedToCreateReposDir { error: SimpleError::from(e) });
           }
@@ -136,26 +143,32 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
     }
   }
 
+  debug!("Updating repo dir structure...");
+
   match err {
     Some(_) => {},
     None => {
-      match update_repo_dir_structure(store.config.lock().await.repos.clone()).await {
+      match update_repo_dir_structure(store.clone()).await {
         Ok(_) => {
-          match download_repo_updates(store.config.lock().await.repos.clone(), store.clone(), repo_dir_path.clone()).await {
+          debug!("Updated repo dir structure, downloading repo updates...");
+
+          match download_repo_updates(store.clone(), repo_dir_path.clone()).await {
             Ok(_) => {
-              
+              info!("Loaded {} repo(s)!", store.repos.lock().await.len());  
             },
-            Err(e) => {
-              
+            Err(error) => {
+              err = Some(Error::FailedToDownloadAndRegisterRepos { error: error.0 });
             }
           }
         },
-        Err(e) => {
-          
+        Err(error) => {
+          err = Some(Error::FailedToUpdateRepoDirectoryStructure { error: error.0 });
         }
       }
     }
   }
+
+  drop(store);
 
   // Return any errors if they occurred
   match err {
