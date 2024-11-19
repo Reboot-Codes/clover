@@ -25,12 +25,14 @@ pub struct ResolutionCtx {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum RequiredSingleManifestEntry<T> {
   Some(T),
   ImportString(String)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalSingleManifestSpecEntry<T> {
   Some(T),
   ImportString(String),
@@ -38,6 +40,7 @@ pub enum OptionalSingleManifestSpecEntry<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalStrTHashMap<T> {
   Some(HashMap<String, T>),
   None
@@ -47,18 +50,21 @@ pub enum OptionalStrTHashMap<T> {
 pub struct RequiredStrTHashMap<T>(pub HashMap<String, RequiredSingleManifestEntry<T>>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalBoolean {
   Some(bool),
   None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum RequiredBoolean {
   Some(bool),
   ImportString(String)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String),
@@ -66,12 +72,14 @@ pub enum OptionalListManifestSpecEntry<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum RequiredListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ManifestEntry<T> {
   RequiredSingleManifestEntry(RequiredSingleManifestEntry<T>),
   OptionalSingleManifestEntry(OptionalSingleManifestSpecEntry<T>),
@@ -80,12 +88,14 @@ pub enum ManifestEntry<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalStrStrHashMap {
   Some(HashMap<String, String>),
   None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalStringListManifestSpecEntry {
   Some(HashMap<String, String>),
   ImportString(String),
@@ -93,12 +103,14 @@ pub enum OptionalStringListManifestSpecEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionalString {
   Some(String),
   None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Optional<T> {
   Some(T),
   ImportString(String),
@@ -115,6 +127,7 @@ pub struct ManifestSpec {
   pub modules: OptionalListManifestSpecEntry<RawModuleSpec>,
   pub applications: OptionalListManifestSpecEntry<RawApplicationSpec>,
   #[cfg(feature = "core")]
+  #[serde(rename = "expression-packs")]
   pub expression_packs: OptionalListManifestSpecEntry<RawExpressionPackSpec>
 }
 
@@ -162,6 +175,7 @@ pub struct RawExpressionPackSpec {
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum RawExpressionSpec {
   RawStaticExpressionSpec(RawStaticExpressionSpec),
 }
@@ -211,6 +225,7 @@ pub struct ExpressionPackSpec {
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ExpressionSpec {
   StaticExpressionSpec(StaticExpressionSpec),
 }

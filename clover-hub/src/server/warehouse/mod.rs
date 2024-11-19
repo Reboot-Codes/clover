@@ -148,7 +148,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   match err {
     Some(_) => {},
     None => {
-      match update_repo_dir_structure(store.clone()).await {
+      match update_repo_dir_structure(repo_dir_path.clone(), store.clone()).await {
         Ok(_) => {
           debug!("Updated repo dir structure, downloading repo updates...");
 

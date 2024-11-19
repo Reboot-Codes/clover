@@ -130,12 +130,12 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
   }
 }
 
-pub async fn update_repo_dir_structure(store: Arc<Store>) -> Result<(), Error> {
+pub async fn update_repo_dir_structure(repo_dir_path: OsPath, store: Arc<Store>) -> Result<(), Error> {
   let mut err = None;
   let repos = store.config.lock().await.repos.clone();
 
   for (repo_id, _repo_spec) in repos {
-    let repo_id_segments = OsPath::from(repo_id.split(".").collect::<Vec<&str>>().join("/")).join("@repo");
+    let repo_id_segments = OsPath::from(repo_dir_path.clone().to_string()).join(repo_id.split(".").collect::<Vec<&str>>().join("/")).join("@repo");
 
     if !repo_id_segments.exists() {
       match fs::create_dir_all(repo_id_segments.to_string()).await {
@@ -263,11 +263,7 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
 
   for (repo_id, repo_spec) in repos.clone() {
     let mut repo_err = None;
-
-    let mut repo_path = OsPath::new().join(repo_dir_path.clone().to_string()).join("/@repo/");
-    for id_segment in repo_id.split(".").collect::<Vec<&str>>() {
-      repo_path.push(id_segment);
-    }
+    let repo_path = OsPath::new().join(repo_dir_path.clone().to_string()).join(repo_id.split(".").collect::<Vec<&str>>().join("/")).join("/@repo/");
     
     let repo_str;
     match repo_spec.name {
@@ -316,9 +312,11 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
 
                 match main_remote {
                   Some(mut remote) => {
-                    match remote.fetch(&[repo_spec.branch.clone()], None, None) {
+                    let remote_branch_name = repo_spec.branch.clone();
+
+                    match remote.fetch(&[remote_branch_name.clone()], None, None) {
                       Ok(_) => {
-                        let remote_branch = repo.find_branch(&repo_spec.branch.clone(), BranchType::Remote)?;
+                        let remote_branch = repo.find_branch(&format!("{}/{}", remote.name().unwrap(), remote_branch_name.clone()), BranchType::Remote)?;
                         if remote_branch.is_head() && (remote_branch.get().resolve()?.target().unwrap() == repo.head().unwrap().resolve()?.target().unwrap()) {
 
                         } else {
@@ -345,6 +343,7 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
                                   info!("Repo: {}, Updated, now using commit: {}!", repo_str, comm_str);
                                 },
                                 Err(e) => {
+                                  error!("Repo: {}, failed to merge commits due to:\n{}", repo_str, e);
                                   repo_err = Some(Error(SimpleError::from(e)));
                                 }
                               }

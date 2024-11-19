@@ -24,7 +24,7 @@ impl ManifestCompilationFrom<Option<String>> for OptionalString {
                     OptionalString::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalString::None
                   }
                 }
@@ -88,7 +88,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     Optional::None
                   }
                 }
@@ -107,7 +107,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     Optional::None
                   }
                 }
@@ -147,7 +147,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
                 RequiredString(val)
               },
               Err(e) => {
-                err = Some(SimpleError::from(e));
+                err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                 Default::default()
               }
             }
@@ -192,7 +192,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(intent_id, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::from(e));
+                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                       break;
                     }
                   }
@@ -228,7 +228,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                     OptionalStrStrHashMap::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalStrStrHashMap::None
                   }
                 }
@@ -242,7 +242,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(val_key, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::from(e));
+                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                       break;
                     }
                   }
@@ -263,7 +263,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                     OptionalStrStrHashMap::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalStrStrHashMap::None
                   }
                 }
@@ -317,7 +317,7 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
               }
             },
             Err(e) => {
-              err = Some(SimpleError::from(e));
+              err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
             }
           }
         },
@@ -378,7 +378,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                       }
                                     },
                                     Err(e) => {
-                                      err = Some(SimpleError::from(e));
+                                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                                     }
                                   }
                                 },
@@ -396,7 +396,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                         }
                                       },
                                       Err(e) => {
-                                        err = Some(SimpleError::from(e));
+                                        err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                                       }
                                     }
                                   }
@@ -414,7 +414,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                       }
                                     },
                                     Err(e) => {
-                                      err = Some(SimpleError::from(e));
+                                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                                     }
                                   }
                                 },
@@ -435,7 +435,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     RequiredStrTHashMap(HashMap::new())
                   }
                 }
@@ -446,7 +446,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     RequiredStrTHashMap(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     RequiredStrTHashMap(HashMap::new())
                   }
                 }
@@ -491,7 +491,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         Err(e) => {
-                          err = Some(SimpleError::from(e));
+                          err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                         }
                       }
                     },
@@ -509,7 +509,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                             }
                           },
                           Err(e) => {
-                            err = Some(SimpleError::from(e));
+                            err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                           }
                         }
                       }
@@ -527,7 +527,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         Err(e) => {
-                          err = Some(SimpleError::from(e));
+                          err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                         }
                       }
                     },
@@ -576,7 +576,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
                     OptionalBoolean::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalBoolean::None
                   }
                 }
@@ -587,7 +587,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
                     OptionalBoolean::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::from(e));
+                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalBoolean::None
                   }
                 }
