@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use log::debug;
+use log::{debug, info};
 use serde::Deserialize;
 use simple_error::SimpleError;
 use os_path::OsPath;
@@ -25,7 +25,7 @@ impl ManifestCompilationFrom<Option<String>> for OptionalString {
                     OptionalString::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalString, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                     OptionalString::None
                   }
                 }
@@ -89,7 +89,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("Optional, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                     Optional::None
                   }
                 }
@@ -108,7 +108,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+                    err = Some(SimpleError::new(format!("Optional, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     Optional::None
                   }
                 }
@@ -148,7 +148,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
                 RequiredString(val)
               },
               Err(e) => {
-                err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                err = Some(SimpleError::new(format!("RequiredString, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                 Default::default()
               }
             }
@@ -193,7 +193,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(intent_id, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                       break;
                     }
                   }
@@ -229,7 +229,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                     OptionalStrStrHashMap::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                     OptionalStrStrHashMap::None
                   }
                 }
@@ -243,7 +243,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(val_key, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                       break;
                     }
                   }
@@ -264,7 +264,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                     OptionalStrStrHashMap::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+                    err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalStrStrHashMap::None
                   }
                 }
@@ -287,12 +287,14 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
   }
 }
 
-impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for OptionalStrTHashMap<K> where
+impl<T: Clone + std::fmt::Debug, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for OptionalStrTHashMap<K> where
   K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
 {
   async fn compile(spec: OptionalListManifestSpecEntry<T>, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized {
     let mut err = None;
     let mut entries = OptionalStrTHashMap::None;
+
+    debug!("{:?}", spec.clone());
 
     match spec {
         OptionalListManifestSpecEntry::Some(hash_map) => {
@@ -306,6 +308,8 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
           }
         },
         OptionalListManifestSpecEntry::ImportString(raw_str) => {
+          debug!("{}", raw_str.clone());
+
           match serde_jsonc::from_str(&raw_str) {
             Ok(hash_map) => {
               match resolve_list_entry(hash_map, resolution_ctx.clone()).await {
@@ -318,7 +322,7 @@ impl<T, K> ManifestCompilationFrom<OptionalListManifestSpecEntry<T>> for Optiona
               }
             },
             Err(e) => {
-              err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+              err = Some(SimpleError::new(format!("OptionalStrTHashMap, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
             }
           }
         },
@@ -379,7 +383,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                       }
                                     },
                                     Err(e) => {
-                                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                                      err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
                                     }
                                   }
                                 },
@@ -397,7 +401,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                         }
                                       },
                                       Err(e) => {
-                                        err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                                        err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
                                       }
                                     }
                                   }
@@ -415,7 +419,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                       }
                                     },
                                     Err(e) => {
-                                      err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+                                      err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                                     }
                                   }
                                 },
@@ -436,7 +440,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone().base, e)));
+                    err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:?}\nerr: {}", resolution_ctx.clone().base, e)));
                     RequiredStrTHashMap(HashMap::new())
                   }
                 }
@@ -447,7 +451,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     RequiredStrTHashMap(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone().base, e)));
+                    err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:?}\nerr: {}", resolution_ctx.clone().base, e)));
                     RequiredStrTHashMap(HashMap::new())
                   }
                 }
@@ -492,7 +496,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         Err(e) => {
-                          err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                          err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                         }
                       }
                     },
@@ -510,7 +514,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                             }
                           },
                           Err(e) => {
-                            err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                            err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
                           }
                         }
                       }
@@ -528,7 +532,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         Err(e) => {
-                          err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+                          err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                         }
                       }
                     },
@@ -577,7 +581,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
                     OptionalBoolean::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalBoolean, ctx: {:?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
                     OptionalBoolean::None
                   }
                 }
@@ -588,7 +592,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
                     OptionalBoolean::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
+                    err = Some(SimpleError::new(format!("OptionalBoolean, ctx: {:?}\nerr: {}", resolution_ctx.clone(), e)));
                     OptionalBoolean::None
                   }
                 }

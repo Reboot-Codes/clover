@@ -168,6 +168,8 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
   let mut ret: Resolution = Resolution::NoImport(value.clone());
   let mut err = None;
 
+  debug!("{}", value.clone());
+
   if import_re.is_match(&value.clone()) {
     let mut import_path = OsPath::new().join(
       resolution_ctx.here.join(import_re.captures(&value.clone()).unwrap().name("src").unwrap().as_str()).to_string()
@@ -202,6 +204,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
 
                 match read_file(file_path.clone()).await {
                   Ok(contents) => {
+                    debug!("{}:\n{}", file_path.clone().to_string(), contents.clone());
                     entries.insert(file_path.name().unwrap().clone(), contents);
                   },
                   Err(e) => {
@@ -228,6 +231,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
     if import_path.exists() {
       match read_file(import_path.clone()).await {
         Ok(contents) => {
+          debug!("{}", contents.clone());
           ret = Resolution::ImportedSingle((import_path.clone(), contents));
         },
         Err(e) => {
@@ -325,7 +329,7 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
 
                         } else {
                           match repo.checkout_tree(
-                            &remote_branch.get().peel_to_tree().unwrap().as_object(), 
+                            remote_branch.get().peel_to_tree().unwrap().as_object(), 
                             Some(CheckoutBuilder::new().conflict_style_merge(true).force()), 
                           ) {
                             Ok(_) => {
@@ -424,8 +428,12 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
 
             match manifest_file.read_to_string(&mut contents).await {
               Ok(_) => {
+                debug!("{}", contents.clone());
+
                 match serde_jsonc::from_str::<ManifestSpec>(&contents) {
                   Ok(raw_manifest_values) => {
+                    debug!("{:?}", raw_manifest_values.clone());
+
                     match Manifest::compile(raw_manifest_values, manifest_path.clone()).await {
                       Ok(manifest) => {
                         let manifest_str;

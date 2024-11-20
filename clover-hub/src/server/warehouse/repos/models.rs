@@ -4,8 +4,7 @@ use simple_error::SimpleError;
 use os_path::OsPath;
 use crate::server::appd::models::BuildConfig;
 
-// TODO: Define defaults via `Default` trait impl.
-
+// TODO: Define defaults via `Default` trait impl for enums that returns its none variant.
 pub enum Resolution {
   /// Raw file content from a resolved `@import`. Should be deserialized prior to use!
   ImportedSingle((OsPath, String)),
@@ -31,28 +30,31 @@ pub enum RequiredSingleManifestEntry<T> {
   ImportString(String)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalSingleManifestSpecEntry<T> {
   Some(T),
   ImportString(String),
+  #[default]
   None
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalStrTHashMap<T> {
   Some(HashMap<String, T>),
+  #[default]
   None
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequiredStrTHashMap<T>(pub HashMap<String, RequiredSingleManifestEntry<T>>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalBoolean {
   Some(bool),
+  #[default]
   None
 }
 
@@ -87,33 +89,37 @@ pub enum ManifestEntry<T> {
   OptionalListManifestEntry(OptionalListManifestSpecEntry<T>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalStrStrHashMap {
   Some(HashMap<String, String>),
+  #[default] 
   None
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalStringListManifestSpecEntry {
   Some(HashMap<String, String>),
   ImportString(String),
+  #[default]
   None
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalString {
   Some(String),
+  #[default]
   None
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum Optional<T> {
   Some(T),
   ImportString(String),
+  #[default]
   None
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -140,13 +146,17 @@ pub struct RawModuleSpec {
 pub struct RawApplicationSpec {
   pub name: String,
   pub version: String,
+  #[serde(default)]
   pub intents: OptionalStringListManifestSpecEntry,
+  #[serde(default)]
   pub containers: OptionalListManifestSpecEntry<RawContainerSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawContainerSpec {
+  #[serde(default)]
   pub interface: OptionalSingleManifestSpecEntry<bool>,
+  #[serde(default)]
   pub build: OptionalSingleManifestSpecEntry<RawBuildConfig>,
 }
 
@@ -155,6 +165,7 @@ pub struct RawBuildConfig {
   /// Url to either container repo, or source git repo
   pub url: String,
   /// Optional repository creds
+  #[serde(default)]
   pub creds: OptionalSingleManifestSpecEntry<RawRepoCreds>
 }
 
@@ -170,6 +181,7 @@ pub struct RawRepoCreds {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawExpressionPackSpec {
   pub name: Option<String>,
+  #[serde(default)]
   pub expressions: OptionalListManifestSpecEntry<RawExpressionSpec>
 }
 
@@ -189,17 +201,23 @@ pub struct RawStaticExpressionSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
+  #[serde(default)]
   pub name: OptionalString,
   pub version: RequiredString,
+  #[serde(default)]
   pub base: OptionalString,
+  #[serde(default)]
   pub modules: OptionalStrTHashMap<ModuleSpec>,
+  #[serde(default)]
   pub applications: OptionalStrTHashMap<ApplicationSpec>,
   #[cfg(feature = "core")]
+  #[serde(default)]
   pub expression_packs: OptionalStrTHashMap<ExpressionPackSpec>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleSpec {
+  #[serde(default)]
   pub name: OptionalString,
 }
 
@@ -207,20 +225,26 @@ pub struct ModuleSpec {
 pub struct ApplicationSpec {
   pub name: RequiredString,
   pub version: RequiredString,
+  #[serde(default)]
   pub intents: OptionalStrStrHashMap,
+  #[serde(default)]
   pub containers: OptionalStrTHashMap<ContainerSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContainerSpec {
+  #[serde(default)]
   pub interface: OptionalBoolean,
+  #[serde(default)]
   pub build: Optional<BuildConfig>,
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExpressionPackSpec {
+  #[serde(default)]
   pub name: OptionalString,
+  #[serde(default)]
   pub expressions: OptionalStrTHashMap<ExpressionSpec>
 }
 
@@ -232,7 +256,7 @@ pub enum ExpressionSpec {
 }
 
 #[cfg(feature = "core")]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaticExpressionSpec {
   pub static_url: RequiredString
 }
