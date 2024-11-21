@@ -3,7 +3,7 @@ pub mod impls;
 
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use std::{collections::HashMap, sync::Arc};
-use git2::{build::CheckoutBuilder, BranchType, FileFavor, Index, MergeOptions, Repository};
+use git2::{build::CheckoutBuilder, BranchType, Repository};
 use log::{debug, error, info, warn};
 use models::{Manifest, ManifestCompilationFrom, ManifestSpec, OptionalString, RequiredSingleManifestEntry, Resolution, ResolutionCtx};
 use os_path::OsPath;
@@ -22,7 +22,22 @@ impl From<git2::Error> for Error {
   }
 }
 
-pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx) -> Result<HashMap<String, K>, SimpleError> 
+pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
+  let base_re = Regex::new("(?<directive>\\@base)").unwrap();
+  let here_re = Regex::new("(?<directive>\\@here)").unwrap();
+
+  let mut val = value.clone();
+  match resolution_ctx.base {
+    Some(base) => {
+      val = String::from(base_re.replace(&value.clone(), base));
+    },
+    None => {}
+  }
+
+  String::from(here_re.replace(&val.clone(), resolution_ctx.here.to_string()))
+}
+
+pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<HashMap<String, K>, SimpleError> 
   where K: ManifestCompilationFrom<T>, T: for<'a> Deserialize<'a>
 {
   let mut err = None;
@@ -38,7 +53,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
 
     match raw_entry {
       RequiredSingleManifestEntry::ImportString(str) => {
-        match resolve_entry_value(str, resolution_ctx.clone()).await {
+        match resolve_entry_value(str, resolution_ctx.clone(), repo_dir_path.clone()).await {
           Ok(resolution) => {
             match resolution {
               Resolution::ImportedSingle((here, raw_obj)) => {
@@ -47,9 +62,9 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                 } else {
                   match serde_jsonc::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
-                      match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here }).await {
+                      match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
                         Ok(obj) => {
-                          entries.insert(key.clone(), obj);
+                          entries.insert(replace_simple_directives(key.clone(), ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }), obj);
                         },
                         Err(e) => {
                           entry_err = Some(e);
@@ -67,7 +82,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                   for (obj_key_seg, raw_obj) in raw_objs {
                     match serde_jsonc::from_str::<T>(&raw_obj) {
                       Ok(obj_spec) => {
-                        match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }).await {
+                        match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
                           Ok(obj) => {
                             entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
                           },
@@ -86,7 +101,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
               Resolution::NoImport(raw_obj) => {
                 match serde_jsonc::from_str::<T>(&raw_obj) {
                   Ok(obj_spec) => {
-                    match K::compile(obj_spec, resolution_ctx.clone()).await {
+                    match K::compile(obj_spec, resolution_ctx.clone(), repo_dir_path.clone()).await {
                       Ok(obj) => {
                         entries.insert(key.clone(), obj);
                       },
@@ -108,7 +123,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
         }
       },
       RequiredSingleManifestEntry::Some(obj_spec) => {
-        match K::compile(obj_spec, resolution_ctx.clone()).await {
+        match K::compile(obj_spec, resolution_ctx.clone(), repo_dir_path.clone()).await {
           Ok(obj) => {
             entries.insert(key.clone(), obj);
           },
@@ -161,26 +176,57 @@ pub async fn update_repo_dir_structure(repo_dir_path: OsPath, store: Arc<Store>)
 }
 
 /// Used to resolve repo manifest entry **values** that may have directives (`@import`, `@base`, `@here`) in them.
-pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -> Result<Resolution, SimpleError> {
+pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Resolution, SimpleError> {
   let import_re = Regex::new("^\\@import\\(('|\"|`)(?<src>.+)('|\"|`)\\)$").unwrap();
-  let base_re = Regex::new("(?<directive>\\@base)").unwrap();
-  let here_re = Regex::new("(?<directive>\\@here)").unwrap();
   let mut ret: Resolution = Resolution::NoImport(value.clone());
   let mut err = None;
 
-  debug!("{}", value.clone());
+  debug!("resolve_entry_value: {}", value.clone());
 
   if import_re.is_match(&value.clone()) {
-    let mut import_path = OsPath::new().join(
-      resolution_ctx.here.join(import_re.captures(&value.clone()).unwrap().name("src").unwrap().as_str()).to_string()
+    let raw_import_path = OsPath::new().join(
+      resolution_ctx.here.parent().unwrap_or(OsPath::new().join("/")).join(import_re.captures(&value.clone()).unwrap().name("src").unwrap().as_str()).to_string()
     );
+    let mut import_path = OsPath::new();
+    let mut within_repo = false;
+    let mut segments = 0;
+
+    for import_path_seg in raw_import_path.to_path() {
+      segments += 1;
+
+      if import_path_seg != "." {
+        if (segments == 1) && raw_import_path.is_absolute() {
+          import_path = OsPath::from("/".to_string() + import_path_seg.to_str().unwrap_or(""))
+        } else {
+          import_path.push(import_path_seg.to_str().unwrap_or(""));
+        }
+      }
+
+      if import_path_seg == "@repo" {
+        within_repo = true;
+      }
+    }
+
+    import_path.resolve();
+
+    if !import_path.to_string().starts_with(&repo_dir_path.to_string()) {
+      within_repo = false;
+    }
+
+    if !within_repo {
+      return Err(SimpleError::new(format!("Path: \"{}\", is not confined within the repository root (\"{}\"). Refusing to evaluate.", import_path.to_string(), repo_dir_path.to_string())));
+    }
+
+    debug!("Attempting to import \"{}\"...", import_path.to_string());
 
     let glob_import_re = Regex::new("^(?<base>[^\\*\\n\\r]+)(\\*)(?<cap>[^\\*\\n\\r]*)").unwrap();
-    if glob_import_re.is_match(&import_path.clone().to_string()) {
+    let is_glob = glob_import_re.is_match(&import_path.clone().to_string());
+
+    if is_glob {
       let import_path_str = import_path.clone().to_string();
       let import_captures = glob_import_re.captures(&import_path_str).unwrap();
       let here = OsPath::new().join(import_captures.name("base").unwrap().as_str());
-
+      
       match fs::read_dir(&here.clone().to_path()).await {
         Ok(dir) => {
           let mut entries = HashMap::new();
@@ -191,24 +237,26 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
             match entry_res {
               Ok(entry) => {
                 let mut file_path = OsPath::from(entry.path());
+                let cap = match import_captures.name("cap") {
+                  Some(val) => val.as_str(),
+                  None => "/manifest.clover.jsonc"
+                };
+
+                debug!("Attempting to import from glob: \"{}\"...", entry.path().to_str().unwrap());
 
                 if entry.path().is_dir() {
-                  let cap = import_captures.name("cap").unwrap().as_str();
-                  
-                  if cap == "" {
-                    file_path.push("/manifest.clover.jsonc");
-                  } else {
-                    file_path.push(cap);
-                  }
+                  file_path.push(cap);
                 }
-
-                match read_file(file_path.clone()).await {
-                  Ok(contents) => {
-                    debug!("{}:\n{}", file_path.clone().to_string(), contents.clone());
-                    entries.insert(file_path.name().unwrap().clone(), contents);
-                  },
-                  Err(e) => {
-                    failed_entries.push(e);
+                
+                if file_path.to_string().ends_with(&cap) {
+                  match read_file(file_path.clone()).await {
+                    Ok(contents) => {
+                      debug!("{}:\n{}", file_path.clone().to_string(), contents.clone());
+                      entries.insert(file_path.name().unwrap().clone(), contents);
+                    },
+                    Err(e) => {
+                      failed_entries.push(e);
+                    }
                   }
                 }
               },
@@ -224,11 +272,7 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
           err = Some(SimpleError::from(e));
         }
       }
-    }
-
-    import_path.resolve();
-
-    if import_path.exists() {
+    } else if import_path.exists() {
       match read_file(import_path.clone()).await {
         Ok(contents) => {
           debug!("{}", contents.clone());
@@ -239,20 +283,10 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx) -
         }
       }
     } else {
-      err = Some(SimpleError::new("Invalid import path!"));
+      err = Some(SimpleError::new(format!("Invalid import path: \"{}\"!", import_path.clone().to_string())));
     }
   } else {
-    let mut val = value.clone();
-    match resolution_ctx.base {
-      Some(base) => {
-        val = String::from(base_re.replace(&value.clone(), base));
-      },
-      None => {}
-    }
-
-    val = String::from(here_re.replace(&val.clone(), resolution_ctx.here.to_string()));
-
-    ret = Resolution::NoImport(val);
+    ret = Resolution::NoImport(replace_simple_directives(value.clone(), resolution_ctx.clone()));
   }
 
   match err {
@@ -372,8 +406,13 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
                         }
                       },
                       Err(e) => {
-                        error!("Repo: {}, failed to fetch updates due to:\n{}", repo_str.clone(), e);
-                        repo_err = Some(Error(SimpleError::from(e)));
+                        if e.class() == git2::ErrorClass::Net {
+                          info!("Repo: {}, was unable to connect to remote server, skipping updates...", repo_str.clone());
+                          debug!("Repo: {}, network error, due to:\n{}", repo_str.clone(), e);
+                        } else {
+                          error!("Repo: {}, failed to fetch updates due to:\n{}", repo_str.clone(), e);
+                          repo_err = Some(Error(SimpleError::from(e)));
+                        }
                       }
                     }
                   },
@@ -432,9 +471,9 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
 
                 match serde_jsonc::from_str::<ManifestSpec>(&contents) {
                   Ok(raw_manifest_values) => {
-                    debug!("{:?}", raw_manifest_values.clone());
+                    debug!("{:#?}", raw_manifest_values.clone());
 
-                    match Manifest::compile(raw_manifest_values, manifest_path.clone()).await {
+                    match Manifest::compile(raw_manifest_values, manifest_path.clone(), manifest_path.parent().unwrap().clone()).await {
                       Ok(manifest) => {
                         let manifest_str;
                         match manifest.name.clone() {
@@ -447,7 +486,8 @@ pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> 
                         }
 
                         store.repos.lock().await.insert(repo_id.clone(), manifest.clone());
-                        debug!("Loaded {}'s manifest!", manifest_str);
+                        info!("Loaded manifest: {}!", manifest_str);
+                        debug!("Imported manifest: {:#?}", manifest.clone());
                       },
                       Err(e) => {
                         error!("Repo: {}, failed to compile manifest, due to:\n{}", repo_str, e);

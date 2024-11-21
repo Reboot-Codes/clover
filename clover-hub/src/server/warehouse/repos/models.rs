@@ -65,11 +65,12 @@ pub enum RequiredBoolean {
   ImportString(String)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(untagged)]
 pub enum OptionalListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String),
+  #[default]
   None
 }
 
@@ -125,15 +126,17 @@ pub enum Optional<T> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RequiredString(pub String);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ManifestSpec {
   pub name: Option<String>,
   pub version: String,
   pub base: Option<String>,
+  #[serde(default)]
   pub modules: OptionalListManifestSpecEntry<RawModuleSpec>,
+  #[serde(default)]
   pub applications: OptionalListManifestSpecEntry<RawApplicationSpec>,
   #[cfg(feature = "core")]
-  #[serde(rename = "expression-packs")]
+  #[serde(rename = "expression-packs", default)]
   pub expression_packs: OptionalListManifestSpecEntry<RawExpressionPackSpec>
 }
 
@@ -262,5 +265,5 @@ pub struct StaticExpressionSpec {
 }
 
 pub trait ManifestCompilationFrom<T> {
-  async fn compile(spec: T, resolution_ctx: ResolutionCtx) -> Result<Self, SimpleError> where Self: Sized, T: for<'a> Deserialize<'a>;
+  async fn compile(spec: T, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized, T: for<'a> Deserialize<'a>;
 }
