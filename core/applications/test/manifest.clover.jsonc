@@ -1,6 +1,9 @@
 {
   "name": "Test",
   "version": "1.0.0",
+  "intents": {
+    "@builtin.from-launcher": "ws-intent://@self/from-launcher"
+  },
   "containers": {
     "main": {
       "interface": true,

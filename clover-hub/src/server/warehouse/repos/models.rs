@@ -20,7 +20,9 @@ pub struct ResolutionCtx {
   /// Used for the `@base` directive, if configured in the repo manifest, the base RFQDN for this repo.
   pub base: Option<String>,
   /// Used for the `@here` directive, should contain the FS path to the manifest file being currently parsed, **NOT** to the repo.
-  pub here: OsPath
+  pub here: OsPath,
+  /// Used for the `@builtin` directive, should contain the built-in context for the current key (either CloverHub or CORE).
+  pub builtin: String
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

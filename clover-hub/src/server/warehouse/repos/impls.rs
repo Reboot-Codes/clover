@@ -3,7 +3,7 @@ use log::debug;
 use serde::Deserialize;
 use simple_error::SimpleError;
 use os_path::OsPath;
-use crate::server::appd::models::{BuildConfig, RepoCreds};
+use crate::server::{appd::models::{BuildConfig, RepoCreds}, warehouse::repos::builtin_rfqdn};
 use super::{models::*, resolve_entry_value, resolve_list_entry};
 
 impl ManifestCompilationFrom<Option<String>> for OptionalString {
@@ -25,7 +25,7 @@ impl ManifestCompilationFrom<Option<String>> for OptionalString {
                     OptionalString::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("OptionalString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                     OptionalString::None
                   }
                 }
@@ -78,7 +78,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
               Resolution::ImportedSingle((here, imported)) => {
                 match serde_jsonc::from_str(&imported) {
                   Ok(raw_val) => {
-                    match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, here }, repo_dir_path.clone()).await {
+                    match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
                       Ok(val) => {
                         Optional::Some(val)
                       },
@@ -89,7 +89,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> Manifest
                     }
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                     Optional::None
                   }
                 }
@@ -148,7 +148,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
                 RequiredString(val)
               },
               Err(e) => {
-                err = Some(SimpleError::new(format!("RequiredString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                err = Some(SimpleError::new(format!("RequiredString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                 Default::default()
               }
             }
@@ -193,7 +193,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(intent_id, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                       break;
                     }
                   }
@@ -229,7 +229,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                     OptionalStrStrHashMap::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                     OptionalStrStrHashMap::None
                   }
                 }
@@ -243,7 +243,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                       entries.insert(val_key, val);
                     },
                     Err(e) => {
-                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                      err = Some(SimpleError::new(format!("OptionalStrStrHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                       break;
                     }
                   }
@@ -322,7 +322,7 @@ impl<T: Clone + std::fmt::Debug, K> ManifestCompilationFrom<OptionalListManifest
                     Ok(hash_map) => {
                       debug!("serde_jsonc::from_str(): {:#?}", hash_map.clone());
         
-                      match resolve_list_entry(hash_map, ResolutionCtx { base: resolution_ctx.clone().base, here }, repo_dir_path.clone()).await {
+                      match resolve_list_entry(hash_map, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
                         Ok(list) => {
                           entries = OptionalStrTHashMap::Some(list);
                         },
@@ -383,7 +383,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     for (entry_id, raw_entry) in spec_list {
                       match raw_entry {
                         RequiredSingleManifestEntry::Some(raw_entry_obj) => {
-                          match K::compile(raw_entry_obj, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                          match K::compile(raw_entry_obj, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                             Ok(val) => {
                               entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                             },
@@ -393,13 +393,13 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         RequiredSingleManifestEntry::ImportString(raw_entry_str) => {
-                          match resolve_entry_value(raw_entry_str, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                          match resolve_entry_value(raw_entry_str, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                             Ok(resolution) => {
                               match resolution {
                                 Resolution::ImportedSingle((here, val_str)) => {
                                   match serde_jsonc::from_str(&val_str) {
                                     Ok(raw_val) => {
-                                      match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                                      match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                                         Ok(val) => {
                                           entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                                         },
@@ -409,7 +409,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                       }
                                     },
                                     Err(e) => {
-                                      err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                                      err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, e)));
                                     }
                                   }
                                 },
@@ -417,7 +417,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                   for (val_id, val_str) in hash_map {
                                     match serde_jsonc::from_str(&val_str) {
                                       Ok(raw_val) => {
-                                        match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                                        match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                                           Ok(val) => {
                                             entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
                                           },
@@ -427,7 +427,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                                         }
                                       },
                                       Err(e) => {
-                                        err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                                        err = Some(SimpleError::new(format!("RequiredStrTHashMap, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, e)));
                                       }
                                     }
                                   }
@@ -512,7 +512,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                     Resolution::ImportedSingle((here, val_str)) => {
                       match serde_jsonc::from_str(&val_str) {
                         Ok(raw_val) => {
-                          match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, here }, repo_dir_path.clone()).await {
+                          match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
                             Ok(val) => {
                               entries.insert(entry_id.clone(), RequiredSingleManifestEntry::Some(val));
                             },
@@ -522,7 +522,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                           }
                         },
                         Err(e) => {
-                          err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                          err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                         }
                       }
                     },
@@ -530,7 +530,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                       for (val_id, val_str) in hash_map {
                         match serde_jsonc::from_str(&val_str) {
                           Ok(raw_val) => {
-                            match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                            match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                               Ok(val) => {
                                 entries.insert(val_id, RequiredSingleManifestEntry::Some(val));
                               },
@@ -540,7 +540,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                             }
                           },
                           Err(e) => {
-                            err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, e)));
+                            err = Some(SimpleError::new(format!("RequiredStrTHashMap.RequiredSingleManifestEntry, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, e)));
                           }
                         }
                       }
@@ -607,7 +607,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
                     OptionalBoolean::Some(val)
                   },
                   Err(e) => {
-                    err = Some(SimpleError::new(format!("OptionalBoolean, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, here }, e)));
+                    err = Some(SimpleError::new(format!("OptionalBoolean, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
                     OptionalBoolean::None
                   }
                 }
@@ -648,7 +648,7 @@ impl Manifest {
     let mut err = None;
 
     debug!("Resolving manifest.base");
-    let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, here: spec_path.clone() }, repo_dir_path.clone()).await {
+    let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, builtin: builtin_rfqdn(false), here: spec_path.clone() }, repo_dir_path.clone()).await {
       Ok(val) => { 
         debug!("Resolved manifest.base");
         val 
@@ -664,7 +664,8 @@ impl Manifest {
         OptionalString::Some(val) => { Some(val) },
         OptionalString::None => { None }
       }, 
-      here: spec_path.clone() 
+      builtin: builtin_rfqdn(false),
+      here: spec_path.clone()
     };
     
     debug!("Resolving manifest.name");
@@ -717,7 +718,7 @@ impl Manifest {
 
     debug!("Resolving manifest.expression-packs");
     #[cfg(feature = "core")]
-    let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
+    let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), ResolutionCtx { base: resolution_ctx.clone().base, builtin: builtin_rfqdn(true), here: resolution_ctx.clone().here }, repo_dir_path.clone()).await {
       Ok(val) => {
         debug!("Resolved manifest.expression-packs");
         val

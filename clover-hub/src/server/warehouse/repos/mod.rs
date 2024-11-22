@@ -22,11 +22,20 @@ impl From<git2::Error> for Error {
   }
 }
 
+pub fn builtin_rfqdn(is_core: bool) -> String {
+  if is_core {
+    String::from("com.reboot-codes.clover.CORE")
+  } else {
+    String::from("com.reboot-codes.clover")
+  }
+}
+
 pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
   debug!("replace_simple_directives: {} + {:#?}", value.clone(), resolution_ctx.clone());
 
   let base_re = Regex::new("(?<directive>\\@base)").unwrap();
   let here_re = Regex::new("(?<directive>\\@here)").unwrap();
+  let builtin_re = Regex::new("(?<directive>\\@builtin)").unwrap();
 
   let mut val = value.clone();
   match resolution_ctx.base {
@@ -36,8 +45,10 @@ pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -
     None => {}
   }
 
-  let binding = val.clone();
-  let val = here_re.replace(&binding, resolution_ctx.here.to_string());
+  let binding1 = val.clone();
+  let val = here_re.replace(&binding1, resolution_ctx.here.to_string());
+  let binding2 = val.clone();
+  let val = builtin_re.replace(&binding2, resolution_ctx.builtin.to_string());
 
   debug!("replace simple directives: {}", val.clone());
 
@@ -66,9 +77,9 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                 } else {
                   match serde_jsonc::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
-                      match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                      match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                         Ok(obj) => {
-                          entries.insert(replace_simple_directives(key.clone(), ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }), obj);
+                          entries.insert(replace_simple_directives(key.clone(), ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }), obj);
                         },
                         Err(e) => {
                           entry_err = Some(e);
@@ -86,9 +97,9 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                   for (obj_key_seg, raw_obj) in raw_objs {
                     match serde_jsonc::from_str::<T>(&raw_obj) {
                       Ok(obj_spec) => {
-                        match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
+                        match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() }, repo_dir_path.clone()).await {
                           Ok(obj) => {
-                            let obj_key_prod = replace_simple_directives(["@base".to_string(), obj_key_seg].join("."), ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() });
+                            let obj_key_prod = replace_simple_directives(["@base".to_string(), obj_key_seg].join("."), ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here: here.clone() });
                             debug!("Resolution::ImportedMultiple: {}", obj_key_prod);
 
                             entries.insert(obj_key_prod, obj);
