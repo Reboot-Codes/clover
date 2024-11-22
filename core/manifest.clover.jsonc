@@ -1,0 +1,5 @@
+{
+  "modules": "@import('./modules/manifest.clover.jsonc')",
+  "applications": "@import('./applications/manifest.clover.jsonc')"
+  // "expression-packs": "@import('./modules/manifest.clover.jsonc')"
+}

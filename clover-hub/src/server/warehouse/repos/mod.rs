@@ -31,11 +31,11 @@ pub fn builtin_rfqdn(is_core: bool) -> String {
 }
 
 pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
-  debug!("replace_simple_directives: {} + {:#?}", value.clone(), resolution_ctx.clone());
+  debug!("replace_simple_directives (provided): {} + {:#?}", value.clone(), resolution_ctx.clone());
 
   let base_re = Regex::new("(?<directive>\\@base)").unwrap();
   let here_re = Regex::new("(?<directive>\\@here)").unwrap();
-  let builtin_re = Regex::new("(?<directive>\\@builtin)").unwrap();
+  let builtin_re = Regex::new("(?<directive>\\@builtin)(\\:(?<domain>core|clover))?").unwrap();
 
   let mut val = value.clone();
   match resolution_ctx.base {
@@ -46,11 +46,49 @@ pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -
   }
 
   let binding1 = val.clone();
-  let val = here_re.replace(&binding1, resolution_ctx.here.to_string());
-  let binding2 = val.clone();
-  let val = builtin_re.replace(&binding2, resolution_ctx.builtin.to_string());
+  let here_import_temp = here_re.replace_all(&binding1, "");
+  // Did the regex replace an `@here` directive? If so, append the stripped value to the "here" path.
+  let val = if here_import_temp != val {
+    let mut val_unsafe_path = resolution_ctx.here.join(&here_import_temp.to_string());
+    val_unsafe_path.resolve();
 
-  debug!("replace simple directives: {}", val.clone());
+    if val_unsafe_path.to_string().starts_with(&resolution_ctx.here.to_string()) {
+      val_unsafe_path.to_string()
+    } else {
+      warn!(
+        "Directory resolution for \"{}\" (resolved to: \"{}\") is not confined to repo directory, removing entry value entirely since this is a security issue.", 
+        binding1.clone(), 
+        val_unsafe_path.to_string()
+      );
+      "".to_string()
+    }
+  } else {
+    val
+  };
+
+  let binding2 = val.clone();
+  let builtin_import_temp = builtin_re.replace_all(&binding2, "");
+  let val = if builtin_import_temp != val {
+    match builtin_re.captures(&binding2).unwrap().name("domain") {
+        Some(domain) => {
+          if domain.as_str() == "core" {
+            builtin_re.replace_all(&binding2, builtin_rfqdn(true)).to_string()
+          } else if domain.as_str() == "clover" {
+            builtin_re.replace_all(&binding2, builtin_rfqdn(false)).to_string()
+          } else {
+            error!("No case for domain: \"{}\", yet it's in the directive regex, this is a bug, please report it; refusing to resolve built-in directive (value unchanged)!", domain.as_str());
+            binding2.clone()
+          }
+        },
+        None => {
+          builtin_re.replace_all(&binding2, resolution_ctx.builtin.to_string()).to_string()
+        },
+    }
+  } else {
+    val
+  };
+
+  debug!("replace simple directives (completed): {}", val.clone());
 
   String::from(val)
 }
@@ -206,7 +244,6 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx, r
       resolution_ctx.here.parent().unwrap_or(OsPath::new().join("/")).join(import_re.captures(&value.clone()).unwrap().name("src").unwrap().as_str()).to_string()
     );
     let mut import_path = OsPath::new();
-    let mut within_repo = false;
     let mut segments = 0;
 
     for import_path_seg in raw_import_path.to_path() {
@@ -219,19 +256,11 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx, r
           import_path.push(import_path_seg.to_str().unwrap_or(""));
         }
       }
-
-      if import_path_seg == "@repo" {
-        within_repo = true;
-      }
     }
 
     import_path.resolve();
 
     if !import_path.to_string().starts_with(&repo_dir_path.to_string()) {
-      within_repo = false;
-    }
-
-    if !within_repo {
       return Err(SimpleError::new(format!("Path: \"{}\", is not confined within the repository root (\"{}\"). Refusing to evaluate.", import_path.to_string(), repo_dir_path.to_string())));
     }
 

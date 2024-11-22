@@ -19,7 +19,10 @@ The top-level `base` key of a manifest can be set to define the RFQDN (reverse f
 
 ## @builtin
 
-`@builtin` resolves to the applicable built-in RFQDN for this area of the manifest. For CloverHub, this will usually resolve to `com.reboot-codes.clover`. Or, for CORE (like expression packs), `com.reboot-codes.clover.CORE`.
+`@builtin` resolves to the applicable built-in RFQDN for this area of the manifest. For CloverHub, this will usually resolve to `com.reboot-codes.clover`. Or, for CORE (like expression packs), `com.reboot-codes.clover.CORE`. You can also use built-in directives for specific domains:
+
+- `@builtin:clover`: `com.reboot-codes.clover`
+- `@builtin:core`: `com.reboot-codes.clover.CORE`
 
 ## @import
 

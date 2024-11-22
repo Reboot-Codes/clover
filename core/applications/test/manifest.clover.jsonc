@@ -2,7 +2,7 @@
   "name": "Test",
   "version": "1.0.0",
   "intents": {
-    "@builtin.from-launcher": "ws-intent://@self/from-launcher"
+    "@builtin.from-launcher": "ws-intent://main/from-launcher"
   },
   "containers": {
     "main": {

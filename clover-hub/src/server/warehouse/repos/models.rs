@@ -134,6 +134,12 @@ pub struct ManifestSpec {
   pub version: String,
   pub base: Option<String>,
   #[serde(default)]
+  pub directory: Option<RawDirectorySpec>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RawDirectorySpec {
+  #[serde(default)]
   pub modules: OptionalListManifestSpecEntry<RawModuleSpec>,
   #[serde(default)]
   pub applications: OptionalListManifestSpecEntry<RawApplicationSpec>,
@@ -211,6 +217,12 @@ pub struct Manifest {
   pub version: RequiredString,
   #[serde(default)]
   pub base: OptionalString,
+  #[serde(default)]
+  pub directory: Optional<DirectorySpec>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectorySpec {
   #[serde(default)]
   pub modules: OptionalStrTHashMap<ModuleSpec>,
   #[serde(default)]

@@ -1,7 +1,5 @@
 {
   "version": "1.0.0",
   "base": "com.reboot-codes.clover.CORE",
-  "modules": "@import('./core/modules.clover.jsonc')",
-  "applications": "@import('./core/applications.clover.jsonc')"
-  // "expression-packs": "@import('./core/expression-packs.clover.jsonc')"
+  "directory": "@import('./core/manifest.clover.json')"
 }

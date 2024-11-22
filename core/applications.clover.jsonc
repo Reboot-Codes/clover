@@ -1,3 +1,0 @@
-{
-  "@base.*": "@import('./applications/*/manifest.clover.jsonc')"
-}
