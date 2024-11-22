@@ -1,5 +1,6 @@
 pub mod config;
 pub mod repos;
+pub mod db;
 
 use config::models::Config;
 use repos::{download_repo_updates, update_repo_dir_structure};

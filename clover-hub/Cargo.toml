@@ -51,3 +51,4 @@ simple-error = "0.3.1"
 git2 = "0.19.0"
 os_path = "0.8.0"
 serde_jsonc = "1.0.108"
+surrealdb = { version = "2.1.0", features = ["kv-mem", "kv-rocksdb"] }
