@@ -20,7 +20,7 @@ pub async fn appd_main(
   mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
   store: Arc<Store>, 
   user_config: Arc<CoreUserConfig>,
-  cancellation_token: CancellationToken
+  cancellation_tokens: (CancellationToken, CancellationToken)
 ) {
   info!("Starting AppDaemon...");
 
@@ -34,7 +34,7 @@ pub async fn appd_main(
       let init_user = Arc::new(user_config.clone());
       let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
       let init_docker = docker.clone();
-      cancellation_token.run_until_cancelled(async move {
+      cancellation_tokens.0.run_until_cancelled(async move {
         let mut init_apps = init_store.applications.lock().await;
         let mut apps_initialized = 0;
 
@@ -75,7 +75,7 @@ pub async fn appd_main(
         }
       }).await;
 
-      let ipc_recv_token = cancellation_token.clone();
+      let ipc_recv_token = cancellation_tokens.0.clone();
       let ipc_recv_handle = tokio::task::spawn(async move {
         tokio::select! {
           _ = ipc_recv_token.cancelled() => {
@@ -94,7 +94,7 @@ pub async fn appd_main(
         }
       });
 
-      let ipc_trans_token = cancellation_token.clone();
+      let ipc_trans_token = cancellation_tokens.0.clone();
       let ipc_trans_tx = Arc::new(ipc_tx.clone());
       let ipc_trans_handle = tokio::task::spawn(async move {
         tokio::select! {
@@ -116,7 +116,7 @@ pub async fn appd_main(
 
       let cleanup_store = store.clone();
       let cleanup_docker = docker.clone();
-      let cleanup_token = cancellation_token.clone();
+      let cleanup_token = cancellation_tokens.0.clone();
       tokio::select! {
         _ = cleanup_token.cancelled() => {
           ipc_recv_handle.abort();
@@ -148,6 +148,8 @@ pub async fn appd_main(
           }
 
           std::mem::drop(store);
+
+          cancellation_tokens.1.cancel();
         }
       }
     },

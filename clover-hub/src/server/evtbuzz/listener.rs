@@ -182,7 +182,7 @@ pub async fn evtbuzz_listener(
   mut modman_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   mut inference_engine_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   mut appd_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
-  cancellation_token: CancellationToken,
+  cancellation_tokens: (CancellationToken, CancellationToken),
   evtbuzz_user_config: Arc<CoreUserConfig>
 ) {
   info!("Starting EvtBuzz on port: {}...", port);
@@ -257,7 +257,7 @@ pub async fn evtbuzz_listener(
   // TODO: Start creating GQL API endpoint.
   
   let server_port = Arc::new(port.clone());
-  let http_token = cancellation_token.clone();
+  let http_token = cancellation_tokens.0.clone();
   let http_handle = tokio::task::spawn(async move {
     let (_, server) = warp::serve(routes)
       // TODO: Add option for listening address.
@@ -273,7 +273,7 @@ pub async fn evtbuzz_listener(
   let ipc_dispatch_store = Arc::new(store.clone());
   let ipc_dispatch_clients_tx = Arc::new(clients_tx.clone());
   let ipc_dispatch_user_config = Arc::new(evtbuzz_user_config.clone());
-  let ipc_dispatch_token = cancellation_token.clone();
+  let ipc_dispatch_token = cancellation_tokens.0.clone();
   let ipc_dispatch_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_dispatch_token.cancelled() => {
@@ -381,7 +381,7 @@ pub async fn evtbuzz_listener(
   let from_arbiter_cfg = Arc::new(arbiter_cfg.clone());
   let from_arbiter_store = Arc::new(store.clone());
   let from_arbiter_tx = Arc::new(from_client_tx.clone());
-  let from_arbiter_token = cancellation_token.clone();
+  let from_arbiter_token = cancellation_tokens.0.clone();
   let from_arbiter_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = from_arbiter_token.cancelled() => {
@@ -398,7 +398,7 @@ pub async fn evtbuzz_listener(
   let from_renderer_cfg = Arc::new(renderer_cfg.clone());
   let from_renderer_store = Arc::new(store.clone());
   let from_renderer_tx = Arc::new(from_client_tx.clone());
-  let from_renderer_token = cancellation_token.clone();
+  let from_renderer_token = cancellation_tokens.0.clone();
   let from_renderer_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = from_renderer_token.cancelled() => {
@@ -415,7 +415,7 @@ pub async fn evtbuzz_listener(
   let from_modman_cfg = Arc::new(modman_cfg.clone());
   let from_modman_store = Arc::new(store.clone());
   let from_modman_tx = Arc::new(from_client_tx.clone());
-  let from_modman_token = cancellation_token.clone();
+  let from_modman_token = cancellation_tokens.0.clone();
   let from_modman_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = from_modman_token.cancelled() => {
@@ -432,7 +432,7 @@ pub async fn evtbuzz_listener(
   let from_inference_engine_cfg = Arc::new(inference_engine_cfg.clone());
   let from_inference_engine_store = Arc::new(store.clone());
   let from_inference_engine_tx = Arc::new(from_client_tx.clone());
-  let from_inference_engine_token = cancellation_token.clone();
+  let from_inference_engine_token = cancellation_tokens.0.clone();
   let from_inference_engine_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = from_inference_engine_token.cancelled() => {
@@ -449,7 +449,7 @@ pub async fn evtbuzz_listener(
   let from_appd_cfg = Arc::new(appd_cfg.clone());
   let from_appd_store = Arc::new(store.clone());
   let from_appd_tx = Arc::new(from_client_tx.clone());
-  let from_appd_token = cancellation_token.clone();
+  let from_appd_token = cancellation_tokens.0.clone();
   let from_appd_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = from_appd_token.cancelled() => {
@@ -463,13 +463,15 @@ pub async fn evtbuzz_listener(
     }
   });
 
-  let cleanup_token = cancellation_token.clone();
+  let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
       info!("Cleaning and saving store...");
       // TODO: Clean up registered sessions when server is shutting down.
 
       std::mem::drop(store);
+
+      cancellation_tokens.1.cancel();
     }
   }
 

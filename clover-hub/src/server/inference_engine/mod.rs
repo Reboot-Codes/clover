@@ -12,14 +12,14 @@ pub async fn inference_engine_main(
   mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
   store: Arc<Store>, 
   user_config: Arc<CoreUserConfig>,
-  cancellation_token: CancellationToken
+  cancellation_tokens: (CancellationToken, CancellationToken)
 ) {
   info!("Starting Inference Engine...");
 
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user_config.clone());
   let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
-  cancellation_token.run_until_cancelled(async move {
+  cancellation_tokens.0.run_until_cancelled(async move {
     let _ = send_ipc_message(
       &init_store, 
       &init_user, 
@@ -29,7 +29,7 @@ pub async fn inference_engine_main(
     ).await;
   }).await;
 
-  let ipc_recv_token = cancellation_token.clone();
+  let ipc_recv_token = cancellation_tokens.0.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
@@ -48,7 +48,7 @@ pub async fn inference_engine_main(
     }
   });
 
-  let ipc_trans_token = cancellation_token.clone();
+  let ipc_trans_token = cancellation_tokens.0.clone();
   let ipc_trans_tx = Arc::new(ipc_tx.clone());
   let ipc_trans_handle = tokio::task::spawn(async move {
     tokio::select! {
@@ -68,7 +68,7 @@ pub async fn inference_engine_main(
     }
   });
 
-  let cleanup_token = cancellation_token.clone();
+  let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
       ipc_recv_handle.abort();
@@ -78,6 +78,8 @@ pub async fn inference_engine_main(
       // TODO: Clean up registered networks when server is shutting down.
 
       std::mem::drop(store);
+
+      cancellation_tokens.1.cancel();
     }
   }
 
