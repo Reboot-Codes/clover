@@ -719,65 +719,58 @@ impl Manifest {
   }
 }
 
-impl ManifestCompilationFrom<Option<RawDirectorySpec>> for Optional<DirectorySpec> {
-  async fn compile(spec: Option<RawDirectorySpec>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized, RawDirectorySpec: for<'a> Deserialize<'a> {
-    match spec {
-      Some(spec) => {
-        let mut err = None;
+impl ManifestCompilationFrom<RawDirectorySpec> for DirectorySpec {
+  async fn compile(spec: RawDirectorySpec, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized, RawDirectorySpec: for<'a> Deserialize<'a> {
+      let mut err = None;
 
-        debug!("Resolving manifest.modules");
-        let modules = match OptionalStrTHashMap::compile(spec.modules.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(val) => {
-            debug!("Resolved manifest.modules");
-            val
-          },
-          Err(e) => {
-            err = Some(e);
-            OptionalStrTHashMap::None
-          }
-        };
-
-        debug!("Resolving manifest.applications");
-        let applications = match OptionalStrTHashMap::compile(spec.applications.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(val) => {
-            debug!("Resolved manifest.applications");
-            val
-          },
-          Err(e) => {
-            err = Some(e);
-            OptionalStrTHashMap::None
-          }
-        };
-
-        debug!("Resolving manifest.expression-packs");
-        #[cfg(feature = "core")]
-        let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), ResolutionCtx { base: resolution_ctx.clone().base, builtin: builtin_rfqdn(true), here: resolution_ctx.clone().here }, repo_dir_path.clone()).await {
-          Ok(val) => {
-            debug!("Resolved manifest.expression-packs");
-            val
-          },
-          Err(e) => {
-            err = Some(e);
-            OptionalStrTHashMap::None
-          }
-        };
-
-        match err {
-          Some(e) => { Err(e) },
-          None => { 
-            Ok(Optional::Some(DirectorySpec {
-              modules, 
-              applications, 
-              #[cfg(feature = "core")]
-              expression_packs
-            }))
-          }
+      debug!("Resolving manifest.modules");
+      let modules = match OptionalStrTHashMap::compile(spec.modules.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
+        Ok(val) => {
+          debug!("Resolved manifest.modules");
+          val
+        },
+        Err(e) => {
+          err = Some(e);
+          OptionalStrTHashMap::None
         }
-      },
-      None => {
-        Ok(Optional::None)
+      };
+
+      debug!("Resolving manifest.applications");
+      let applications = match OptionalStrTHashMap::compile(spec.applications.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
+        Ok(val) => {
+          debug!("Resolved manifest.applications");
+          val
+        },
+        Err(e) => {
+          err = Some(e);
+          OptionalStrTHashMap::None
+        }
+      };
+
+      debug!("Resolving manifest.expression-packs");
+      #[cfg(feature = "core")]
+      let expression_packs = match OptionalStrTHashMap::compile(spec.expression_packs.clone(), ResolutionCtx { base: resolution_ctx.clone().base, builtin: builtin_rfqdn(true), here: resolution_ctx.clone().here }, repo_dir_path.clone()).await {
+        Ok(val) => {
+          debug!("Resolved manifest.expression-packs");
+          val
+        },
+        Err(e) => {
+          err = Some(e);
+          OptionalStrTHashMap::None
+        }
+      };
+
+      match err {
+        Some(e) => { Err(e) },
+        None => { 
+          Ok(DirectorySpec {
+            modules, 
+            applications, 
+            #[cfg(feature = "core")]
+            expression_packs
+          })
+        }
       }
-    }
   }
 }
 

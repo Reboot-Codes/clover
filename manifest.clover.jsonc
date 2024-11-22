@@ -1,5 +1,5 @@
 {
   "version": "1.0.0",
   "base": "com.reboot-codes.clover.CORE",
-  "directory": "@import('./core/manifest.clover.json')"
+  "directory": "@import('./core/manifest.clover.jsonc')"
 }

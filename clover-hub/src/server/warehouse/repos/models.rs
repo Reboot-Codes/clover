@@ -134,7 +134,7 @@ pub struct ManifestSpec {
   pub version: String,
   pub base: Option<String>,
   #[serde(default)]
-  pub directory: Option<RawDirectorySpec>
+  pub directory: OptionalSingleManifestSpecEntry<RawDirectorySpec>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
