@@ -23,18 +23,25 @@ impl From<git2::Error> for Error {
 }
 
 pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
+  debug!("replace_simple_directives: {} + {:#?}", value.clone(), resolution_ctx.clone());
+
   let base_re = Regex::new("(?<directive>\\@base)").unwrap();
   let here_re = Regex::new("(?<directive>\\@here)").unwrap();
 
   let mut val = value.clone();
   match resolution_ctx.base {
     Some(base) => {
-      val = String::from(base_re.replace(&value.clone(), base));
+      val = String::from(base_re.replace_all(&value.clone(), base));
     },
     None => {}
   }
 
-  String::from(here_re.replace(&val.clone(), resolution_ctx.here.to_string()))
+  let binding = val.clone();
+  let val = here_re.replace(&binding, resolution_ctx.here.to_string());
+
+  debug!("replace simple directives: {}", val.clone());
+
+  String::from(val)
 }
 
 pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleManifestEntry<T>>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<HashMap<String, K>, SimpleError> 
@@ -44,10 +51,7 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
   let mut entries = HashMap::new();
   let glob_import_key_re = Regex::new("^(?<base>[^\\*\\n\\r]+)(\\*)$").unwrap();
 
-  for (raw_key, raw_entry) in raw_list {
-    let base_re = Regex::new("(?<directive>\\@base)").unwrap();
-    let key = base_re.replace_all(&raw_key, "").to_string();
-
+  for (key, raw_entry) in raw_list {
     let is_glob = glob_import_key_re.is_match(&key);
     let mut entry_err = None;
 
@@ -84,7 +88,10 @@ pub async fn resolve_list_entry<T, K>(raw_list: HashMap<String, RequiredSingleMa
                       Ok(obj_spec) => {
                         match K::compile(obj_spec, ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() }, repo_dir_path.clone()).await {
                           Ok(obj) => {
-                            entries.insert([glob_import_key_re.captures(&key).unwrap().name("base").unwrap().as_str().to_string(), obj_key_seg].join("."), obj);
+                            let obj_key_prod = replace_simple_directives(["@base".to_string(), obj_key_seg].join("."), ResolutionCtx { base: resolution_ctx.clone().base, here: here.clone() });
+                            debug!("Resolution::ImportedMultiple: {}", obj_key_prod);
+
+                            entries.insert(obj_key_prod, obj);
                           },
                           Err(e) => {
                             entry_err = Some(e);
@@ -247,12 +254,17 @@ pub async fn resolve_entry_value(value: String, resolution_ctx: ResolutionCtx, r
                 if entry.path().is_dir() {
                   file_path.push(cap);
                 }
+
+                let base = match import_captures.name("base") {
+                    Some(val) => val.as_str(),
+                    None => "",
+                };
                 
                 if file_path.to_string().ends_with(&cap) {
                   match read_file(file_path.clone()).await {
                     Ok(contents) => {
-                      debug!("{}:\n{}", file_path.clone().to_string(), contents.clone());
-                      entries.insert(file_path.name().unwrap().clone(), contents);
+                      debug!("resolve_entry_value {}:\n{}", file_path.clone().to_string(), contents.clone());
+                      entries.insert(replace_simple_directives(file_path.to_string().replace(base, "").replace(cap, ""), resolution_ctx.clone()), contents);
                     },
                     Err(e) => {
                       failed_entries.push(e);
