@@ -4,7 +4,7 @@ use serde::Deserialize;
 use simple_error::SimpleError;
 use os_path::OsPath;
 use crate::server::{appd::models::{BuildConfig, RepoCreds}, warehouse::repos::builtin_rfqdn};
-use super::{models::*, resolve_entry_value, resolve_list_entry};
+use super::{models::*, replace_simple_directives, resolve_entry_value, resolve_list_entry};
 
 impl ManifestCompilationFrom<Option<String>> for OptionalString {
   async fn compile(spec: Option<String>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized {
@@ -179,7 +179,9 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
       OptionalStringListManifestSpecEntry::Some(raw_intents) => {
         let mut entries = HashMap::new();
 
-        for (intent_id, raw_intent) in raw_intents {
+        for (raw_intent_id, raw_intent) in raw_intents {
+          let intent_id = replace_simple_directives(raw_intent_id, resolution_ctx.clone());
+
           match resolve_entry_value(raw_intent.try_into().unwrap(), resolution_ctx.clone(), repo_dir_path.clone()).await {
             Ok(resolution) => {
               match resolution {
