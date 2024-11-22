@@ -1,3 +1,26 @@
 # To-Dos
 
-- [ ] Log related message IDs to users, api keys, and clients (add a `messages` )
+- [ ] CloverHub
+  - [ ] Server
+    - [ ] Arbiter
+      - [ ] Log related message IDs to users, api keys, and clients (add a `messages` key to user in store).
+    - [ ] EVTBuzz
+      - [ ] Move to ZMQ for EVTBuzz (via `zeromq::proxy()`).
+      - [ ] Require message encryption with `pqcrypto`
+      - [ ] Setup protobuf for messages.
+    - [ ] Warehouse
+      - [ ] Setup serialization and de-serialization for general store dbs.
+      - [ ] Finish models
+- [ ] Core
+  - [ ] Write AppLIB
+    - [ ] Rust
+    - [ ] Python
+    - [ ] TypeScript
+    - [ ] Go
+  - [ ] Write ModuleLIB
+    - [ ] Rust (`no_std`)
+      - [ ] FFI bindings for C++
+        - [ ] Arduino
+        - [ ] Python
+          - [ ] Circuit Python
+        - [ ] Go
