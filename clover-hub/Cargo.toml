@@ -29,10 +29,11 @@ api_key = "0.1.0"
 url = "2.5.0"
 fast_websocket_client = "0.2.0"
 warp = "0.3.6"
+juniper = "0.16.1"
+juniper_warp = "0.8.0"
 
 # Graphics
-#raylib = "5.0.2"
-#egl = "0.2.7"
+wgpu = { version = "23.0.0", features = ["serde", "glsl", "replay", "vulkan-portability" ] }
 
 # Adding stuff to rust that shoulda been there in the first place.
 tokio = { version = "1.40.0", features = ["signal", "macros", "sync", "rt-multi-thread"] }
@@ -54,5 +55,3 @@ os_path = "0.8.0"
 # Storage
 serde_jsonc = "1.0.108"
 sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
-juniper = "0.16.1"
-juniper_warp = "0.8.0"
