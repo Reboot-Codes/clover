@@ -1,10 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
+use os_path::OsPath;
+use sea_orm::DatabaseConnection;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
   pub docker_daemon: String,
   pub repos: HashMap<String, RepoSpec>,
+  #[serde(default)]
+  pub data_dir: OsPath,
+  #[serde(skip)]
+  pub db: Option<Arc<DatabaseConnection>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +27,9 @@ impl Default for Config {
   fn default() -> Self {
     Config { 
       docker_daemon: "/run/user/1000/podman/podman.sock".to_string(),
-      repos: HashMap::new()
+      repos: HashMap::new(),
+      data_dir: OsPath::new(),
+      db: None
     }
   }
 }

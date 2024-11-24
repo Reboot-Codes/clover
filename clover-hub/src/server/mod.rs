@@ -21,6 +21,7 @@ use modman::modman_main;
 use warehouse::setup_warehouse;
 use inference_engine::inference_engine_main;
 use tokio_util::sync::CancellationToken;
+use warehouse::warehouse_main;
 
 pub async fn server_main(data_dir: &String, port: u16, cancellation_token: CancellationToken, server_token: CancellationToken) {
   info!("Starting CloverHub...");
@@ -34,23 +35,38 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
       renderer: renderer_user_config,
       appd: appd_user_config,
       modman: modman_user_config,
-      inference_engine: inference_engine_user_config
+      inference_engine: inference_engine_user_config,
+      warehouse: warehouse_user_config
     }
   ) = Store::new_configured_store().await;
-  let master_user_id = master_user_config.id.clone();
   if env::var("CLOVER_MASTER_PRINT").unwrap_or("false".to_string()) == "true".to_string() { 
-    debug!("Master user id: \"{}\", primary api key: \"{}\"", master_user_id.clone(), master_user_config.api_key.clone());
-    debug!("clover-hub.evtbuzz user id: \"{}\", primary api key: \"{}\"", evtbuzz_user_config.id.clone(), evtbuzz_user_config.api_key.clone());
-    debug!("clover-hub.arbiter user id: \"{}\", primary api key: \"{}\"", arbiter_user_config.id.clone(), arbiter_user_config.api_key.clone());
-    debug!("clover-hub.renderer user id: \"{}\", primary api key: \"{}\"", renderer_user_config.id.clone(), renderer_user_config.api_key.clone());
-    debug!("clover-hub.appd user id: \"{}\", primary api key: \"{}\"", appd_user_config.id.clone(), appd_user_config.api_key.clone());
-    debug!("clover-hub.modman user id: \"{}\", primary api key: \"{}\"", modman_user_config.id.clone(), modman_user_config.api_key.clone());
-    debug!("clover-hub.inference-engine user id: \"{}\", primary api key: \"{}\"", inference_engine_user_config.id.clone(), inference_engine_user_config.api_key.clone());
+    for core_user in vec![
+      ("Master", master_user_config.clone()),
+      ("clover-hub.arbiter", arbiter_user_config.clone()),
+      ("clover-hub.evtbuzz", evtbuzz_user_config.clone()),
+      ("clover-hub.appd", appd_user_config.clone()),
+      ("clover-hub.renderer", renderer_user_config.clone()),
+      ("clover-hub.modman", modman_user_config.clone()),
+      ("clover-hub.inference-engine", inference_engine_user_config.clone())
+    ] {
+      debug!("\"{}\" user id: \"{}\", primary api key: \"{}\"", core_user.0, core_user.1.id.clone(), core_user.1.api_key.clone());
+    }
   }
 
   let warehouse_setup_store = Arc::new(store.clone());
   match setup_warehouse(data_dir.clone(), warehouse_setup_store).await {
     Ok(_) => {
+      // Start Warehouse
+      let (warehouse_from_tx, warehouse_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
+      let (warehouse_to_tx, warehouse_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
+      let warehouse_store = Arc::new(store.clone());
+      let warehouse_uca = Arc::new(arbiter_user_config.clone());
+      let warehouse_tokens = (CancellationToken::new(), CancellationToken::new());
+      let warehouse_tokens_clone = warehouse_tokens.clone();
+      let warehouse_handle = tokio::task::spawn(async move {
+        warehouse_main(warehouse_from_tx, warehouse_to_rx, warehouse_store.clone(), warehouse_uca.clone(), warehouse_tokens_clone).await;
+      });
+
       // Start Arbiter
       let (arbiter_from_tx, arbiter_from_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
       let (arbiter_to_tx, arbiter_to_rx) = mpsc::unbounded_channel::<IPCMessageWithId>();
@@ -120,6 +136,7 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
       let evtbuzz_modman_user_config_arc = Arc::new(modman_user_config.clone());
       let evtbuzz_inference_engine_user_config_arc = Arc::new(inference_engine_user_config.clone());
       let evtbuzz_appd_user_config_arc = Arc::new(appd_user_config.clone());
+      let evtbuzz_warehouse_user_config_arc = Arc::new(warehouse_user_config.clone());
       let evtbuzz_tokens = (CancellationToken::new(), CancellationToken::new());
       let evtbuzz_tokens_clone = evtbuzz_tokens.clone();
       let evtbuzz_handle = tokio::task::spawn(async move {
@@ -131,6 +148,7 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
           (&evtbuzz_modman_user_config_arc.clone(), modman_from_rx, modman_to_tx),
           (&evtbuzz_inference_engine_user_config_arc.clone(), inference_engine_from_rx, inference_engine_to_tx),
           (&evtbuzz_appd_user_config_arc.clone(), appd_from_rx, appd_to_tx),
+          (&evtbuzz_warehouse_user_config_arc.clone(), warehouse_from_rx, warehouse_to_tx),
           evtbuzz_tokens_clone,
           evtbuzz_uca.clone()
         ).await;
@@ -163,7 +181,13 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
                                 evtbuzz_tokens.0.cancel();
                                 tokio::select! {
                                   _ = evtbuzz_tokens.1.cancelled() => {
-                                    info!("Graceful shutdown successful!");
+                                    info!("Shutting down Warehouse");
+                                    warehouse_tokens.0.cancel();
+                                    tokio::select! {
+                                      _ = warehouse_tokens.1.cancelled() => {
+                                        info!("Graceful shutdown successful!");
+                                      }
+                                    }
                                   }
                                 }
                               }
@@ -182,6 +206,7 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
 
       tokio::select! {_ = futures::future::join_all(vec![
         cleanup_handle,
+        warehouse_handle,
         evtbuzz_handle,
         arbiter_handle, 
         renderer_handle,

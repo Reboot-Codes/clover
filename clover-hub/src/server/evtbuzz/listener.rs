@@ -182,6 +182,7 @@ pub async fn evtbuzz_listener(
   mut modman_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   mut inference_engine_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   mut appd_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
+  mut warehouse_ipc: (&CoreUserConfig, UnboundedReceiver<IPCMessageWithId>, UnboundedSender<IPCMessageWithId>),
   cancellation_tokens: (CancellationToken, CancellationToken),
   evtbuzz_user_config: Arc<CoreUserConfig>
 ) {
@@ -198,23 +199,26 @@ pub async fn evtbuzz_listener(
   let inference_engine_tx = inference_engine_ipc.2;
   let appd_cfg = appd_ipc.0;
   let appd_tx = appd_ipc.2;
+  let warehouse_cfg = warehouse_ipc.0;
+  let warehouse_tx = warehouse_ipc.2;
   for client in vec![
     (arbiter_cfg, arbiter_tx),
     (renderer_cfg, renderer_tx),
     (modman_cfg, modman_tx),
     (inference_engine_cfg, inference_engine_tx),
-    (appd_cfg, appd_tx)
+    (appd_cfg, appd_tx),
+    (warehouse_cfg, warehouse_tx)
   ] {
+    let client_obj = Client { 
+      api_key: client.0.api_key.clone(), 
+      user_id: client.0.id.clone(),
+      active: true,
+    };
     let cid = gen_cid_with_check(&store).await;
-    store.clients.lock().await.insert(
-      cid.clone(), 
-      Client { 
-        api_key: client.0.api_key.clone(), 
-        user_id: client.0.id.clone(),
-        active: true,
-      }
-    );
 
+    debug!("Registering internal client \"{}\":\n{:#?}", cid.clone(), client_obj.clone());
+
+    store.clients.lock().await.insert(cid.clone(), client_obj.clone());
     clients_tx.lock().await.insert(cid.clone(), client.1);
   }
 
@@ -378,6 +382,23 @@ pub async fn evtbuzz_listener(
   });
 
   // Internal IPC Handles
+  let from_warehouse_cfg = Arc::new(warehouse_cfg.clone());
+  let from_warehouse_store = Arc::new(store.clone());
+  let from_warehouse_tx = Arc::new(from_client_tx.clone());
+  let from_warehouse_token = cancellation_tokens.0.clone();
+  let from_warehouse_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = from_warehouse_token.cancelled() => {
+        debug!("from_warehouse exited");
+      },
+      _ = async move {
+        while let Some(msg) = warehouse_ipc.1.recv().await {
+          handle_ipc_send(from_warehouse_tx.clone(), msg, &from_warehouse_cfg.clone(), &from_warehouse_store.clone()).await;
+        }
+      } => {}
+    }
+  });
+
   let from_arbiter_cfg = Arc::new(arbiter_cfg.clone());
   let from_arbiter_store = Arc::new(store.clone());
   let from_arbiter_tx = Arc::new(from_client_tx.clone());
@@ -476,6 +497,7 @@ pub async fn evtbuzz_listener(
   }
 
   tokio::select! {_ = futures::future::join_all(vec![
+    from_warehouse_handle,
     http_handle,
     ipc_dispatch_handle,
     from_arbiter_handle,

@@ -98,7 +98,8 @@ pub struct CoreUserConfigs {
   pub renderer: CoreUserConfig, 
   pub appd: CoreUserConfig, 
   pub modman: CoreUserConfig, 
-  pub inference_engine: CoreUserConfig
+  pub inference_engine: CoreUserConfig,
+  pub warehouse: CoreUserConfig
 }
 
 impl Store {
@@ -260,6 +261,21 @@ impl Store {
       }]
     }).await;
 
+    // Warehouse
+    let warehouse_uid = gen_uid_with_check(&self).await;
+    let warehouse_key = gen_api_key_with_check(&self).await;
+    self.clone().add_user(UserConfig {
+      user_type: "com.reboot-codes.clover.warehouse".to_string(),
+      pretty_name: "Warehouse".to_string(),
+      id: warehouse_uid.clone(),
+      api_keys: vec![ApiKeyWithKeyWithoutUID {
+        allowed_events_to: vec![".*".to_string()], 
+        allowed_events_from: vec![".*".to_string()],
+        key: warehouse_key.clone(),
+        echo: true
+      }]
+    }).await;
+
     CoreUserConfigs {
       evtbuzz: CoreUserConfig {
         id: evtbuzz_uid.clone(),
@@ -284,7 +300,11 @@ impl Store {
       inference_engine: CoreUserConfig {
         id: inference_engine_uid.clone(),
         api_key: inference_engine_key.clone()
-      }
+      },
+      warehouse: CoreUserConfig {
+        id: warehouse_uid.clone(),
+        api_key: warehouse_key.clone()
+      },
     }
   }
 }
