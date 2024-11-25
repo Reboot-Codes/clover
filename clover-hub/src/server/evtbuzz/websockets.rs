@@ -149,7 +149,14 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
         } else if deauthed {
           break;
         } else {
-          if (msg.author.clone().split("?client=").collect::<Vec<_>>()[1] != send_client.id.clone()) || send_api_key.echo.clone() {
+          let msg_author = msg.author.clone();
+          let msg_client_id = if msg.author.clone().split("?client=").collect::<Vec<_>>().len() > 1 {
+            msg_author.split("?client=").collect::<Vec<_>>()[1]
+          } else {
+            ""
+          };
+
+          if (msg_client_id != send_client.id.clone()) || send_api_key.echo.clone() {
             let response = serde_json::to_string(&IPCMessageWithId {
               id: msg.id.clone(),
               author: msg.author.clone(),

@@ -49,11 +49,12 @@ dependencies = with pkgs; [
   xorg.libXrandr
   xorg.libXcursor
   xorg.libXi
+  shaderc
 ];
 
 nativeBuildInputs = with pkgs;
   [
-    llvmPkgs.bintools-unwrapped
+    (lib.hiPrio llvmPkgs.bintools-unwrapped)
     lldb_17
     ninja
     cmake
@@ -69,7 +70,6 @@ nativeBuildInputs = with pkgs;
     compilerLinks
 
     pkg-config
-    gccPkg.cc
   ]
   ++ dependencies ++ [ clangTools ];
   rust_overlay = import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
@@ -93,6 +93,7 @@ in pkgs.mkShell {
     llvmPkgs.libclang
   ] ++ (with pkgs; [
     clang
+    glslang
   ]);
 
   shellHook = ''

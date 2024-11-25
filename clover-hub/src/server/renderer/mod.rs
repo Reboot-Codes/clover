@@ -1,9 +1,12 @@
-use log::{debug, info};
+mod display;
+
+use log::{debug, error, info};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use crate::{server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store}, utils::send_ipc_message};
+use display::{register_display, DisplaySpec};
 
 pub async fn renderer_main(
   ipc_tx: UnboundedSender<IPCMessageWithId>, 
@@ -14,9 +17,13 @@ pub async fn renderer_main(
 ) {
   info!("Starting Renderer...");
 
+  let display_map = Arc::new(HashMap::new());
+  let display_handles = Arc::new(HashMap::new());
+  let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
+
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user_config.clone());
-  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
+  let init_from_tx = from_tx.clone();
   cancellation_tokens.0.run_until_cancelled(async move {
     let _ = send_ipc_message(
       &init_store, 
@@ -27,7 +34,10 @@ pub async fn renderer_main(
     ).await;
   }).await;
 
+  let ipc_recv_store = Arc::new(store.clone());
+  let ipc_recv_user = Arc::new(user_config.clone());
   let ipc_recv_token = cancellation_tokens.0.clone();
+  let ipc_recv_from_tx = from_tx.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
@@ -39,8 +49,46 @@ pub async fn renderer_main(
 
           // Verify that we care about this event.
           if kind.host().unwrap() == url::Host::Domain("renderer.clover.reboot-codes.com") {
-            // TODO: Setup EGL ctx for each display we're handling.
             debug!("Processing: {}", msg.kind.clone());
+
+            if kind.path() == "/register-display" {
+              match serde_jsonc::from_str::<DisplaySpec>(&msg.message) {
+                Ok(display_spec) => {
+                  match register_display(display_map.clone(), display_handles.clone(), display_spec.clone()).await {
+                    Ok(_) => {
+                      info!("Registered display: {}!", display_spec.id.clone());
+                      let _ = send_ipc_message(
+                        &ipc_recv_store,
+                        &ipc_recv_user,
+                        ipc_recv_from_tx.clone(),
+                        "clover://renderer.clover.reboot-codes.com/register-display/succeeded".to_string(), 
+                        display_spec.id.clone()
+                      ).await;
+                    },
+                    Err(e) => {
+                      error!("Failed to register display, due to\n{}", e);
+                      let _ = send_ipc_message(
+                        &ipc_recv_store,
+                        &ipc_recv_user,
+                        ipc_recv_from_tx.clone(),
+                        "clover://renderer.clover.reboot-codes.com/register-display/failed/registration".to_string(), 
+                        serde_jsonc::to_string(&(display_spec.id.clone(), e.to_string())).unwrap()
+                      ).await;
+                    }
+                  }
+                },
+                Err(e) => {
+                  error!("Failed to register display, due to\n{}", e);
+                  let _ = send_ipc_message(
+                    &ipc_recv_store,
+                    &ipc_recv_user,
+                    ipc_recv_from_tx.clone(),
+                    "clover://renderer.clover.reboot-codes.com/register-display/failed/parsing".to_string(), 
+                    serde_jsonc::to_string(&e.to_string()).unwrap()
+                  ).await;
+                }
+              }
+            }
           }
         }
       } => {}
@@ -52,9 +100,12 @@ pub async fn renderer_main(
   let ipc_trans_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = async move {
-        while let Some(msg) = init_from_rx.recv().await {
+        while let Some(msg) = from_rx.recv().await {
+          debug!("Sending message {} to IPC bus!", msg.kind.clone());
           match ipc_trans_tx.send(msg) {
-            Ok(_) => {},
+            Ok(_) => {
+              debug!("Sent message to IPC bus!");
+            },
             Err(_) => {
               debug!("Failed to send message to IPC bus!");
             }
