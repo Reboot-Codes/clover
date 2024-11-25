@@ -18,7 +18,7 @@ pub async fn renderer_main(
   info!("Starting Renderer...");
 
   let display_map = Arc::new(HashMap::new());
-  let display_handles = Arc::new(HashMap::new());
+  // let display_handles = Arc::new(HashMap::new());
   let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
 
   let init_store = Arc::new(store.clone());
@@ -54,7 +54,7 @@ pub async fn renderer_main(
             if kind.path() == "/register-display" {
               match serde_jsonc::from_str::<DisplaySpec>(&msg.message) {
                 Ok(display_spec) => {
-                  match register_display(display_map.clone(), display_handles.clone(), display_spec.clone()).await {
+                  match register_display(display_map.clone(), /* display_handles.clone(), */ display_spec.clone()).await {
                     Ok(_) => {
                       info!("Registered display: {}!", display_spec.id.clone());
                       let _ = send_ipc_message(
