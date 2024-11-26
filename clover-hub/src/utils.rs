@@ -1,4 +1,4 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::{hash::{DefaultHasher, Hash, Hasher}, sync::Arc};
 use tokio::{fs, io::AsyncReadExt};
 use api_key::types::{ApiKeyResults, Default, StringGenerator};
 use chrono::prelude::{DateTime, Utc};
@@ -99,7 +99,7 @@ pub async fn gen_cid_with_check(store: &Store) -> String {
 pub async fn send_ipc_message(
   store: &Store, 
   user_config: &CoreUserConfig, 
-  ipc_tx: UnboundedSender<IPCMessageWithId>, 
+  ipc_tx: Arc<UnboundedSender<IPCMessageWithId>>, 
   kind: String, 
   message: String
 ) -> Result<(), tokio::sync::mpsc::error::SendError<IPCMessageWithId>> {

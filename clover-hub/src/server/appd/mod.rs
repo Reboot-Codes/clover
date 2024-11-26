@@ -60,7 +60,7 @@ pub async fn appd_main(
           let _ = send_ipc_message(
             &init_store, 
             &init_user, 
-            init_from_tx.clone(), 
+            Arc::new(init_from_tx.clone()), 
             "clover://appd.clover.reboot-codes.com/status".to_string(), 
             "incomplete-init".to_string()
           ).await;
@@ -68,7 +68,7 @@ pub async fn appd_main(
           let _ = send_ipc_message(
             &init_store, 
             &init_user, 
-            init_from_tx.clone(), 
+            Arc::new(init_from_tx.clone()), 
             "clover://appd.clover.reboot-codes.com/status".to_string(), 
             "finished-init".to_string()
           ).await;

@@ -25,7 +25,7 @@ pub async fn arbiter_main(
     let _ = send_ipc_message(
       &init_store, 
       &init_user, 
-      init_from_tx, 
+      Arc::new(init_from_tx), 
       "clover://arbiter.clover.reboot-codes.com/status".to_string(), 
       "finished-init".to_string()
     ).await;
