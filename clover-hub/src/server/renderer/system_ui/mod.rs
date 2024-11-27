@@ -59,6 +59,7 @@ pub fn system_ui_main(bevy_cancel_ipc: BevyCancelIPC) {
       Update, make_visible
     )
     .add_systems(Startup, setup)
+    .add_systems(Update, mouse_scroll)
     .run();
 }
 
