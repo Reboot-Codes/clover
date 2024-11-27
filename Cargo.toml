@@ -3,9 +3,9 @@ resolver = "2"
 
 members = [
   "clover-hub",
-  "spanner/spanner-lib", 
-  "spanner/spanner-desktop"
-  ]
+  "toolbox/toolbox-lib", 
+  "toolbox/ratchet"
+]
 
 [profile.dev]
 opt-level = 1
