@@ -56,5 +56,5 @@ serde_jsonc = "1.0.108"
 sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
 
 # SystemUI
-bevy = "0.14.2"
+bevy = { version = "0.14.2", features = ["bevy_winit"] }
 bevy-tokio-tasks = "0.14.0"
