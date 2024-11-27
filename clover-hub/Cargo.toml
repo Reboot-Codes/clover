@@ -31,9 +31,6 @@ fast_websocket_client = "0.2.0"
 warp = "0.3.6"
 juniper = "0.16.1"
 juniper_warp = "0.8.0"
-
-# Graphics
-wgpu = { version = "23.0.0", features = ["serde", "glsl", "replay", "vulkan-portability", "spirv"] }
 image = { version = "0.25.5", features = ["serde"] }
 
 # Adding stuff to rust that shoulda been there in the first place.
@@ -56,6 +53,7 @@ os_path = "0.8.0"
 # Storage
 serde_jsonc = "1.0.108"
 sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
-shaderc = "0.8.3"
 bytemuck = { version = "1.20.0", features = ["derive"] }
 overflow-proof = "0.1.0"
+bevy = "0.14.2"
+bevy-tokio-tasks = "0.14.0"

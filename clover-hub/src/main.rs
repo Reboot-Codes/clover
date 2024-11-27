@@ -2,6 +2,7 @@
 #![feature(let_chains)]
 #![feature(ascii_char)]
 #![feature(async_closure)]
+#![feature(trivial_bounds)]
 
 mod server;
 mod tui;
@@ -71,7 +72,7 @@ fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
   }
 }
 
-fn get_signal_handle(cancellation_token: CancellationToken, server_token: Option<CancellationToken>) -> tokio::task::JoinHandle<()> {
+fn get_signal_handle(big_boy_token: CancellationToken, cancellation_token: CancellationToken, server_token: Option<CancellationToken>) -> tokio::task::JoinHandle<()> {
   tokio::task::spawn(async move {
     tokio::select! {
       _ = wait_for_signal_impl(server_token.clone()) => {
@@ -83,7 +84,7 @@ fn get_signal_handle(cancellation_token: CancellationToken, server_token: Option
         tokio::select! {
           _ = wait_for_signal_impl(None) => {
             warn!("Forcibly exiting!");
-            exit(1);
+            big_boy_token.cancel();
           },
           _ = cancellation_token.cancelled() => {}
           _ = async {
@@ -159,13 +160,7 @@ async fn wait_for_signal_impl() {
   };
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-  // TODO:: Create a logger that will send logs to a FIFO buffer to send over WS via EvtBuzz
-  env_logger::Builder::new()
-    .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
-    .init();
-
+async fn run(big_boy_token: CancellationToken) {
   let matches = Box::leak(Box::new(cli().get_matches()));
   let subcommand = matches.subcommand();
 
@@ -195,7 +190,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_token).await; 
           });
 
-          let signal_handle = get_signal_handle(cancellation_token, Some(server_cancellation_token_clone));
+          let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, Some(server_cancellation_token_clone));
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle, server_handle]) => {
             info!("Exiting...");
@@ -216,7 +211,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             server_main(data_dir, port, server_token, from_server_token).await; 
           });
           
-          let signal_handle = get_signal_handle(cancellation_token, Some(server_cancellation_token_clone));
+          let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, Some(server_cancellation_token_clone));
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
             info!("Exiting...");
@@ -236,7 +231,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
           });
 
-          let signal_handle = get_signal_handle(cancellation_token, None);
+          let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, None);
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle]) => {
             info!("Exiting...");
@@ -257,6 +252,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
       info!("Calling out to {ext:?} with {args:?}");
     }
     _ => unreachable!(), // If all subcommands are defined above, anything else is unreachable!()
+  }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+  // TODO:: Create a logger that will send logs to a FIFO buffer to send over WS via EvtBuzz
+  env_logger::Builder::new()
+    .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
+    .init();
+
+  let big_boy_token = CancellationToken::new();
+
+  tokio::select! {
+    _ = run(big_boy_token.clone()) => {},
+    _ = big_boy_token.cancelled() => {}
   }
 
   Ok(())

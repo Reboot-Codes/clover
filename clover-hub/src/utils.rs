@@ -8,6 +8,10 @@ use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 use crate::server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store};
 
+pub struct RecvSync<T>(pub std::sync::mpsc::Receiver<T>);
+
+unsafe impl<T> Sync for RecvSync<T> {}
+
 /// formats like "2001-07-08T00:34:60.026490+09:30"
 pub fn iso8601(st: &std::time::SystemTime) -> String {
   let dt: DateTime<Utc> = st.clone().into();
