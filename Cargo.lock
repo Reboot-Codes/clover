@@ -1790,7 +1790,6 @@ dependencies = [
  "bevy",
  "bevy-tokio-tasks",
  "bollard",
- "bytemuck",
  "chrono",
  "clap",
  "crossterm 0.19.0",

@@ -50,6 +50,7 @@ dependencies = with pkgs; [
   xorg.libXcursor
   xorg.libXi
   shaderc
+  kdePackages.full
 ];
 
 nativeBuildInputs = with pkgs;
@@ -58,6 +59,7 @@ nativeBuildInputs = with pkgs;
     lldb_17
     ninja
     cmake
+    mold-wrapped
 
     # Toolchain
 
@@ -84,8 +86,12 @@ nativeBuildInputs = with pkgs;
   };
 
   hostPlatform = "x86_64-unknown-linux-gnu";
-in pkgs.mkShell {
+in pkgs.mkShell.override {
+  stdenv = pkgs.stdenvAdapters.useMoldLinker pkgs.clangStdenv;
+} {
   name = "clover-dev";
+
+  _propagatePkgConfigDepends = false;
 
   buildInputs = [
     rust
@@ -102,6 +108,7 @@ in pkgs.mkShell {
     export RUST_BACKTRACE=1;
     # $(< ${gccPkg.cc}/nix-support/libc-crt1-cflags) $(< ${gccPkg.cc}/nix-support/libc-cflags) $(< ${gccPkg.cc}/nix-support/cc-cflags) $(< ${gccPkg.cc}/nix-support/libcxx-cxxflags)
     export BINDGEN_EXTRA_CLANG_ARGS="-idirafter ${gccPkg.cc}/lib/clang/${pkgs.lib.getVersion gccPkg.cc}/include ${pkgs.lib.optionalString gccPkg.cc.isGNU "-isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc} -isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc}/${hostPlatform} -idirafter ${gccPkg.cc}/lib/gcc/${hostPlatform}/${pkgs.lib.getVersion gccPkg.cc}/include"}"
+    export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"
   '';
 
   inherit nativeBuildInputs;

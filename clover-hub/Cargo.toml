@@ -23,6 +23,7 @@ regex = "1.10.4"
 uuid = { version = "1.8.0", features = ["serde", "v4"] }
 thiserror = "1.0"
 tokio-util = "0.7.12"
+overflow-proof = "0.1.0"
 
 # HTTP/WS
 api_key = "0.1.0"
@@ -53,7 +54,7 @@ os_path = "0.8.0"
 # Storage
 serde_jsonc = "1.0.108"
 sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
-bytemuck = { version = "1.20.0", features = ["derive"] }
-overflow-proof = "0.1.0"
+
+# SystemUI
 bevy = "0.14.2"
 bevy-tokio-tasks = "0.14.0"
