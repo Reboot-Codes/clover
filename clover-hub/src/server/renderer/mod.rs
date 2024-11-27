@@ -1,37 +1,13 @@
-mod display;
+mod system_ui;
 
 use log::{debug, info};
+use system_ui::{BevyCancelIPC, ExitState};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use std::{num::NonZero, sync::Arc};
-use bevy::{app::{App, AppExit, Startup}, prelude::{EventWriter, Res, Resource}};
+use std::sync::Arc;
 use crate::{server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store}, utils::{send_ipc_message, RecvSync}};
-
-pub enum ExitState {
-  Success,
-  Error,
-}
-
-unsafe impl Sync for ExitState {}
-
-#[derive(Resource)]
-pub struct BevyCancelIPC {
-  channel: RecvSync<ExitState>
-}
-
-pub fn stop_system(cancel_ipc: Res<BevyCancelIPC>, mut exit: EventWriter<AppExit>) {
-  for state in cancel_ipc.channel.0.iter() {
-    match state {
-      ExitState::Success => {
-        exit.send(AppExit::Success);
-      },
-      ExitState::Error => {
-        exit.send(AppExit::Error(NonZero::new(1).unwrap()));
-      },
-    }
-  }
-}
+use self::system_ui::system_ui_main;
 
 pub async fn renderer_main(
   ipc_tx: UnboundedSender<IPCMessageWithId>, 
@@ -44,13 +20,7 @@ pub async fn renderer_main(
 
   let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
   let bevy_cancel_ipc = BevyCancelIPC { channel: RecvSync(bevy_cancel_rx) };
-  std::thread::spawn(|| {
-    App::new()
-      .insert_resource(bevy_cancel_ipc)
-      .add_systems(Startup, stop_system)
-      .add_plugins(bevy_tokio_tasks::TokioTasksPlugin::default())
-      .run();
-  });
+  std::thread::spawn(|| { system_ui_main(bevy_cancel_ipc) });
 
   // let display_handles = Arc::new(HashMap::new());
   let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
