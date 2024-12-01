@@ -1,12 +1,10 @@
 pub mod models;
-pub mod displays;
-pub mod movement;
+pub mod busses;
+pub mod components;
 
 use std::sync::Arc;
-use displays::init_display_component;
 use log::{debug, error, info, warn};
 use models::Module;
-use movement::init_movement_component;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -24,14 +22,6 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
       initialized_module = true;
     } else {
       for (component_id, component) in module.components.iter() {
-        if component.component_type.clone().starts_with(&"com.reboot-codes.clover.display".to_string()) {
-          if init_display_component(&store, module.clone(), component_id.clone(), component.clone()) { initialized_module_components += 1; }
-        }
-
-        if component.component_type.clone().starts_with(&"com.reboot-codes.clover.movement".to_string()) {
-          if init_movement_component(&store, module.clone(), component_id.clone(), component.clone()) { initialized_module_components += 1; }
-        }
-  
         // TODO: Add init functions for other component types.
       }
   

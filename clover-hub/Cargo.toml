@@ -4,8 +4,35 @@ version = "1.0.0"
 edition = "2021"
 
 [features]
-default = ["core"]
-core = []
+default = ["core", "compositor", "all_busses"]
+
+# Usage specific features
+  core = []
+
+# Hardware specific features
+  compositor = ["bevy/bevy_winit"]
+
+  # HW busses
+  all_busses = ["can", "bt", "spi", "i2c", "uart"]
+
+  can = ["can_fd", "can_2"]
+  
+    can_fd = ["dep:can", "socketcan"]
+  
+    # Includes support for CAN 2.0A and 2.0B
+    can_2 = ["dep:can", "socketcan"]
+
+  bt = ["bt_classic", "bt_le"]
+
+    bt_classic = ["bluer"]
+
+    bt_le = ["bluer"]
+
+  spi = ["spidev"]
+
+  i2c = ["dep:i2c", "i2cdev"]
+
+  uart = ["uart_16550"]
 
 [dependencies]
 # CLI
@@ -24,6 +51,7 @@ uuid = { version = "1.8.0", features = ["serde", "v4"] }
 thiserror = "1.0"
 tokio-util = "0.7.12"
 overflow-proof = "0.1.0"
+decorum = "0.4.0"
 
 # HTTP/WS
 api_key = "0.1.0"
@@ -56,5 +84,14 @@ serde_jsonc = "1.0.108"
 sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
 
 # SystemUI
-bevy = { version = "0.14.2", features = ["bevy_winit"] }
+bevy = { version = "0.14.2" }
 bevy-tokio-tasks = "0.14.0"
+
+# ModMan Bus Proxies
+uart_16550 = { version = "0.3.2", optional = true }
+can = { version = "0.2.0", optional = true }
+socketcan = { version = "3.3.1", optional = true }
+bluer = { version = "0.17.3", optional = true }
+spidev = { version = "0.6.0", optional = true }
+i2c = { version = "0.1.0", optional = true }
+i2cdev = { version = "0.6.1", optional = true }

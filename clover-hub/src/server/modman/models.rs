@@ -11,15 +11,10 @@ pub struct Module {
   pub registered_by: String,
 }
 
-// TODO: Finish module configuration struct
-struct ModuleConfig {
-  pub pretty_name: String,
-  pub module_type: String,
-}
-
 #[derive(Debug, Clone)]
-pub struct Component {
-  pub component_type: String
+pub enum Component {
+  Audio,
+  Video,
+  Sensor,
+  Movement
 }
-
-// TODO: Add component types

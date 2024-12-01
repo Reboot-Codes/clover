@@ -1,5 +1,5 @@
-mod plugins;
-mod systems;
+pub mod plugins;
+pub mod systems;
 
 use bevy::{a11y::AccessibilityNode, app::{App, Startup}, core::FrameCount, diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin}, ecs::system::Query, input::mouse::{MouseScrollUnit, MouseWheel}, log::LogPlugin, prelude::*, window::{PresentMode, Window, WindowPlugin, WindowTheme}, winit::{WakeUp, WinitPlugin}, DefaultPlugins};
 use systems::stop_system;

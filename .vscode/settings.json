@@ -2,5 +2,9 @@
   "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
   "cSpell.words": [
     "evtbuzz"
+  ],
+  "deno.enablePaths": [
+    "./toolbox/spanner",
+    "./docs"
   ]
 }

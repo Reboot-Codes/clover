@@ -62,7 +62,7 @@ nativeBuildInputs = with pkgs;
     mold-wrapped
 
     # Toolchain
-
+    deno
     # Do not use the clangd from this package as it does not work correctly with
     # stdlib headers.
     llvmPkgs.lld
@@ -108,7 +108,7 @@ in pkgs.mkShell.override {
     export RUST_BACKTRACE=1;
     # $(< ${gccPkg.cc}/nix-support/libc-crt1-cflags) $(< ${gccPkg.cc}/nix-support/libc-cflags) $(< ${gccPkg.cc}/nix-support/cc-cflags) $(< ${gccPkg.cc}/nix-support/libcxx-cxxflags)
     export BINDGEN_EXTRA_CLANG_ARGS="-idirafter ${gccPkg.cc}/lib/clang/${pkgs.lib.getVersion gccPkg.cc}/include ${pkgs.lib.optionalString gccPkg.cc.isGNU "-isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc} -isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc}/${hostPlatform} -idirafter ${gccPkg.cc}/lib/gcc/${hostPlatform}/${pkgs.lib.getVersion gccPkg.cc}/include"}"
-    export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"
+    export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold -Zshare-generics=y"
   '';
 
   inherit nativeBuildInputs;
