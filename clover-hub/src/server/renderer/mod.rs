@@ -1,13 +1,14 @@
 mod system_ui;
 
 use log::{debug, info};
-use system_ui::{BevyCancelIPC, ExitState};
+use system_ui::{CustomBevyIPC, ExitState};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 use std::sync::Arc;
 use crate::{server::evtbuzz::models::{CoreUserConfig, IPCMessageWithId, Store}, utils::{send_ipc_message, RecvSync}};
 use self::system_ui::system_ui_main;
+use queues::*;
 
 pub async fn renderer_main(
   ipc_tx: UnboundedSender<IPCMessageWithId>, 
@@ -19,7 +20,11 @@ pub async fn renderer_main(
   info!("Starting Renderer...");
 
   let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
-  let bevy_cancel_ipc = BevyCancelIPC { channel: RecvSync(bevy_cancel_rx) };
+  let bevy_cancel_ipc = CustomBevyIPC { 
+    exit_channel: RecvSync(bevy_cancel_rx), 
+    display_registration_queue: queue![] 
+  };
+
   std::thread::spawn(|| { system_ui_main(bevy_cancel_ipc) });
 
   // let display_handles = Arc::new(HashMap::new());

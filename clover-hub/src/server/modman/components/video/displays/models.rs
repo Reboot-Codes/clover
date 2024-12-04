@@ -35,7 +35,7 @@ pub enum ConnectionType {
 #[cfg(feature = "compositor")]
 pub struct DirectConnection {
   pub display_id: String,
-  pub adapter: String
+  pub windowed: bool
 }
 
 #[derive(Debug, Clone)]
