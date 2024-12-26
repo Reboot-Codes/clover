@@ -1,60 +1,73 @@
-{ pkgs ? import <nixpkgs> {} }: /*
+{ pkgs ? import <nixpkgs> {
+  config = {
+    android_sdk.accept_license = true;
+    allowUnfree = true;
+  };
+
+  overlays = [
+    (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"))
+  ];
+} }: /*
 based on
 https://discourse.nixos.org/t/how-can-i-set-up-my-rust-programming-environment/4501/9
 */
 let
-# Toolchain.
-gccVersion = "13";
-gccPkg = pkgs."gcc${gccVersion}"; # pkgs.wrapCCMulti $GCC
-llvmVersion = "17";
-llvmPkgs = pkgs."llvmPackages_${llvmVersion}";
-clangTools = pkgs."clang-tools_${llvmVersion}";
-clanggccPkg = pkgs.gccPkgAdapters.overrideCC llvmPkgs.gccPkg (llvmPkgs.clang.override {gccForLibs = gccPkg;});
-libTriple = "x86_64-unknown-linux-gnu";
+  # Toolchain.
+  gccVersion = "13";
+  gccPkg = pkgs."gcc${gccVersion}"; # pkgs.wrapCCMulti $GCC
+  llvmVersion = "17";
+  llvmPkgs = pkgs."llvmPackages_${llvmVersion}";
+  clangTools = pkgs."clang-tools_${llvmVersion}";
+  clanggccPkg = pkgs.gccPkgAdapters.overrideCC llvmPkgs.gccPkg (llvmPkgs.clang.override {gccForLibs = gccPkg;});
+  libTriple = "x86_64-unknown-linux-gnu";
 
-compilerLinks = pkgs.runCommand "clang-links" {} ''
-  mkdir -p $out/bin
-  mkdir -p $out/usr/${libTriple}/usr/lib/
-  ln -s ${llvmPkgs.clang}/bin/clang $out/bin/clang-${llvmVersion}
-  ln -s ${llvmPkgs.clang}/bin/clang++ $out/bin/clang++-${llvmVersion}
-  ln -s ${llvmPkgs.llvm}/bin/llvm-as $out/bin/llvm-as-${llvmVersion}
-  ln -s ${gccPkg.cc}/lib/gcc/${libTriple}/${gccPkg.cc.version}/crtbeginS.o $out/usr/${libTriple}/usr/lib/crtbeginS.o
-  ln -s ${gccPkg.cc}/lib/gcc/${libTriple}/${gccPkg.cc.version}/crtendS.o $out/usr/${libTriple}/usr/lib/crtendS.o
-'';
+  compilerLinks = pkgs.runCommand "clang-links" {} ''
+    mkdir -p $out/bin
+    mkdir -p $out/usr/${libTriple}/usr/lib/
+    ln -s ${llvmPkgs.clang}/bin/clang $out/bin/clang-${llvmVersion}
+    ln -s ${llvmPkgs.clang}/bin/clang++ $out/bin/clang++-${llvmVersion}
+    ln -s ${llvmPkgs.llvm}/bin/llvm-as $out/bin/llvm-as-${llvmVersion}
+    ln -s ${gccPkg.cc}/lib/gcc/${libTriple}/${gccPkg.cc.version}/crtbeginS.o $out/usr/${libTriple}/usr/lib/crtbeginS.o
+    ln -s ${gccPkg.cc}/lib/gcc/${libTriple}/${gccPkg.cc.version}/crtendS.o $out/usr/${libTriple}/usr/lib/crtendS.o
+  '';
 
-dependencies = with pkgs; [
-  # Dependencies
-  fmt
-  protobuf
-  gtk3
-  harfbuzz
-  atk
-  cairo
-  pango
-  gdk-pixbuf
-  webkitgtk_4_1
-  openssl
-  wayland
-  libxkbcommon
-  libGL
-  xorg.libX11
-  SDL2
-  SDL2_image
-  egl-wayland
-  eglexternalplatform
-  alsa-lib
-  udev
-  vulkan-loader
-  xorg.libX11
-  xorg.libXrandr
-  xorg.libXcursor
-  xorg.libXi
-  shaderc
-  kdePackages.full
-];
+  androidPkgs_8_0 = pkgs.androidenv.composeAndroidPackages {
+    platformVersions = [ "26" ];
+    abiVersions = [ "x86" "x86_64"];
+  };
 
-nativeBuildInputs = with pkgs;
-  [
+  dependencies = with pkgs; [
+    # Dependencies
+    fmt
+    protobuf
+    gtk3
+    harfbuzz
+    atk
+    cairo
+    pango
+    gdk-pixbuf
+    webkitgtk_4_1
+    openssl
+    wayland
+    libxkbcommon
+    libGL
+    xorg.libX11
+    SDL2
+    SDL2_image
+    egl-wayland
+    eglexternalplatform
+    alsa-lib
+    udev
+    vulkan-loader
+    xorg.libX11
+    xorg.libXrandr
+    xorg.libXcursor
+    xorg.libXi
+    shaderc
+    kdePackages.full
+  ];
+
+  nativeBuildInputs = with pkgs; [
     (lib.hiPrio llvmPkgs.bintools-unwrapped)
     lldb_17
     ninja
@@ -63,6 +76,9 @@ nativeBuildInputs = with pkgs;
 
     # Toolchain
     deno
+    nodejs_23
+    yarn-berry
+    android-tools
     # Do not use the clangd from this package as it does not work correctly with
     # stdlib headers.
     llvmPkgs.lld
@@ -72,16 +88,31 @@ nativeBuildInputs = with pkgs;
     compilerLinks
 
     pkg-config
-  ]
-  ++ dependencies ++ [ clangTools ];
-  rust_overlay = import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
-  pkgs = import <nixpkgs> { overlays = [ rust_overlay ]; };
-  rustVersion = "latest";
-  #rustVersion = "1.62.0";
+  ] ++ dependencies ++ [
+    clangTools
+  ];
+
+  rustVersion = "2024-12-20";
   rust = pkgs.rust-bin.nightly.${rustVersion}.default.override {
     extensions = [
       "rust-src" # for rust-analyzer
       "rust-analyzer"
+    ];
+
+    targets = [
+      "x86_64-unknown-linux-gnu"
+      "x86_64-pc-windows-gnu"
+      "i686-unknown-linux-gnu"
+      "x86_64-apple-darwin"
+      "aarch64-apple-darwin"
+      "aarch64-unknown-linux-gnu"
+      "aarch64-linux-android"
+      "arm-linux-androideabi"
+      "armv7-linux-androideabi"
+      "i686-linux-android"
+      "x86_64-linux-android"
+      "aarch64-apple-ios"
+      "x86_64-apple-ios"
     ];
   };
 
@@ -97,6 +128,7 @@ in pkgs.mkShell.override {
     rust
     gccPkg.cc
     llvmPkgs.libclang
+    androidPkgs_8_0.androidsdk
   ] ++ (with pkgs; [
     clang
     glslang
@@ -110,6 +142,8 @@ in pkgs.mkShell.override {
     export BINDGEN_EXTRA_CLANG_ARGS="-idirafter ${gccPkg.cc}/lib/clang/${pkgs.lib.getVersion gccPkg.cc}/include ${pkgs.lib.optionalString gccPkg.cc.isGNU "-isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc} -isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc}/${hostPlatform} -idirafter ${gccPkg.cc}/lib/gcc/${hostPlatform}/${pkgs.lib.getVersion gccPkg.cc}/include"}"
     export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold -Zshare-generics=y"
   '';
+
+  GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidPkgs_8_0.androidsdk}/libexec/android-sdk/build-tools/28.0.3/aapt2";
 
   inherit nativeBuildInputs;
 }
