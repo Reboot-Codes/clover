@@ -31,10 +31,31 @@ let
     ln -s ${gccPkg.cc}/lib/gcc/${libTriple}/${gccPkg.cc.version}/crtendS.o $out/usr/${libTriple}/usr/lib/crtendS.o
   '';
 
-  androidPkgs_8_0 = pkgs.androidenv.composeAndroidPackages {
+  androidBuildToolsVersion = "30.0.3";
+  androidCMakeVersion = "3.10.2";
+
+  androidComposition = pkgs.androidenv.composeAndroidPackages {
+    cmdLineToolsVersion = "8.0";
+    toolsVersion = "26.1.1";
+    platformToolsVersion = androidBuildToolsVersion;
+    buildToolsVersions = [ androidBuildToolsVersion ];
+    includeEmulator = true;
+    emulatorVersion = "30.3.4";
     platformVersions = [ "26" ];
-    abiVersions = [ "x86" "x86_64"];
+    abiVersions = [ "x86" "x86_64" "arm64-v8a" "armeabi-v7a" ];
+    includeSources = false;
+    includeSystemImages = true;
+    systemImageTypes = [ "google_apis_playstore" ];
+    cmakeVersions = [ androidCMakeVersion ];
+    includeNDK = true;
+    ndkVersions = ["22.0.7026061"];
+    useGoogleAPIs = false;
+    includeExtras = [
+      "extras;google;gcm"
+    ];
   };
+
+  androidsdk = androidComposition.androidsdk;
 
   dependencies = with pkgs; [
     # Dependencies
@@ -128,7 +149,7 @@ in pkgs.mkShell.override {
     rust
     gccPkg.cc
     llvmPkgs.libclang
-    androidPkgs_8_0.androidsdk
+    androidsdk
   ] ++ (with pkgs; [
     clang
     glslang
@@ -141,9 +162,13 @@ in pkgs.mkShell.override {
     # $(< ${gccPkg.cc}/nix-support/libc-crt1-cflags) $(< ${gccPkg.cc}/nix-support/libc-cflags) $(< ${gccPkg.cc}/nix-support/cc-cflags) $(< ${gccPkg.cc}/nix-support/libcxx-cxxflags)
     export BINDGEN_EXTRA_CLANG_ARGS="-idirafter ${gccPkg.cc}/lib/clang/${pkgs.lib.getVersion gccPkg.cc}/include ${pkgs.lib.optionalString gccPkg.cc.isGNU "-isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc} -isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc}/${hostPlatform} -idirafter ${gccPkg.cc}/lib/gcc/${hostPlatform}/${pkgs.lib.getVersion gccPkg.cc}/include"}"
     export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold -Zshare-generics=y"
+    export PATH="$(echo "$ANDROID_SDK_ROOT/cmake/${androidCMakeVersion}".*/bin):$PATH"
   '';
 
-  GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidPkgs_8_0.androidsdk}/libexec/android-sdk/build-tools/28.0.3/aapt2";
+  GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidsdk}/libexec/android-sdk/build-tools/${androidBuildToolsVersion}/aapt2";
+  ANDROID_SDK_ROOT = "${androidsdk}/libexec/android-sdk";
+  ANDROID_HOME = ANDROID_SDK_ROOT;
+  ANDROID_NDK_ROOT = "${ANDROID_SDK_ROOT}/ndk-bundle";
 
   inherit nativeBuildInputs;
 }
