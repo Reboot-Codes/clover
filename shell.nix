@@ -37,10 +37,10 @@ let
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     cmdLineToolsVersion = "8.0";
     toolsVersion = "26.1.1";
-    platformToolsVersion = androidBuildToolsVersion;
+    platformToolsVersion = "35.0.2";
     buildToolsVersions = [ androidBuildToolsVersion ];
     includeEmulator = true;
-    emulatorVersion = "30.3.4";
+    emulatorVersion = "35.2.5";
     platformVersions = [ "26" ];
     abiVersions = [ "x86" "x86_64" "arm64-v8a" "armeabi-v7a" ];
     includeSources = false;
@@ -167,8 +167,8 @@ in pkgs.mkShell.override {
 
   GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidsdk}/libexec/android-sdk/build-tools/${androidBuildToolsVersion}/aapt2";
   ANDROID_SDK_ROOT = "${androidsdk}/libexec/android-sdk";
-  ANDROID_HOME = ANDROID_SDK_ROOT;
-  ANDROID_NDK_ROOT = "${ANDROID_SDK_ROOT}/ndk-bundle";
+  ANDROID_HOME = "${androidsdk}/libexec/android-sdk";
+  ANDROID_NDK_ROOT = "${androidsdk}/libexec/android-sdk/ndk-bundle";
 
   inherit nativeBuildInputs;
 }
