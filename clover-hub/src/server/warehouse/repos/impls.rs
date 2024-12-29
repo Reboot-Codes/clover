@@ -7,128 +7,128 @@ use crate::server::{appd::models::{BuildConfig, RepoCreds}, warehouse::repos::bu
 use super::{models::*, replace_simple_directives, resolve_entry_value, resolve_list_entry};
 
 impl ManifestCompilationFrom<Option<String>> for OptionalString {
-  async fn compile(spec: Option<String>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized {
-    let mut err = None;
+    async fn compile(spec: Option<String>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized {
+        let mut err = None;
 
-    let res = match spec.clone() {
-      Some(raw_str) => {
-        match resolve_entry_value(raw_str, resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(resolution) => {
-            match resolution {
-              Resolution::ImportedMultiple(_) => {
-                err = Some(SimpleError::new("Glob import not supported at this level!"));
-                OptionalString::None
-              },
-              Resolution::ImportedSingle((here, imported)) => {
-                match serde_jsonc::from_str::<String>(&imported) {
-                  Ok(val) => {
-                    OptionalString::Some(val)
-                  },
-                  Err(e) => {
-                    err = Some(SimpleError::new(format!("OptionalString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
-                    OptionalString::None
-                  }
+        let res = match spec.clone() {
+            Some(raw_str) => {
+                match resolve_entry_value(raw_str, resolution_ctx.clone(), repo_dir_path.clone()).await {
+                    Ok(resolution) => {
+                        match resolution {
+                            Resolution::ImportedMultiple(_) => {
+                                err = Some(SimpleError::new("Glob import not supported at this level!"));
+                                OptionalString::None
+                            },
+                            Resolution::ImportedSingle((here, imported)) => {
+                                match serde_jsonc::from_str::<String>(&imported) {
+                                    Ok(val) => {
+                                        OptionalString::Some(val)
+                                    },
+                                    Err(e) => {
+                                        err = Some(SimpleError::new(format!("OptionalString, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
+                                        OptionalString::None
+                                    }
+                                }
+                            },
+                            Resolution::NoImport(val) => {
+                                OptionalString::Some(val)
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        err = Some(e);
+                        OptionalString::None
+                    }
                 }
-              },
-              Resolution::NoImport(val) => {
-                OptionalString::Some(val)
-              }
-            }
-          },
-          Err(e) => {
-            err = Some(e);
-            OptionalString::None
-          }
-        }
-      },
-      None => { OptionalString::None }
-    };
+            },
+            None => { OptionalString::None }
+        };
 
-    match err {
-      Some(e) => { Err(e) },
-      None => { Ok(res) }
+        match err {
+            Some(e) => { Err(e) },
+            None => { Ok(res) }
+        }
     }
-  }
 }
 
 impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>> ManifestCompilationFrom<OptionalSingleManifestSpecEntry<T>> for Optional<K> {
-  async fn compile(spec: OptionalSingleManifestSpecEntry<T>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized {
-    let mut err = None;
+    async fn compile(spec: OptionalSingleManifestSpecEntry<T>, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized {
+        let mut err = None;
 
-    let res = match spec.clone() {
-      OptionalSingleManifestSpecEntry::Some(raw_val) => {
-        match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(val) => {
-            Optional::Some(val)
-          },
-          Err(e) => {
-            err = Some(e);
-            Optional::None
-          }
-        }
-      },
-      OptionalSingleManifestSpecEntry::ImportString(raw_str) => {
-        match resolve_entry_value(raw_str, resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(resolution) => {
-            match resolution {
-              Resolution::ImportedMultiple(_) => {
-                err = Some(SimpleError::new("Glob import not supported at this level!"));
-                Optional::None
-              },
-              Resolution::ImportedSingle((here, imported)) => {
-                match serde_jsonc::from_str(&imported) {
-                  Ok(raw_val) => {
-                    match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
-                      Ok(val) => {
+        let res = match spec.clone() {
+            OptionalSingleManifestSpecEntry::Some(raw_val) => {
+                match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await {
+                    Ok(val) => {
                         Optional::Some(val)
-                      },
-                      Err(e) => {
+                    },
+                    Err(e) => {
                         err = Some(e);
                         Optional::None
-                      }
                     }
-                  },
-                  Err(e) => {
-                    err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
-                    Optional::None
-                  }
                 }
-              },
-              Resolution::NoImport(val_str) => {
-                match serde_jsonc::from_str(&val_str) {
-                  Ok(raw_val) => {
-                    match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await {
-                      Ok(val) => {
-                        Optional::Some(val)
-                      },
-                      Err(e) => {
+            },
+            OptionalSingleManifestSpecEntry::ImportString(raw_str) => {
+                match resolve_entry_value(raw_str, resolution_ctx.clone(), repo_dir_path.clone()).await {
+                    Ok(resolution) => {
+                        match resolution {
+                            Resolution::ImportedMultiple(_) => {
+                                err = Some(SimpleError::new("Glob import not supported at this level!"));
+                                Optional::None
+                            },
+                            Resolution::ImportedSingle((here, imported)) => {
+                                match serde_jsonc::from_str(&imported) {
+                                    Ok(raw_val) => {
+                                            match K::compile(raw_val, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
+                                            Ok(val) => {
+                                                Optional::Some(val)
+                                            },
+                                            Err(e) => {
+                                                err = Some(e);
+                                                Optional::None
+                                            }
+                                        }
+                                    },
+                                    Err(e) => {
+                                        err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, e)));
+                                        Optional::None
+                                    }
+                                }
+                            },
+                            Resolution::NoImport(val_str) => {
+                                match serde_jsonc::from_str(&val_str) {
+                                    Ok(raw_val) => {
+                                        match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await {
+                                            Ok(val) => {
+                                                Optional::Some(val)
+                                            },
+                                            Err(e) => {
+                                                err = Some(e);
+                                                Optional::None
+                                            }
+                                        }
+                                    },
+                                    Err(e) => {
+                                        err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", resolution_ctx.clone(), e)));
+                                        Optional::None
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    Err(e) => {
                         err = Some(e);
                         Optional::None
-                      }
                     }
-                  },
-                  Err(e) => {
-                    err = Some(SimpleError::new(format!("Optional, ctx: {:#?}\nerr: {}", resolution_ctx.clone(), e)));
-                    Optional::None
-                  }
                 }
-              }
-            }
-          },
-          Err(e) => {
-            err = Some(e);
-            Optional::None
-          }
-        }
-      },
-      OptionalSingleManifestSpecEntry::None => { Optional::None }
-    };
+            },
+            OptionalSingleManifestSpecEntry::None => { Optional::None }
+        };
 
-    match err {
-      Some(e) => { Err(e) },
-      None => { Ok(res) }
+        match err {
+            Some(e) => { Err(e) },
+            None => { Ok(res) }
+        }
     }
-  }
 }
 
 impl ManifestCompilationFrom<String> for RequiredString {
@@ -323,7 +323,7 @@ impl<T: Clone + std::fmt::Debug, K> ManifestCompilationFrom<OptionalListManifest
                   match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(&res_str) {
                     Ok(hash_map) => {
                       debug!("serde_jsonc::from_str(): {:#?}", hash_map.clone());
-        
+
                       match resolve_list_entry(hash_map, ResolutionCtx { base: resolution_ctx.clone().base, builtin: resolution_ctx.clone().builtin, here }, repo_dir_path.clone()).await {
                         Ok(list) => {
                           entries = OptionalStrTHashMap::Some(list);
@@ -651,9 +651,9 @@ impl Manifest {
 
     debug!("Resolving manifest.base");
     let base = match OptionalString::compile(spec.base.clone(), ResolutionCtx { base: None, builtin: builtin_rfqdn(false), here: spec_path.clone() }, repo_dir_path.clone()).await {
-      Ok(val) => { 
+      Ok(val) => {
         debug!("Resolved manifest.base");
-        val 
+        val
       },
       Err(e) => {
         err = Some(e);
@@ -661,20 +661,20 @@ impl Manifest {
       }
     };
 
-    let resolution_ctx = ResolutionCtx { 
+    let resolution_ctx = ResolutionCtx {
       base: match base.clone() {
         OptionalString::Some(val) => { Some(val) },
         OptionalString::None => { None }
-      }, 
+      },
       builtin: builtin_rfqdn(false),
       here: spec_path.clone()
     };
-    
+
     debug!("Resolving manifest.name");
     let name = match OptionalString::compile(spec.name.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-      Ok(val) => { 
+      Ok(val) => {
         debug!("Resolved manifest.name");
-        val 
+        val
       },
       Err(e) => {
         err = Some(e);
@@ -684,9 +684,9 @@ impl Manifest {
 
     debug!("Resolving manifest.version");
     let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-      Ok(val) => { 
+      Ok(val) => {
         debug!("Resolved manifest.version");
-        val 
+        val
       },
       Err(e) => {
         err = Some(e);
@@ -707,7 +707,7 @@ impl Manifest {
 
     match err {
       Some(e) => { Err(e) },
-      None => { 
+      None => {
         Ok(Manifest {
           name,
           version,
@@ -762,10 +762,10 @@ impl ManifestCompilationFrom<RawDirectorySpec> for DirectorySpec {
 
       match err {
         Some(e) => { Err(e) },
-        None => { 
+        None => {
           Ok(DirectorySpec {
-            modules, 
-            applications, 
+            modules,
+            applications,
             #[cfg(feature = "core")]
             expression_packs
           })
@@ -780,9 +780,9 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
 
     debug!("Resolving application.name");
     let name = match RequiredString::compile(spec.name.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-      Ok(val) => { 
+      Ok(val) => {
         debug!("Resolved application.name");
-        val 
+        val
       },
       Err(e) => {
         err = Some(e);
@@ -792,9 +792,9 @@ impl ManifestCompilationFrom<RawApplicationSpec> for ApplicationSpec {
 
     debug!("Resolving application.version");
     let version = match RequiredString::compile(spec.version.clone(), resolution_ctx.clone(), repo_dir_path.clone()).await {
-      Ok(val) => { 
+      Ok(val) => {
         debug!("Resolved application.version");
-        val 
+        val
       },
       Err(e) => {
         err = Some(e);
@@ -1011,7 +1011,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
         OptionalStrTHashMap::None
       }
     };
-    
+
     match err {
       Some(e) => { Err(e) },
       None => {
@@ -1032,7 +1032,7 @@ impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
     let ret = match spec {
       RawExpressionSpec::RawStaticExpressionSpec(raw_expression_spec) => {
         match StaticExpressionSpec::compile(raw_expression_spec, resolution_ctx.clone(), repo_dir_path.clone()).await {
-          Ok(val) => { 
+          Ok(val) => {
             debug!("Resolved raw-expression-pack");
             Self::StaticExpressionSpec(val)
           },
