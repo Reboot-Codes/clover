@@ -4,11 +4,11 @@ pub mod systems;
 use bevy::{
   prelude::*,
   app::{
-    App, 
+    App,
     Startup
   },
   diagnostic::{
-    FrameTimeDiagnosticsPlugin, 
+    FrameTimeDiagnosticsPlugin,
     LogDiagnosticsPlugin
   },
   log::LogPlugin,
@@ -43,13 +43,13 @@ pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC) {
   {
     use bevy::{
       window::{
-        PresentMode, 
-        Window, 
-        WindowPlugin, 
+        PresentMode,
+        Window,
+        WindowPlugin,
         WindowTheme
-      }, 
+      },
       winit::{
-        WakeUp, 
+        WakeUp,
         WinitPlugin
       },
       DefaultPlugins

@@ -32,6 +32,8 @@ const config: Config = {
     locales: ['en'],
   },
 
+  plugins: ["docusaurus-lunr-search"],
+
   presets: [
     [
       'classic',
@@ -62,15 +64,21 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'guideSidebar',
+          sidebarId: 'userGuideSidebar',
           position: 'left',
-          label: 'Guide',
+          label: 'User Guide',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'developerGuideSidebar',
+          position: 'left',
+          label: 'Developer Guide',
         },
         {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
           position: 'left',
-          label: 'Manual',
+          label: 'Internal Documentation',
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
@@ -86,11 +94,15 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Guide',
-              to: '/docs/guide/intro',
+              label: 'User Guide',
+              to: '/docs/user-guide/intro',
             },
             {
-              label: 'Manual',
+              label: 'Developer Guide',
+              to: '/docs/developer-guide/intro',
+            },
+            {
+              label: 'Internal Documentation',
               to: '/docs/components/intro',
             },
           ],

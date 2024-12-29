@@ -19,17 +19,24 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/guide/intro"
+            to="/docs/user-guide/intro"
             style={{ margin: "12px" }}
           >
-            Get Started
+            Build Your Instance
+          </Link>
+          <Link
+            className="button button--secondary button--lg"
+            to="/docs/developer-guide/intro"
+            style={{ margin: "12px" }}
+          >
+            Create For Clover
           </Link>
           <Link
             className="button button--secondary button--lg"
             to="/docs/components/intro"
             style={{ margin: "12px" }}
           >
-            Read the Manual
+            Read the Internal Docs
           </Link>
         </div>
       </div>
