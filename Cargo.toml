@@ -4,8 +4,9 @@ resolver = "2"
 members = [
   "clover-hub",
   "toolbox/toolbox-lib",
-  "toolbox/ratchet"
-, "tesseract"]
+  "toolbox/ratchet",
+  "tesseract"
+]
 
 [profile.dev]
 opt-level = 1

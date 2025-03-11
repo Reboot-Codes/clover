@@ -105,7 +105,7 @@ async fn ensure_authentication(path: String, store: Arc<Arc<Store>>, auth_header
         debug!("Registering as client: {}", client_id.clone());
         client = ClientWithId { api_key: api_key_str.clone(), user_id: user_id.clone(), id: client_id.clone(), active: true };
         store.clients.lock().await.insert(client_id.clone(), client.clone().into());
-        
+
         let user = store.users.clone().lock().await.get(&user_id.clone()).unwrap().clone().to_user_with_id(user_id.clone());
         let session = Session { start_time: iso8601(&SystemTime::now()), end_time: "".to_string(), api_key: api_key.key.clone() };
         user.sessions.lock().await.insert(client_id.clone(), session.clone());
@@ -314,7 +314,7 @@ pub async fn evtbuzz_listener(
                                       error!("Failed to send message to client: {}, due to:\n{}", client_id.clone(), e);
                                     }
                                   };
-                                  
+
                                   break;
                                 }
                               },
@@ -353,8 +353,8 @@ pub async fn evtbuzz_listener(
 
                           let generated_message = gen_ipc_message(
                             &ipc_dispatch_store.clone(),
-                            &ipc_dispatch_user_config.clone(), 
-                            kind, 
+                            &ipc_dispatch_user_config.clone(),
+                            kind,
                             "api key removed from store".to_string()
                           ).await;
                           ipc_dispatch_store.messages.lock().await.insert(generated_message.id.clone(), generated_message.clone().into());
@@ -376,7 +376,7 @@ pub async fn evtbuzz_listener(
               error!("Message: {{ \"id\": \"{}\", \"kind\": \"{}\", \"message\": \"{}\" }}, error parsing `kind`: {}", message.id.clone(), message.kind.clone(), message.message.clone(), e);
             }
           }
-        } 
+        }
       } => {}
     }
   });

@@ -1,6 +1,6 @@
 { pkgs ? import <nixpkgs> {
   config = {
-    android_sdk.accept_license = true;
+    # android_sdk.accept_license = true;
     allowUnfree = true;
   };
 
@@ -13,7 +13,7 @@ https://discourse.nixos.org/t/how-can-i-set-up-my-rust-programming-environment/4
 */
 let
   # Toolchain.
-  gccVersion = "13";
+  gccVersion = "14";
   gccPkg = pkgs."gcc${gccVersion}"; # pkgs.wrapCCMulti $GCC
   llvmVersion = "17";
   llvmPkgs = pkgs."llvmPackages_${llvmVersion}";
@@ -34,28 +34,28 @@ let
   androidBuildToolsVersion = "30.0.3";
   androidCMakeVersion = "3.10.2";
 
-  androidComposition = pkgs.androidenv.composeAndroidPackages {
-    cmdLineToolsVersion = "8.0";
-    toolsVersion = "26.1.1";
-    platformToolsVersion = "35.0.2";
-    buildToolsVersions = [ androidBuildToolsVersion ];
-    includeEmulator = true;
-    emulatorVersion = "35.2.5";
-    platformVersions = [ "26" ];
-    abiVersions = [ "x86" "x86_64" "arm64-v8a" "armeabi-v7a" ];
-    includeSources = false;
-    includeSystemImages = true;
-    systemImageTypes = [ "google_apis_playstore" ];
-    cmakeVersions = [ androidCMakeVersion ];
-    includeNDK = true;
-    ndkVersions = ["22.0.7026061"];
-    useGoogleAPIs = false;
-    includeExtras = [
-      "extras;google;gcm"
-    ];
-  };
+  # androidComposition = pkgs.androidenv.composeAndroidPackages {
+  #   cmdLineToolsVersion = "8.0";
+  #   toolsVersion = "26.1.1";
+  #   platformToolsVersion = "35.0.2";
+  #   buildToolsVersions = [ androidBuildToolsVersion ];
+  #   includeEmulator = true;
+  #   emulatorVersion = "35.2.5";
+  #   platformVersions = [ "26" ];
+  #   abiVersions = [ "x86" "x86_64" "arm64-v8a" "armeabi-v7a" ];
+  #   includeSources = false;
+  #   includeSystemImages = true;
+  #   systemImageTypes = [ "google_apis_playstore" ];
+  #   cmakeVersions = [ androidCMakeVersion ];
+  #   includeNDK = true;
+  #   ndkVersions = ["22.0.7026061"];
+  #   useGoogleAPIs = false;
+  #   includeExtras = [
+  #     "extras;google;gcm"
+  #   ];
+  # };
 
-  androidsdk = androidComposition.androidsdk;
+  # androidsdk = androidComposition.androidsdk;
 
   dependencies = with pkgs; [
     # Dependencies
@@ -99,7 +99,7 @@ let
     deno
     nodejs_23
     yarn-berry
-    android-tools
+    # android-tools
     # Do not use the clangd from this package as it does not work correctly with
     # stdlib headers.
     llvmPkgs.lld
@@ -122,18 +122,18 @@ let
 
     targets = [
       "x86_64-unknown-linux-gnu"
-      "x86_64-pc-windows-gnu"
-      "i686-unknown-linux-gnu"
-      "x86_64-apple-darwin"
-      "aarch64-apple-darwin"
-      "aarch64-unknown-linux-gnu"
-      "aarch64-linux-android"
-      "arm-linux-androideabi"
-      "armv7-linux-androideabi"
-      "i686-linux-android"
-      "x86_64-linux-android"
-      "aarch64-apple-ios"
-      "x86_64-apple-ios"
+      # "x86_64-pc-windows-gnu"
+      # "i686-unknown-linux-gnu"
+      # "x86_64-apple-darwin"
+      # "aarch64-apple-darwin"
+      # "aarch64-unknown-linux-gnu"
+      # "aarch64-linux-android"
+      # "arm-linux-androideabi"
+      # "armv7-linux-androideabi"
+      # "i686-linux-android"
+      # "x86_64-linux-android"
+      # "aarch64-apple-ios"
+      # "x86_64-apple-ios"
     ];
   };
 
@@ -149,7 +149,7 @@ in pkgs.mkShell.override {
     rust
     gccPkg.cc
     llvmPkgs.libclang
-    androidsdk
+    # androidsdk
   ] ++ (with pkgs; [
     clang
     glslang
@@ -162,13 +162,13 @@ in pkgs.mkShell.override {
     # $(< ${gccPkg.cc}/nix-support/libc-crt1-cflags) $(< ${gccPkg.cc}/nix-support/libc-cflags) $(< ${gccPkg.cc}/nix-support/cc-cflags) $(< ${gccPkg.cc}/nix-support/libcxx-cxxflags)
     export BINDGEN_EXTRA_CLANG_ARGS="-idirafter ${gccPkg.cc}/lib/clang/${pkgs.lib.getVersion gccPkg.cc}/include ${pkgs.lib.optionalString gccPkg.cc.isGNU "-isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc} -isystem ${gccPkg.cc}/include/c++/${pkgs.lib.getVersion gccPkg.cc}/${hostPlatform} -idirafter ${gccPkg.cc}/lib/gcc/${hostPlatform}/${pkgs.lib.getVersion gccPkg.cc}/include"}"
     export RUSTFLAGS="-C link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold -Zshare-generics=y"
-    export PATH="$(echo "$ANDROID_SDK_ROOT/cmake/${androidCMakeVersion}".*/bin):$PATH"
+    # export PATH="$(echo "$ANDROID_SDK_ROOT/cmake/${androidCMakeVersion}".*/bin):$PATH"
   '';
 
-  GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidsdk}/libexec/android-sdk/build-tools/${androidBuildToolsVersion}/aapt2";
-  ANDROID_SDK_ROOT = "${androidsdk}/libexec/android-sdk";
-  ANDROID_HOME = "${androidsdk}/libexec/android-sdk";
-  ANDROID_NDK_ROOT = "${androidsdk}/libexec/android-sdk/ndk-bundle";
+  # GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidsdk}/libexec/android-sdk/build-tools/${androidBuildToolsVersion}/aapt2";
+  # ANDROID_SDK_ROOT = "${androidsdk}/libexec/android-sdk";
+  # ANDROID_HOME = "${androidsdk}/libexec/android-sdk";
+  # ANDROID_NDK_ROOT = "${androidsdk}/libexec/android-sdk/ndk-bundle";
 
   inherit nativeBuildInputs;
 }
