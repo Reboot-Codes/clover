@@ -10,7 +10,7 @@ use bevy::{
     prelude::*,
 };
 use queues::*;
-use systems::{displays::display_registrar, setup::setup};
+use systems::{displays::{vdisplay_registrar, display_registrar}, setup::setup};
 
 pub enum ExitState {
     Success,
@@ -30,7 +30,7 @@ pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC) {
 
     app.insert_resource(custom_bevy_ipc)
         .add_systems(Startup, setup)
-        .add_systems(Update, display_registrar);
+        .add_systems(Update, (vdisplay_registrar, display_registrar).chain());
 
     #[cfg(feature = "compositor")]
     {

@@ -6,5 +6,7 @@
   "deno.enablePaths": [
     "./toolbox/spanner",
     "./docs"
-  ]
+  ],
+  "rust-analyzer.check.workspace": false,
+  "rust-analyzer.numThreads": 4
 }

@@ -1,6 +1,7 @@
-use std::num::NonZero;
+use std::{collections::HashMap, num::NonZero};
 use decorum::Real;
 use crate::server::modman::busses::models::BusTypes;
+use bevy::prelude::Component;
 
 #[derive(Debug, Clone)]
 pub struct DisplayComponent {
@@ -8,7 +9,22 @@ pub struct DisplayComponent {
   pub resolution: DisplayResolution,
   /// Required to calculate PPI (and optionally pixel aspect ratio).
   pub size: DisplaySize,
-  pub connection: ConnectionType
+  pub connection: ConnectionType,
+  // If configured, the Entity ID of the VDisplay this physical display is a part of.
+  pub virtual_display: Option<u64>
+}
+
+#[derive(Debug, Clone, Component)]
+pub struct VirtualDisplayComponent {
+  /// Position and Component ID of the displays that make up this Virtual Display
+  pub displays: HashMap<String, DisplayPosition>,
+  pub resolution: DisplayResolution
+}
+
+#[derive(Debug, Clone)]
+pub struct DisplayPosition {
+  pub x: f64,
+  pub y: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +50,7 @@ pub enum ConnectionType {
 #[derive(Debug, Clone)]
 #[cfg(feature = "compositor")]
 pub struct DirectConnection {
+  /// Set to `@primary` to use the primary display configured by wayland.
   pub display_id: String,
   pub windowed: bool
 }
