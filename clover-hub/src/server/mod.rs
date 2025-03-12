@@ -53,6 +53,8 @@ pub async fn server_main(data_dir: &String, port: u16, cancellation_token: Cance
     }
   }
 
+  // TODO: Let each process run independantly of eachother using nexus
+
   let warehouse_setup_store = Arc::new(store.clone());
   match setup_warehouse(data_dir.clone(), warehouse_setup_store).await {
     Ok(_) => {
