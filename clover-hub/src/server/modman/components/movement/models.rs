@@ -1,4 +1,2 @@
 #[derive(Debug, Clone)]
-pub struct MovementComponent {
-  
-}
+pub struct MovementComponent {}

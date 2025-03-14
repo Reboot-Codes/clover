@@ -1,7 +1,31 @@
-use std::{collections::HashMap, sync::Arc};
+use crate::{
+  server::{
+    appd::models::Application,
+    arbiter::models::{
+      ApiKey,
+      ApiKeyWithKeyWithoutUID,
+      User,
+    },
+    modman::models::Module,
+    warehouse::{
+      config::models::Config,
+      repos::models::Manifest,
+    },
+  },
+  utils::{
+    gen_api_key_with_check,
+    gen_uid_with_check,
+  },
+};
+use serde::{
+  Deserialize,
+  Serialize,
+};
+use std::{
+  collections::HashMap,
+  sync::Arc,
+};
 use tokio::sync::Mutex;
-use serde::{Deserialize, Serialize};
-use crate::{server::{arbiter::models::{ApiKey, ApiKeyWithKeyWithoutUID, User}, warehouse::{config::models::Config, repos::models::Manifest}, modman::models::Module, appd::models::Application}, utils::{gen_api_key_with_check, gen_uid_with_check}};
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -66,7 +90,7 @@ pub struct Session {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreUserConfig {
   pub id: String,
-  pub api_key: String
+  pub api_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +98,7 @@ pub struct UserConfig {
   pub user_type: String,
   pub pretty_name: String,
   pub id: String,
-  pub api_keys: Vec<ApiKeyWithKeyWithoutUID>
+  pub api_keys: Vec<ApiKeyWithKeyWithoutUID>,
 }
 
 // TODO: Add serialization/deserialization functions...
@@ -93,13 +117,13 @@ pub struct Store {
 
 #[derive(Debug, Clone)]
 pub struct CoreUserConfigs {
-  pub evtbuzz: CoreUserConfig, 
-  pub arbiter: CoreUserConfig, 
-  pub renderer: CoreUserConfig, 
-  pub appd: CoreUserConfig, 
-  pub modman: CoreUserConfig, 
+  pub evtbuzz: CoreUserConfig,
+  pub arbiter: CoreUserConfig,
+  pub renderer: CoreUserConfig,
+  pub appd: CoreUserConfig,
+  pub modman: CoreUserConfig,
   pub inference_engine: CoreUserConfig,
-  pub warehouse: CoreUserConfig
+  pub warehouse: CoreUserConfig,
 }
 
 impl Store {
@@ -128,44 +152,54 @@ impl Store {
 
   pub async fn add_user(self, user_config: UserConfig) {
     let mut key_ids: Vec<String> = vec![];
-    for key_config in user_config.api_keys.iter() { key_ids.push(key_config.key.clone()); };
+    for key_config in user_config.api_keys.iter() {
+      key_ids.push(key_config.key.clone());
+    }
 
-    self.users.lock().await.insert(user_config.id.clone(), User { 
-      pretty_name: user_config.pretty_name, 
-      user_type: user_config.user_type, 
-      api_keys: key_ids, 
-      sessions: Arc::new(Mutex::new(HashMap::new()))
-    });
+    self.users.lock().await.insert(
+      user_config.id.clone(),
+      User {
+        pretty_name: user_config.pretty_name,
+        user_type: user_config.user_type,
+        api_keys: key_ids,
+        sessions: Arc::new(Mutex::new(HashMap::new())),
+      },
+    );
 
     for key_config in user_config.api_keys.iter() {
-      self.api_keys.lock().await.insert(key_config.key.clone(), ApiKey { 
-        allowed_events_to: key_config.allowed_events_to.clone(), 
-        allowed_events_from: key_config.allowed_events_from.clone(), 
-        user_id: user_config.id.clone(), 
-        echo: key_config.echo.clone()
-      });
-    };
+      self.api_keys.lock().await.insert(
+        key_config.key.clone(),
+        ApiKey {
+          allowed_events_to: key_config.allowed_events_to.clone(),
+          allowed_events_from: key_config.allowed_events_from.clone(),
+          user_id: user_config.id.clone(),
+          echo: key_config.echo.clone(),
+        },
+      );
+    }
   }
 
   pub async fn create_master_user(self) -> CoreUserConfig {
     let master_user_id = gen_uid_with_check(&self).await;
     let master_api_key = gen_api_key_with_check(&self).await;
-    
-    self.add_user(UserConfig {
-      id: master_user_id.clone(), 
-      pretty_name: "Master User".to_string(), 
-      user_type: "com.reboot-codes.clover.master".to_string(), 
-      api_keys: vec![ApiKeyWithKeyWithoutUID { 
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: master_api_key.clone(),
-        echo: true
-      }]
-    }).await;
+
+    self
+      .add_user(UserConfig {
+        id: master_user_id.clone(),
+        pretty_name: "Master User".to_string(),
+        user_type: "com.reboot-codes.clover.master".to_string(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: master_api_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     CoreUserConfig {
-      id: master_user_id.clone(), 
-      api_key: master_api_key.clone()
+      id: master_user_id.clone(),
+      api_key: master_api_key.clone(),
     }
   }
 
@@ -174,136 +208,157 @@ impl Store {
     // EvtBuzz
     let evtbuzz_uid = gen_uid_with_check(&self).await;
     let evtbuzz_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.evtbuzz".to_string(),
-      pretty_name: "EvtBuzz".to_string(),
-      id: evtbuzz_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: evtbuzz_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.evtbuzz".to_string(),
+        pretty_name: "EvtBuzz".to_string(),
+        id: evtbuzz_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: evtbuzz_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // Arbiter
     let arbiter_uid = gen_uid_with_check(&self).await;
     let arbiter_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.arbiter".to_string(),
-      pretty_name: "Arbiter".to_string(),
-      id: arbiter_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: arbiter_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.arbiter".to_string(),
+        pretty_name: "Arbiter".to_string(),
+        id: arbiter_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: arbiter_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // Renderer
     let renderer_uid = gen_uid_with_check(&self).await;
     let renderer_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.renderer".to_string(),
-      pretty_name: "Renderer".to_string(),
-      id: renderer_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: renderer_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.renderer".to_string(),
+        pretty_name: "Renderer".to_string(),
+        id: renderer_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: renderer_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // AppD
     let appd_uid = gen_uid_with_check(&self).await;
     let appd_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.appd".to_string(),
-      pretty_name: "appd".to_string(),
-      id: appd_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: appd_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.appd".to_string(),
+        pretty_name: "appd".to_string(),
+        id: appd_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: appd_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // ModMan
     let modman_uid = gen_uid_with_check(&self).await;
     let modman_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.modman".to_string(),
-      pretty_name: "ModMan".to_string(),
-      id: modman_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: modman_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.modman".to_string(),
+        pretty_name: "ModMan".to_string(),
+        id: modman_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: modman_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // Inference Engine
     let inference_engine_uid = gen_uid_with_check(&self).await;
     let inference_engine_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.inference-engine".to_string(),
-      pretty_name: "Inference Engine".to_string(),
-      id: inference_engine_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: inference_engine_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.inference-engine".to_string(),
+        pretty_name: "Inference Engine".to_string(),
+        id: inference_engine_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: inference_engine_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     // Warehouse
     let warehouse_uid = gen_uid_with_check(&self).await;
     let warehouse_key = gen_api_key_with_check(&self).await;
-    self.clone().add_user(UserConfig {
-      user_type: "com.reboot-codes.clover.warehouse".to_string(),
-      pretty_name: "Warehouse".to_string(),
-      id: warehouse_uid.clone(),
-      api_keys: vec![ApiKeyWithKeyWithoutUID {
-        allowed_events_to: vec![".*".to_string()], 
-        allowed_events_from: vec![".*".to_string()],
-        key: warehouse_key.clone(),
-        echo: true
-      }]
-    }).await;
+    self
+      .clone()
+      .add_user(UserConfig {
+        user_type: "com.reboot-codes.clover.warehouse".to_string(),
+        pretty_name: "Warehouse".to_string(),
+        id: warehouse_uid.clone(),
+        api_keys: vec![ApiKeyWithKeyWithoutUID {
+          allowed_events_to: vec![".*".to_string()],
+          allowed_events_from: vec![".*".to_string()],
+          key: warehouse_key.clone(),
+          echo: true,
+        }],
+      })
+      .await;
 
     CoreUserConfigs {
       evtbuzz: CoreUserConfig {
         id: evtbuzz_uid.clone(),
-        api_key: evtbuzz_key.clone()
+        api_key: evtbuzz_key.clone(),
       },
       arbiter: CoreUserConfig {
         id: arbiter_uid.clone(),
-        api_key: arbiter_key.clone()
+        api_key: arbiter_key.clone(),
       },
       renderer: CoreUserConfig {
         id: renderer_uid.clone(),
-        api_key: renderer_key.clone()
+        api_key: renderer_key.clone(),
       },
       appd: CoreUserConfig {
         id: appd_uid.clone(),
-        api_key: appd_key.clone()
+        api_key: appd_key.clone(),
       },
       modman: CoreUserConfig {
         id: modman_uid.clone(),
-        api_key: modman_key.clone()
+        api_key: modman_key.clone(),
       },
       inference_engine: CoreUserConfig {
         id: inference_engine_uid.clone(),
-        api_key: inference_engine_key.clone()
+        api_key: inference_engine_key.clone(),
       },
       warehouse: CoreUserConfig {
         id: warehouse_uid.clone(),
-        api_key: warehouse_key.clone()
+        api_key: warehouse_key.clone(),
       },
     }
   }

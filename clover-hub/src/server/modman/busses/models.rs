@@ -14,9 +14,7 @@ pub enum BusTypes {
   #[cfg(feature = "i2c")]
   I2C,
   #[cfg(feature = "uart")]
-  UART
+  UART,
 }
 
-pub trait Bus {
-  
-}
+pub trait Bus {}

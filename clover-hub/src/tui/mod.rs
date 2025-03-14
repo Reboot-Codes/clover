@@ -1,18 +1,53 @@
-use std::{io, thread, time::Duration};
+use crossterm::{
+  event::{
+    DisableMouseCapture,
+    EnableMouseCapture,
+  },
+  execute,
+  terminal::{
+    EnterAlternateScreen,
+    LeaveAlternateScreen,
+    disable_raw_mode,
+    enable_raw_mode,
+  },
+};
 use log::info;
+use std::{
+  io,
+  thread,
+  time::Duration,
+};
 use tokio_util::sync::CancellationToken;
 use tui::{
-  backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::{Color, Style}, text::{Span, Spans}, widgets::{Block, Borders, Paragraph}, Terminal
-};
-use crossterm::{
-  event::{DisableMouseCapture, EnableMouseCapture},
-  execute,
-  terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+  Terminal,
+  backend::CrosstermBackend,
+  layout::{
+    Constraint,
+    Direction,
+    Layout,
+  },
+  style::{
+    Color,
+    Style,
+  },
+  text::{
+    Span,
+    Spans,
+  },
+  widgets::{
+    Block,
+    Borders,
+    Paragraph,
+  },
 };
 
-pub async fn tui_main(port: u16, host: Option<String>, cancellation_token: CancellationToken) -> Result<(), io::Error> {
+pub async fn tui_main(
+  port: u16,
+  host: Option<String>,
+  cancellation_token: CancellationToken,
+) -> Result<(), io::Error> {
   info!("Starting TUI...");
-  
+
   // setup terminal
   enable_raw_mode().err();
   let mut stdout = io::stdout();
@@ -24,16 +59,13 @@ pub async fn tui_main(port: u16, host: Option<String>, cancellation_token: Cance
     let chunks = Layout::default()
       .direction(Direction::Vertical)
       .margin(1)
-      .constraints(
-        [
-          Constraint::Percentage(100),
-        ].as_ref()
-      )
+      .constraints([Constraint::Percentage(100)].as_ref())
       .split(f.size());
-    let title = Paragraph::new(vec![
-      Spans::from(Span::styled(format!("Connecting to {}:{}...", host.unwrap(), port), Style::default().fg(Color::Yellow)))
-    ])
-      .block(Block::default().title("Clover TUI").borders(Borders::ALL));
+    let title = Paragraph::new(vec![Spans::from(Span::styled(
+      format!("Connecting to {}:{}...", host.unwrap(), port),
+      Style::default().fg(Color::Yellow),
+    ))])
+    .block(Block::default().title("Clover TUI").borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
   })?;
 
@@ -45,7 +77,8 @@ pub async fn tui_main(port: u16, host: Option<String>, cancellation_token: Cance
     terminal.backend_mut(),
     LeaveAlternateScreen,
     DisableMouseCapture
-  ).err();
+  )
+  .err();
   terminal.show_cursor().err();
 
   Ok(())

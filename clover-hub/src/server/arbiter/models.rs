@@ -1,7 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
-use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use crate::server::evtbuzz::models::Session;
+use serde::{
+  Deserialize,
+  Serialize,
+};
+use std::{
+  collections::HashMap,
+  sync::Arc,
+};
+use tokio::sync::Mutex;
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -11,17 +17,17 @@ pub struct User {
   pub api_keys: Vec<String>,
   pub sessions: Arc<Mutex<HashMap<String, Session>>>,
   pub user_type: String,
-  pub pretty_name: String
+  pub pretty_name: String,
 }
 
 impl User {
   pub fn to_user_with_id(self, id: String) -> UserWithId {
-    UserWithId { 
-      id, 
-      api_keys: self.api_keys, 
+    UserWithId {
+      id,
+      api_keys: self.api_keys,
       sessions: self.sessions,
       user_type: self.user_type,
-      pretty_name: self.pretty_name
+      pretty_name: self.pretty_name,
     }
   }
 }
@@ -32,7 +38,7 @@ pub struct UserWithId {
   pub api_keys: Vec<String>,
   pub sessions: Arc<Mutex<HashMap<String, Session>>>,
   pub user_type: String,
-  pub pretty_name: String
+  pub pretty_name: String,
 }
 
 impl Into<User> for UserWithId {
@@ -41,7 +47,7 @@ impl Into<User> for UserWithId {
       api_keys: self.api_keys,
       sessions: self.sessions,
       user_type: self.user_type,
-      pretty_name: self.pretty_name
+      pretty_name: self.pretty_name,
     }
   }
 }

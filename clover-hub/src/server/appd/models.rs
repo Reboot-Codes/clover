@@ -1,7 +1,14 @@
-use std::collections::HashMap;
+use crate::server::warehouse::repos::models::{
+  Optional,
+  OptionalString,
+  RequiredString,
+};
 use bollard::container;
-use serde::{Deserialize, Serialize};
-use crate::server::warehouse::repos::models::{Optional, OptionalString, RequiredString};
+use serde::{
+  Deserialize,
+  Serialize,
+};
+use std::collections::HashMap;
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -10,15 +17,15 @@ use crate::server::warehouse::repos::models::{Optional, OptionalString, Required
 #[serde(remote = "container::CreateContainerOptions")]
 pub struct CreateContainerOptionsDef<T>
 where
-    T: Into<String> + Serialize,
+  T: Into<String> + Serialize,
 {
-    /// Assign the specified name to the container.
-    pub name: T,
+  /// Assign the specified name to the container.
+  pub name: T,
 
-    /// The platform to use for the container.
-    /// Added in API v1.41.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub platform: Option<T>,
+  /// The platform to use for the container.
+  /// Added in API v1.41.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub platform: Option<T>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +45,7 @@ pub struct Application {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContainerConfig {
   #[serde(with = "CreateContainerOptionsDef")]
-  pub options: container::CreateContainerOptions<String>, 
+  pub options: container::CreateContainerOptions<String>,
   pub config: container::Config<String>,
   pub build: Option<BuildConfig>,
 }
@@ -48,7 +55,7 @@ pub struct BuildConfig {
   /// Url to either container repo, or source git repo
   pub url: RequiredString,
   /// Optional repository creds
-  pub creds: Optional<RepoCreds>
+  pub creds: Optional<RepoCreds>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

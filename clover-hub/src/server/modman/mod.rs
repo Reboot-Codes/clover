@@ -1,16 +1,29 @@
-pub mod models;
 pub mod busses;
 pub mod components;
+pub mod models;
 
-use std::sync::Arc;
-use log::{debug, error, info, warn};
+use crate::utils::send_ipc_message;
+use log::{
+  debug,
+  error,
+  info,
+  warn,
+};
 use models::Module;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use std::sync::Arc;
+use tokio::sync::mpsc::{
+  UnboundedReceiver,
+  UnboundedSender,
+  unbounded_channel,
+};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use crate::utils::send_ipc_message;
 
-use super::evtbuzz::models::{IPCMessageWithId, CoreUserConfig, Store};
+use super::evtbuzz::models::{
+  CoreUserConfig,
+  IPCMessageWithId,
+  Store,
+};
 
 async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
@@ -18,16 +31,24 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
 
   if !initialized_module {
     if module.components.len() == 0 {
-      warn!("Module: {}, does not have any components, skipping.", id.clone());
+      warn!(
+        "Module: {}, does not have any components, skipping.",
+        id.clone()
+      );
       initialized_module = true;
     } else {
       for (component_id, component) in module.components.iter() {
         // TODO: Add init functions for other component types.
       }
-  
+
       if initialized_module_components != module.components.len() {
         if initialized_module_components > 0 {
-          warn!("Module: {}, only initialized {} out of {} components!", id.clone(), initialized_module_components, module.components.len());
+          warn!(
+            "Module: {}, only initialized {} out of {} components!",
+            id.clone(),
+            initialized_module_components,
+            module.components.len()
+          );
           initialized_module = true;
         } else {
           error!("Module: {}, failed to initialize!", id.clone());
@@ -39,14 +60,21 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
   if initialized_module {
     // Update the store with new state of the module.
     if initialized_module {
-      store.modules.lock().await.insert(id.clone(), Module {
-        module_type: module.module_type.clone(),
-        pretty_name: module.pretty_name.clone(),
-        initialized: true,
-        components: module.components.clone(),
-        registered_by: module.registered_by.clone()
-      });
-      info!("Module: {} ({}), Initialized!", module.pretty_name.clone(), id.clone());
+      store.modules.lock().await.insert(
+        id.clone(),
+        Module {
+          module_type: module.module_type.clone(),
+          pretty_name: module.pretty_name.clone(),
+          initialized: true,
+          components: module.components.clone(),
+          registered_by: module.registered_by.clone(),
+        },
+      );
+      info!(
+        "Module: {} ({}), Initialized!",
+        module.pretty_name.clone(),
+        id.clone()
+      );
     }
   }
 
@@ -54,37 +82,46 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
 }
 
 pub async fn modman_main(
-  ipc_tx: UnboundedSender<IPCMessageWithId>, 
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
-  store: Arc<Store>, 
+  ipc_tx: UnboundedSender<IPCMessageWithId>,
+  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  store: Arc<Store>,
   user_config: Arc<CoreUserConfig>,
-  cancellation_tokens: (CancellationToken, CancellationToken)
+  cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting ModMan...");
 
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user_config.clone());
   let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
-  cancellation_tokens.0.run_until_cancelled(async move {
-    let modules = init_store.modules.lock().await;
-    if modules.len() > 0 {
-      // Initialize modules that were registered already via persistence.
-      for (id, module) in modules.iter() {
-        info!("Initializing pre configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
-        let _components_initialized = init_module(&init_store, id.clone(), module.clone()).await;
+  cancellation_tokens
+    .0
+    .run_until_cancelled(async move {
+      let modules = init_store.modules.lock().await;
+      if modules.len() > 0 {
+        // Initialize modules that were registered already via persistence.
+        for (id, module) in modules.iter() {
+          info!(
+            "Initializing pre configured module: {}:\n  type: {}\n  name: {}",
+            id.clone(),
+            module.module_type.clone(),
+            module.pretty_name.clone()
+          );
+          let _components_initialized = init_module(&init_store, id.clone(), module.clone()).await;
+        }
+      } else {
+        info!("No pre-configured modules to initialize.");
       }
-    } else {
-      info!("No pre-configured modules to initialize.");
-    }
 
-    let _ = send_ipc_message(
-      &init_store, 
-      &init_user, 
-      Arc::new(init_from_tx), 
-      "clover://modman.clover.reboot-codes.com/status".to_string(), 
-      "finished-init".to_string()
-    ).await;
-  }).await;
+      let _ = send_ipc_message(
+        &init_store,
+        &init_user,
+        Arc::new(init_from_tx),
+        "clover://modman.clover.reboot-codes.com/status".to_string(),
+        "finished-init".to_string(),
+      )
+      .await;
+    })
+    .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
@@ -143,7 +180,7 @@ pub async fn modman_main(
                 info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
                 // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
                 let de_initialized = true;
-                
+
                 // Update the store with new state of the module.
                 if de_initialized {
                   store.modules.lock().await.insert(id.clone(), Module {

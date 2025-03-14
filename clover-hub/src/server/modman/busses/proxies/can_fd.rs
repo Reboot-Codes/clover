@@ -1,2 +1,2 @@
-use socketcan;
 use can;
+use socketcan;

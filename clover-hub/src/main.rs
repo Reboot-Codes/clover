@@ -8,10 +8,15 @@ mod server;
 mod tui;
 mod utils;
 
-use log::{info, warn};
+use clap::{
+  Arg,
+  Command,
+};
 use env_logger;
-use tokio::time;
-use tokio_util::sync::CancellationToken;
+use log::{
+  info,
+  warn,
+};
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -19,7 +24,8 @@ use std::num::ParseIntError;
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
-use clap::{Arg, Command};
+use tokio::time;
+use tokio_util::sync::CancellationToken;
 
 use crate::server::server_main;
 use crate::tui::tui_main;
@@ -43,19 +49,41 @@ fn cli() -> Command {
         .subcommand(Command::new("aio").args(aio_args()))
         .subcommand(
           Command::new("server")
-            .arg(Arg::new("data_dir").short('d').long("data-dir").required(false).default_value("/opt/clover").help("The data directory to use other than `/opt/clover`"))
-            .arg(port_arg())
+            .arg(
+              Arg::new("data_dir")
+                .short('d')
+                .long("data-dir")
+                .required(false)
+                .default_value("/opt/clover")
+                .help("The data directory to use other than `/opt/clover`"),
+            )
+            .arg(port_arg()),
         )
         .subcommand(
           Command::new("tui")
-            .arg(Arg::new("host").short('H').long("host").required(false).default_value("localhost").help("The host to connect to other than `localhost`"))
-            .arg(port_arg())
+            .arg(
+              Arg::new("host")
+                .short('H')
+                .long("host")
+                .required(false)
+                .default_value("localhost")
+                .help("The host to connect to other than `localhost`"),
+            )
+            .arg(port_arg()),
         ),
     )
 }
 
 fn port_arg() -> Arg {
-  Arg::new("port").short('p').long("port").required(false).default_value(DEFAULT_PORT_STR).help(format!("The port on the host to connect to if not on {}.", DEFAULT_PORT_STR))
+  Arg::new("port")
+    .short('p')
+    .long("port")
+    .required(false)
+    .default_value(DEFAULT_PORT_STR)
+    .help(format!(
+      "The port on the host to connect to if not on {}.",
+      DEFAULT_PORT_STR
+    ))
 }
 
 fn aio_args() -> Vec<Arg> {
@@ -64,15 +92,22 @@ fn aio_args() -> Vec<Arg> {
 
 fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
   match arg {
-    Ok(val) => { val },
+    Ok(val) => val,
     Err(e) => {
-      warn!("User-provided port did not parse correctly, using default, due to:\n{}", e);
+      warn!(
+        "User-provided port did not parse correctly, using default, due to:\n{}",
+        e
+      );
       DEFAULT_PORT
     }
   }
 }
 
-fn get_signal_handle(big_boy_token: CancellationToken, cancellation_token: CancellationToken, server_token: Option<CancellationToken>) -> tokio::task::JoinHandle<()> {
+fn get_signal_handle(
+  big_boy_token: CancellationToken,
+  cancellation_token: CancellationToken,
+  server_token: Option<CancellationToken>,
+) -> tokio::task::JoinHandle<()> {
   tokio::task::spawn(async move {
     tokio::select! {
       _ = wait_for_signal_impl(server_token.clone()) => {
@@ -80,7 +115,7 @@ fn get_signal_handle(big_boy_token: CancellationToken, cancellation_token: Cance
 
         cancellation_token.cancel();
         let mut token_long = Default::default();
-        
+
         tokio::select! {
           _ = wait_for_signal_impl(None) => {
             warn!("Forcibly exiting!");
@@ -101,7 +136,7 @@ fn get_signal_handle(big_boy_token: CancellationToken, cancellation_token: Cance
               }
             }
           } => {}
-        } 
+        }
       }
     }
   })
@@ -112,7 +147,10 @@ fn get_signal_handle(big_boy_token: CancellationToken, cancellation_token: Cance
 #[cfg(unix)]
 async fn wait_for_signal_impl(server_token: Option<CancellationToken>) {
   use log::debug;
-  use tokio::signal::unix::{signal, SignalKind};
+  use tokio::signal::unix::{
+    SignalKind,
+    signal,
+  };
 
   // Infos here:
   // https://www.gnu.org/software/libc/manual/html_node/Termination-Signals.html
@@ -173,45 +211,78 @@ async fn run(big_boy_token: CancellationToken) {
           let cancellation_token = CancellationToken::new();
           let from_server_token = CancellationToken::new();
           let server_cancellation_token_clone = from_server_token.clone();
-          let data_dir = sub_matches.get_one::<String>("data_dir").expect("Default set in Clap.");
-          let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
+          let data_dir = sub_matches
+            .get_one::<String>("data_dir")
+            .expect("Default set in Clap.");
+          let port = unwrap_port_arg(
+            sub_matches
+              .get_one::<String>("port")
+              .expect("Default set in Clap.")
+              .parse::<u16>(),
+          );
 
           info!("Running Backend Server and Terminal UI (All-In-One)...");
 
           let server_port = Arc::new(port);
           let server_token = cancellation_token.clone();
-          let server_handle = tokio::task::spawn(async move { 
-            server_main(data_dir, *server_port.to_owned(), server_token, from_server_token).await; 
+          let server_handle = tokio::task::spawn(async move {
+            server_main(
+              data_dir,
+              *server_port.to_owned(),
+              server_token,
+              from_server_token,
+            )
+            .await;
           });
 
           let tui_port = Arc::new(port);
           let tui_token = cancellation_token.clone();
-          let tui_handle = tokio::task::spawn(async move { 
-            let _ = tui_main(*tui_port.to_owned(), Ok::<String, ()>("localhost".to_string()).ok(), tui_token).await; 
+          let tui_handle = tokio::task::spawn(async move {
+            let _ = tui_main(
+              *tui_port.to_owned(),
+              Ok::<String, ()>("localhost".to_string()).ok(),
+              tui_token,
+            )
+            .await;
           });
 
-          let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, Some(server_cancellation_token_clone));
+          let signal_handle = get_signal_handle(
+            big_boy_token.clone(),
+            cancellation_token,
+            Some(server_cancellation_token_clone),
+          );
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle, server_handle]) => {
             info!("Exiting...");
             exit(0);
           }}
-        },
+        }
         ("server", sub_matches) => {
           info!("Starting CloverHub!");
           let from_server_token = CancellationToken::new();
           let server_cancellation_token_clone = from_server_token.clone();
           let cancellation_token = CancellationToken::new();
-          let data_dir = sub_matches.get_one::<String>("data_dir").expect("Default set in Clap.");
-          let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default provided in Clap.").parse::<u16>());
+          let data_dir = sub_matches
+            .get_one::<String>("data_dir")
+            .expect("Default set in Clap.");
+          let port = unwrap_port_arg(
+            sub_matches
+              .get_one::<String>("port")
+              .expect("Default provided in Clap.")
+              .parse::<u16>(),
+          );
 
           info!("Running Backend Server...");
           let server_token = cancellation_token.clone();
-          let server_handle = tokio::task::spawn(async move { 
-            server_main(data_dir, port, server_token, from_server_token).await; 
+          let server_handle = tokio::task::spawn(async move {
+            server_main(data_dir, port, server_token, from_server_token).await;
           });
-          
-          let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, Some(server_cancellation_token_clone));
+
+          let signal_handle = get_signal_handle(
+            big_boy_token.clone(),
+            cancellation_token,
+            Some(server_cancellation_token_clone),
+          );
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
             info!("Exiting...");
@@ -221,14 +292,27 @@ async fn run(big_boy_token: CancellationToken) {
         ("tui", sub_matches) => {
           info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
-          let host = sub_matches.get_one::<String>("host").expect("Default set in Clap.");
-          let port = unwrap_port_arg(sub_matches.get_one::<String>("port").expect("Default set in Clap.").parse::<u16>());
+          let host = sub_matches
+            .get_one::<String>("host")
+            .expect("Default set in Clap.");
+          let port = unwrap_port_arg(
+            sub_matches
+              .get_one::<String>("port")
+              .expect("Default set in Clap.")
+              .parse::<u16>(),
+          );
 
           info!("Running Terminal UI...");
           let tui_host = Arc::new(host);
           let tui_token = cancellation_token.clone();
-          let tui_handle = tokio::task::spawn(async move { 
-            tui_main(port, Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(), tui_token).await.err();
+          let tui_handle = tokio::task::spawn(async move {
+            tui_main(
+              port,
+              Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(),
+              tui_token,
+            )
+            .await
+            .err();
           });
 
           let signal_handle = get_signal_handle(big_boy_token.clone(), cancellation_token, None);

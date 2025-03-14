@@ -16,5 +16,5 @@ pub enum Component {
   Audio,
   Video,
   Sensor,
-  Movement
+  Movement,
 }

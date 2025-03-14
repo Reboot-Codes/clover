@@ -1,8 +1,11 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use simple_error::SimpleError;
-use os_path::OsPath;
 use crate::server::appd::models::BuildConfig;
+use os_path::OsPath;
+use serde::{
+  Deserialize,
+  Serialize,
+};
+use simple_error::SimpleError;
+use std::collections::HashMap;
 
 // TODO: Define defaults via `Default` trait impl for enums that returns its none variant.
 pub enum Resolution {
@@ -13,7 +16,7 @@ pub enum Resolution {
   ImportedMultiple((OsPath, HashMap<String, String>)),
   /// Every other case in which there was no `@import`.
   /// If there were other directives, they've been replaced with the correct value if provided in the ResolutionCtx.
-  NoImport(String)
+  NoImport(String),
 }
 #[derive(Debug, Clone)]
 pub struct ResolutionCtx {
@@ -22,14 +25,14 @@ pub struct ResolutionCtx {
   /// Used for the `@here` directive, should contain the FS path to the manifest file being currently parsed, **NOT** to the repo.
   pub here: OsPath,
   /// Used for the `@builtin` directive, should contain the built-in context for the current key (either CloverHub or CORE).
-  pub builtin: String
+  pub builtin: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RequiredSingleManifestEntry<T> {
   Some(T),
-  ImportString(String)
+  ImportString(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -38,7 +41,7 @@ pub enum OptionalSingleManifestSpecEntry<T> {
   Some(T),
   ImportString(String),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -46,7 +49,7 @@ pub enum OptionalSingleManifestSpecEntry<T> {
 pub enum OptionalStrTHashMap<T> {
   Some(HashMap<String, T>),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,14 +60,14 @@ pub struct RequiredStrTHashMap<T>(pub HashMap<String, RequiredSingleManifestEntr
 pub enum OptionalBoolean {
   Some(bool),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RequiredBoolean {
   Some(bool),
-  ImportString(String)
+  ImportString(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -73,14 +76,14 @@ pub enum OptionalListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
   ImportString(String),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RequiredListManifestSpecEntry<T> {
   Some(HashMap<String, RequiredSingleManifestEntry<T>>),
-  ImportString(String)
+  ImportString(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,8 +99,8 @@ pub enum ManifestEntry<T> {
 #[serde(untagged)]
 pub enum OptionalStrStrHashMap {
   Some(HashMap<String, String>),
-  #[default] 
-  None
+  #[default]
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -106,7 +109,7 @@ pub enum OptionalStringListManifestSpecEntry {
   Some(HashMap<String, String>),
   ImportString(String),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -114,7 +117,7 @@ pub enum OptionalStringListManifestSpecEntry {
 pub enum OptionalString {
   Some(String),
   #[default]
-  None
+  None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -123,7 +126,7 @@ pub enum Optional<T> {
   Some(T),
   ImportString(String),
   #[default]
-  None
+  None,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RequiredString(pub String);
@@ -134,7 +137,7 @@ pub struct ManifestSpec {
   pub version: String,
   pub base: Option<String>,
   #[serde(default)]
-  pub directory: OptionalSingleManifestSpecEntry<RawDirectorySpec>
+  pub directory: OptionalSingleManifestSpecEntry<RawDirectorySpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -145,7 +148,7 @@ pub struct RawDirectorySpec {
   pub applications: OptionalListManifestSpecEntry<RawApplicationSpec>,
   #[cfg(feature = "core")]
   #[serde(rename = "expression-packs", default)]
-  pub expression_packs: OptionalListManifestSpecEntry<RawExpressionPackSpec>
+  pub expression_packs: OptionalListManifestSpecEntry<RawExpressionPackSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,7 +180,7 @@ pub struct RawBuildConfig {
   pub url: String,
   /// Optional repository creds
   #[serde(default)]
-  pub creds: OptionalSingleManifestSpecEntry<RawRepoCreds>
+  pub creds: OptionalSingleManifestSpecEntry<RawRepoCreds>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,7 +196,7 @@ pub struct RawRepoCreds {
 pub struct RawExpressionPackSpec {
   pub name: Option<String>,
   #[serde(default)]
-  pub expressions: OptionalListManifestSpecEntry<RawExpressionSpec>
+  pub expressions: OptionalListManifestSpecEntry<RawExpressionSpec>,
 }
 
 #[cfg(feature = "core")]
@@ -207,7 +210,7 @@ pub enum RawExpressionSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawStaticExpressionSpec {
   #[serde(rename = "static-url")]
-  pub static_url: String
+  pub static_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,7 +232,7 @@ pub struct DirectorySpec {
   pub applications: OptionalStrTHashMap<ApplicationSpec>,
   #[cfg(feature = "core")]
   #[serde(default)]
-  pub expression_packs: OptionalStrTHashMap<ExpressionPackSpec>
+  pub expression_packs: OptionalStrTHashMap<ExpressionPackSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -262,7 +265,7 @@ pub struct ExpressionPackSpec {
   #[serde(default)]
   pub name: OptionalString,
   #[serde(default)]
-  pub expressions: OptionalStrTHashMap<ExpressionSpec>
+  pub expressions: OptionalStrTHashMap<ExpressionSpec>,
 }
 
 #[cfg(feature = "core")]
@@ -275,9 +278,16 @@ pub enum ExpressionSpec {
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StaticExpressionSpec {
-  pub static_url: RequiredString
+  pub static_url: RequiredString,
 }
 
 pub trait ManifestCompilationFrom<T> {
-  async fn compile(spec: T, resolution_ctx: ResolutionCtx, repo_dir_path: OsPath) -> Result<Self, SimpleError> where Self: Sized, T: for<'a> Deserialize<'a>;
+  async fn compile(
+    spec: T,
+    resolution_ctx: ResolutionCtx,
+    repo_dir_path: OsPath,
+  ) -> Result<Self, SimpleError>
+  where
+    Self: Sized,
+    T: for<'a> Deserialize<'a>;
 }

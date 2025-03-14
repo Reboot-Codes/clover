@@ -1,25 +1,28 @@
-use std::sync::Arc;
-use bollard::{image::BuildImageOptions, Docker};
-use futures::TryStreamExt;
 use crate::server::appd::models::Application;
-use log::{info, debug, error};
+use bollard::{
+  Docker,
+  image::BuildImageOptions,
+};
+use futures::TryStreamExt;
+use log::{
+  debug,
+  error,
+  info,
+};
+use std::sync::Arc;
 
 pub enum Error {
-  ContainerBuildFailed {
-    container_id: String
-  },
-  ContainerCreationFailed {
-    container_id: String
-  },
-  ContainerStartFailed {
-    container_id: String
-  },
-  ContainerStopFailed {
-    container_id: String
-  }
+  ContainerBuildFailed { container_id: String },
+  ContainerCreationFailed { container_id: String },
+  ContainerStartFailed { container_id: String },
+  ContainerStopFailed { container_id: String },
 }
 
-pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Application) -> Result<(), Error> {
+pub async fn init_app(
+  docker: Arc<Docker>,
+  app_id: &String,
+  app_spec: &mut Application,
+) -> Result<(), Error> {
   let app_str = format!("{} ({})", app_spec.name.clone(), app_id.clone());
 
   info!("Initializing {}...", app_str.clone());
@@ -31,38 +34,68 @@ pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Appli
     let mut build_errored = None;
 
     match container_config.build {
-      None => {},
+      None => {}
       Some(build_config) => {
-        let image_tag = format!("{}/{}:{}", app_id.clone(), container_id.clone(), app_spec.version.clone());
-        info!("{}, Building image: {}...", container_str.clone(), image_tag.clone());
+        let image_tag = format!(
+          "{}/{}:{}",
+          app_id.clone(),
+          container_id.clone(),
+          app_spec.version.clone()
+        );
+        info!(
+          "{}, Building image: {}...",
+          container_str.clone(),
+          image_tag.clone()
+        );
 
-        let mut build_progress = docker.build_image(BuildImageOptions {
-          dockerfile: build_config.url.0.clone(),
-          t: image_tag.clone(),
-          ..Default::default()
-        }, None, None);
+        let mut build_progress = docker.build_image(
+          BuildImageOptions {
+            dockerfile: build_config.url.0.clone(),
+            t: image_tag.clone(),
+            ..Default::default()
+          },
+          None,
+          None,
+        );
 
         while let Ok(Some(response)) = build_progress.try_next().await {
           debug!("{}: {:?}", image_tag.clone(), response.clone());
 
           match response.error {
-            None => {
-              match response.progress_detail {
-                Some(progress) => {
-                  info!("{}, Building: {}, {:?}/{:?}", container_str.clone(), image_tag.clone(), progress.current, progress.total);
-                }
-                None => {}
+            None => match response.progress_detail {
+              Some(progress) => {
+                info!(
+                  "{}, Building: {}, {:?}/{:?}",
+                  container_str.clone(),
+                  image_tag.clone(),
+                  progress.current,
+                  progress.total
+                );
               }
+              None => {}
             },
             Some(e) => {
-              error!("{}, Building: {}, Build failed! Stopping because of:\n{}", container_str.clone(), image_tag.clone(), e);
-              build_errored = Some(Error::ContainerBuildFailed { container_id: container_config.options.name.clone() });
+              error!(
+                "{}, Building: {}, Build failed! Stopping because of:\n{}",
+                container_str.clone(),
+                image_tag.clone(),
+                e
+              );
+              build_errored = Some(Error::ContainerBuildFailed {
+                container_id: container_config.options.name.clone(),
+              });
             }
           }
         }
 
         match build_errored {
-          None => { info!("{}: Finished building: {}!", container_str.clone(), image_tag.clone()); }
+          None => {
+            info!(
+              "{}: Finished building: {}!",
+              container_str.clone(),
+              image_tag.clone()
+            );
+          }
           Some(_) => {}
         }
       }
@@ -72,31 +105,49 @@ pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Appli
       Some(e) => {
         app_init_errored = Some(e);
         break;
-      },
+      }
       None => {
         debug!("{}, Creating...", container_str.clone());
-        match docker.create_container(Some(container_config.options.clone()), container_config.config.clone()).await {
+        match docker
+          .create_container(
+            Some(container_config.options.clone()),
+            container_config.config.clone(),
+          )
+          .await
+        {
           Ok(_) => {
             info!("{}, Starting...", container_str.clone());
-            match docker.start_container::<String>(
-              &container_config.options.name.clone(),
-              None
-            ).await {
+            match docker
+              .start_container::<String>(&container_config.options.name.clone(), None)
+              .await
+            {
               Ok(_) => {
                 info!("{}, Started!", container_str.clone());
-              },
+              }
               Err(e) => {
                 // TODO: Better error formatting.
-                error!("{}, Failed to start container!\n{:?}", container_str.clone(), e);
-                app_init_errored = Some(Error::ContainerStartFailed { container_id: container_id.clone() });
+                error!(
+                  "{}, Failed to start container!\n{:?}",
+                  container_str.clone(),
+                  e
+                );
+                app_init_errored = Some(Error::ContainerStartFailed {
+                  container_id: container_id.clone(),
+                });
                 break;
               }
             }
-          },
+          }
           Err(e) => {
             // TODO: Better error formatting.
-            error!("{}, Failed to create container!\n{:?}", container_str.clone(), e);
-            app_init_errored = Some(Error::ContainerCreationFailed { container_id: container_id.clone() });
+            error!(
+              "{}, Failed to create container!\n{:?}",
+              container_str.clone(),
+              e
+            );
+            app_init_errored = Some(Error::ContainerCreationFailed {
+              container_id: container_id.clone(),
+            });
             break;
           }
         }
@@ -105,11 +156,11 @@ pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Appli
   }
 
   match app_init_errored {
-    None => { 
+    None => {
       app_spec.initialized = true;
-      Ok(()) 
-    },
-    Some(e) => { 
+      Ok(())
+    }
+    Some(e) => {
       // match e.clone() {
       //   Error::ContainerBuildFailed { container_id } => {},
       //   Error::ContainerCreationFailed { container_id } => {
@@ -120,12 +171,16 @@ pub async fn init_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Appli
       //   }
       // }
 
-      Err(e) 
+      Err(e)
     }
   }
 }
 
-pub async fn remove_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut Application) -> Result<(), Error> {
+pub async fn remove_app(
+  docker: Arc<Docker>,
+  app_id: &String,
+  app_spec: &mut Application,
+) -> Result<(), Error> {
   let app_str = format!("{} ({})", app_spec.name.clone(), app_id.clone());
 
   info!("Removing {}...", app_str.clone());
@@ -136,30 +191,32 @@ pub async fn remove_app(docker: Arc<Docker>, app_id: &String, app_spec: &mut App
     let container_str = format!("{}, Container: {}", app_str.clone(), container_id.clone());
 
     info!("{}, Stopping...", container_str.clone());
-    match docker.stop_container(
-      &container_config.options.name.clone(),
-      None
-    ).await {
+    match docker
+      .stop_container(&container_config.options.name.clone(), None)
+      .await
+    {
       Ok(_) => {
         info!("{}, Stopped!", container_str.clone());
 
         // TODO: Add config to remove containers when the app is removed.
-      },
+      }
       Err(e) => {
         // TODO: Better error formatting.
-        error!("{}, Failed to stop container!\n{:?}", container_str.clone(), e);
-        app_removal_errored = Some(Error::ContainerStopFailed { container_id: container_id.clone() });
+        error!(
+          "{}, Failed to stop container!\n{:?}",
+          container_str.clone(),
+          e
+        );
+        app_removal_errored = Some(Error::ContainerStopFailed {
+          container_id: container_id.clone(),
+        });
         break;
       }
     }
   }
 
   match app_removal_errored {
-    None => {
-      Ok(())
-    },
-    Some(e) => {
-      Err(e)
-    }
+    None => Ok(()),
+    Some(e) => Err(e),
   }
 }

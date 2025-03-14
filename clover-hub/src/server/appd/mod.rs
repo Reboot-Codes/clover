@@ -1,26 +1,42 @@
-pub mod models;
 pub mod docker;
+pub mod models;
 
-use std::sync::Arc;
+use self::docker::init_app;
+use crate::utils::send_ipc_message;
+use bollard::{
+  API_DEFAULT_VERSION,
+  Docker,
+};
 use docker::remove_app;
-use log::{debug, error, info, warn};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use log::{
+  debug,
+  error,
+  info,
+  warn,
+};
+use std::sync::Arc;
+use tokio::sync::mpsc::{
+  UnboundedReceiver,
+  UnboundedSender,
+  unbounded_channel,
+};
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use crate::utils::send_ipc_message;
-use bollard::{Docker, API_DEFAULT_VERSION};
-use self::docker::init_app;
 
-use super::evtbuzz::models::{IPCMessageWithId, CoreUserConfig, Store};
+use super::evtbuzz::models::{
+  CoreUserConfig,
+  IPCMessageWithId,
+  Store,
+};
 
 // TODO: Create application manifest schema/models
 
 pub async fn appd_main(
-  ipc_tx: UnboundedSender<IPCMessageWithId>, 
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>, 
-  store: Arc<Store>, 
+  ipc_tx: UnboundedSender<IPCMessageWithId>,
+  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>,
+  store: Arc<Store>,
   user_config: Arc<CoreUserConfig>,
-  cancellation_tokens: (CancellationToken, CancellationToken)
+  cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting AppDaemon...");
 
@@ -34,46 +50,65 @@ pub async fn appd_main(
       let init_user = Arc::new(user_config.clone());
       let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
       let init_docker = docker.clone();
-      cancellation_tokens.0.run_until_cancelled(async move {
-        let mut init_apps = init_store.applications.lock().await;
-        let mut apps_initialized = 0;
+      cancellation_tokens
+        .0
+        .run_until_cancelled(async move {
+          let mut init_apps = init_store.applications.lock().await;
+          let mut apps_initialized = 0;
 
-        if init_apps.len() == 0 {
-          info!("No pre-configured applications to initialize.");
-        } else {
-          for (id, spec) in init_apps.iter_mut() {
-            match init_app(init_docker.clone(), id, spec).await {
-              Ok(_) => { apps_initialized += 1; },
-              Err(_e) => {
-                error!("Failed to initialize application {} ({})!", spec.name.clone(), id.clone());
+          if init_apps.len() == 0 {
+            info!("No pre-configured applications to initialize.");
+          } else {
+            for (id, spec) in init_apps.iter_mut() {
+              match init_app(init_docker.clone(), id, spec).await {
+                Ok(_) => {
+                  apps_initialized += 1;
+                }
+                Err(_e) => {
+                  error!(
+                    "Failed to initialize application {} ({})!",
+                    spec.name.clone(),
+                    id.clone()
+                  );
+                }
               }
+
+              // Update the application state.
+              init_store
+                .applications
+                .lock()
+                .await
+                .insert(id.clone(), spec.clone());
             }
-
-            // Update the application state.
-            init_store.applications.lock().await.insert(id.clone(), spec.clone());
           }
-        }
 
-        if apps_initialized != init_apps.len() {
-          warn!("Only initialized {} apps out of {}!", apps_initialized, init_apps.len());
+          if apps_initialized != init_apps.len() {
+            warn!(
+              "Only initialized {} apps out of {}!",
+              apps_initialized,
+              init_apps.len()
+            );
 
-          let _ = send_ipc_message(
-            &init_store, 
-            &init_user, 
-            Arc::new(init_from_tx.clone()), 
-            "clover://appd.clover.reboot-codes.com/status".to_string(), 
-            "incomplete-init".to_string()
-          ).await;
-        } else {
-          let _ = send_ipc_message(
-            &init_store, 
-            &init_user, 
-            Arc::new(init_from_tx.clone()), 
-            "clover://appd.clover.reboot-codes.com/status".to_string(), 
-            "finished-init".to_string()
-          ).await;
-        }
-      }).await;
+            let _ = send_ipc_message(
+              &init_store,
+              &init_user,
+              Arc::new(init_from_tx.clone()),
+              "clover://appd.clover.reboot-codes.com/status".to_string(),
+              "incomplete-init".to_string(),
+            )
+            .await;
+          } else {
+            let _ = send_ipc_message(
+              &init_store,
+              &init_user,
+              Arc::new(init_from_tx.clone()),
+              "clover://appd.clover.reboot-codes.com/status".to_string(),
+              "finished-init".to_string(),
+            )
+            .await;
+          }
+        })
+        .await;
 
       let ipc_recv_token = cancellation_tokens.0.clone();
       let ipc_recv_handle = tokio::task::spawn(async move {
@@ -121,9 +156,9 @@ pub async fn appd_main(
         _ = cleanup_token.cancelled() => {
           ipc_recv_handle.abort();
           ipc_trans_handle.abort();
-          
+
           info!("Cleaning up applications...");
-          
+
           let mut cleanup_apps = cleanup_store.applications.lock().await;
           let mut apps_removed = 0;
 
@@ -152,7 +187,7 @@ pub async fn appd_main(
           cancellation_tokens.1.cancel();
         }
       }
-    },
+    }
     Err(e) => {
       error!("Failed to setup docker connection!\n{}", e);
     }

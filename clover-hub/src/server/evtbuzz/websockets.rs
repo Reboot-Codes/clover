@@ -1,18 +1,44 @@
-use log::{debug, error, info, warn};
+use crate::server::arbiter::models::{
+  ApiKeyWithKey,
+  UserWithId,
+};
+use crate::server::evtbuzz::models::{
+  Client,
+  ClientWithId,
+  IPCMessageWithId,
+  Session,
+  Store,
+};
+use crate::utils::iso8601;
+use futures::{
+  SinkExt,
+  StreamExt,
+};
+use log::{
+  debug,
+  error,
+  info,
+  warn,
+};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
-use url::Url;
-use uuid::Uuid;
+use serde::{
+  Deserialize,
+  Serialize,
+};
 use std::collections::HashMap;
-use tokio::sync::mpsc::{self, UnboundedSender};
 use std::sync::Arc;
 use std::time::SystemTime;
-use futures::{SinkExt, StreamExt};
-use warp::filters::ws::{Message, WebSocket};
-use crate::server::arbiter::models::{ApiKeyWithKey, UserWithId};
-use crate::utils::iso8601;
-use crate::server::evtbuzz::models::{Client, ClientWithId, IPCMessageWithId, Session, Store};
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{
+  self,
+  UnboundedSender,
+};
+use url::Url;
+use uuid::Uuid;
+use warp::filters::ws::{
+  Message,
+  WebSocket,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct WsIn {
@@ -20,13 +46,22 @@ pub struct WsIn {
   pub message: String,
 }
 
-pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Session), ws: warp::ws::Ws, store: Arc<Arc<Store>>, to_clients_tx: Arc<Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>>>, from_clients_tx: Arc<UnboundedSender<IPCMessageWithId>>) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn handle_ws_client(
+  auth: (UserWithId, ApiKeyWithKey, ClientWithId, Session),
+  ws: warp::ws::Ws,
+  store: Arc<Arc<Store>>,
+  to_clients_tx: Arc<Arc<Mutex<HashMap<String, UnboundedSender<IPCMessageWithId>>>>>,
+  from_clients_tx: Arc<UnboundedSender<IPCMessageWithId>>,
+) -> Result<impl warp::Reply, warp::Rejection> {
   let user = auth.0.clone();
   let api_key = auth.1.clone();
   let client = auth.2.clone();
   let session = auth.3.clone();
 
-  info!("Upgrading client: {}, to websocket connection...", client.id.clone());
+  info!(
+    "Upgrading client: {}, to websocket connection...",
+    client.id.clone()
+  );
 
   let ws_client = Arc::new(client.clone());
   Ok(ws.on_upgrade(move |websocket: WebSocket| async move {
@@ -74,7 +109,7 @@ pub async fn handle_ws_client(auth: (UserWithId, ApiKeyWithKey, ClientWithId, Se
                   }
                 };
                 debug!("Client: {}, send message: {{ \"id\": \"{}\",  \"kind\": \"{}\", \"message\": \"{}\" }}...", ws_client.id.clone(), message_id.clone(), msg.kind.clone(), msg.message.clone());
-                
+
                 let mut allowed_to_send = false;
                 for allowed_send_pattern in recv_api_key.allowed_events_from.clone() {
                   match Regex::new(&allowed_send_pattern) {
