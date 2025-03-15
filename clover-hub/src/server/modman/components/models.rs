@@ -1,1 +1,1 @@
-pub trait Component {}
+pub trait CloverComponent {}

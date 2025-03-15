@@ -21,14 +21,16 @@
             openssl
             pkg-config
             rust-bin.nightly.latest.default
-	    alsa-lib
+            alsa-lib
             udev
             vulkan-loader
             xorg.libX11
             xorg.libXrandr
             xorg.libXcursor
             xorg.libXi
-	    kdePackages.qtbase
+            kdePackages.qtbase
+            nodejs_23
+            yarn-berry
           ];
 
           shellHook = ''
@@ -43,4 +45,3 @@
       }
     );
 }
-

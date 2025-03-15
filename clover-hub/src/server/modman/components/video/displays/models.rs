@@ -1,4 +1,7 @@
-use crate::server::modman::busses::models::BusTypes;
+use crate::server::modman::{
+  busses::models::BusTypes,
+  components::models::CloverComponent,
+};
 use bevy::prelude::Component;
 use decorum::Real;
 use std::{
@@ -17,12 +20,16 @@ pub struct DisplayComponent {
   pub virtual_display: Option<u64>,
 }
 
+impl CloverComponent for DisplayComponent {}
+
 #[derive(Debug, Clone, Component)]
 pub struct VirtualDisplayComponent {
   /// Position and Component ID of the displays that make up this Virtual Display
   pub displays: HashMap<String, DisplayPosition>,
   pub resolution: DisplayResolution,
 }
+
+impl CloverComponent for VirtualDisplayComponent {}
 
 #[derive(Debug, Clone)]
 pub struct DisplayPosition {
