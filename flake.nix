@@ -39,6 +39,7 @@
                   pkgs.udev
                   pkgs.alsa-lib
                   pkgs.vulkan-loader
+                  pkgs.libxkbcommon
                 ]
               }"'';
         };
