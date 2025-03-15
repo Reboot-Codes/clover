@@ -1,9 +1,11 @@
-use crate::server::modman::components::models::CloverComponent;
+use crate::server::modman::components::models::CloverComponentTrait;
 
+#[derive(Debug, Clone)]
 pub struct InputSensorComponent {}
 
-impl CloverComponent for InputSensorComponent {}
+impl CloverComponentTrait for InputSensorComponent {}
 
+#[derive(Debug, Clone)]
 pub struct OutputSensorComponent {}
 
-impl CloverComponent for OutputSensorComponent {}
+impl CloverComponentTrait for OutputSensorComponent {}

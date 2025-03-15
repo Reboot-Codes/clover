@@ -1,6 +1,6 @@
 use crate::server::modman::{
   busses::models::BusTypes,
-  components::models::CloverComponent,
+  components::models::CloverComponentTrait,
 };
 use bevy::prelude::Component;
 use decorum::Real;
@@ -20,7 +20,7 @@ pub struct DisplayComponent {
   pub virtual_display: Option<u64>,
 }
 
-impl CloverComponent for DisplayComponent {}
+impl CloverComponentTrait for DisplayComponent {}
 
 #[derive(Debug, Clone, Component)]
 pub struct VirtualDisplayComponent {
@@ -29,7 +29,7 @@ pub struct VirtualDisplayComponent {
   pub resolution: DisplayResolution,
 }
 
-impl CloverComponent for VirtualDisplayComponent {}
+impl CloverComponentTrait for VirtualDisplayComponent {}
 
 #[derive(Debug, Clone)]
 pub struct DisplayPosition {

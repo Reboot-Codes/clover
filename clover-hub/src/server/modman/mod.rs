@@ -37,21 +37,85 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
       );
       initialized_module = true;
     } else {
-      for (component_id, component) in module.components.iter() {
-        // TODO: Add init functions for other component types.
+      let mut critical_failiure = None;
+
+      for (component_id, component_arc) in module.components.iter() {
+        let (component_meta, component) = &**component_arc;
+        let mut component_initalized = false;
+
+        if component_meta.critical {
+          info!(
+            "Module: {}, initalizing CRITICAL component: {}...",
+            id.clone(),
+            component_id.clone()
+          );
+        } else {
+          info!(
+            "Module: {}, initalizing component: {}...",
+            id.clone(),
+            component_id.clone()
+          );
+        }
+
+        /*
+          component_initalized = match component.init().await {
+            Ok(_) => { true },
+            Err(error) => {
+              error(error);
+              false
+            }
+          }
+        */
+
+        if component_initalized {
+          info!(
+            "Module: {}, successfully initalized component: {}!",
+            id.clone(),
+            component_id.clone()
+          );
+          initialized_module_components += 1;
+        } else {
+          if component_meta.critical {
+            critical_failiure = Some(component_id.clone());
+          } else {
+            warn!(
+              "Module: {}, failed to initialize component: {}!",
+              id.clone(),
+              component_id.clone()
+            );
+          }
+        }
+
+        match critical_failiure {
+          Some(_) => {
+            break;
+          }
+          None => {}
+        }
       }
 
-      if initialized_module_components != module.components.len() {
-        if initialized_module_components > 0 {
-          warn!(
-            "Module: {}, only initialized {} out of {} components!",
+      match critical_failiure {
+        Some(component_id) => {
+          error!(
+            "Module: {}, failed to initalize critical component: {}!",
             id.clone(),
-            initialized_module_components,
-            module.components.len()
+            component_id.clone()
           );
-          initialized_module = true;
-        } else {
-          error!("Module: {}, failed to initialize!", id.clone());
+        }
+        None => {
+          if initialized_module_components != module.components.len() {
+            if initialized_module_components > 0 {
+              warn!(
+                "Module: {}, only initialized {} out of {} components!",
+                id.clone(),
+                initialized_module_components,
+                module.components.len()
+              );
+              initialized_module = true;
+            } else {
+              error!("Module: {}, failed to initialize!", id.clone());
+            }
+          }
         }
       }
     }
@@ -64,15 +128,17 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
         id.clone(),
         Module {
           module_type: module.module_type.clone(),
-          pretty_name: module.pretty_name.clone(),
+          module_name: module.module_name.clone(),
+          custom_name: module.custom_name.clone(),
           initialized: true,
           components: module.components.clone(),
           registered_by: module.registered_by.clone(),
         },
       );
+
       info!(
         "Module: {} ({}), Initialized!",
-        module.pretty_name.clone(),
+        module.get_name(),
         id.clone()
       );
     }
@@ -104,7 +170,7 @@ pub async fn modman_main(
             "Initializing pre configured module: {}:\n  type: {}\n  name: {}",
             id.clone(),
             module.module_type.clone(),
-            module.pretty_name.clone()
+            module.get_name()
           );
           let _components_initialized = init_module(&init_store, id.clone(), module.clone()).await;
         }
@@ -185,7 +251,8 @@ pub async fn modman_main(
                 if de_initialized {
                   store.modules.lock().await.insert(id.clone(), Module {
                     module_type: module.module_type.clone(),
-                    pretty_name: module.pretty_name.clone(),
+                    module_name: module.module_name.clone(),
+                    custom_name: module.custom_name.clone(),
                     initialized: false,
                     components: module.components.clone(),
                     registered_by: module.registered_by.clone()

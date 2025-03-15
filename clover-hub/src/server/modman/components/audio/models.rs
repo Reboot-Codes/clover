@@ -1,9 +1,11 @@
-use crate::server::modman::components::models::CloverComponent;
+use crate::server::modman::components::models::CloverComponentTrait;
 
+#[derive(Debug, Clone)]
 pub struct AudioOutputComponent {}
 
-impl CloverComponent for AudioOutputComponent {}
+impl CloverComponentTrait for AudioOutputComponent {}
 
+#[derive(Debug, Clone)]
 pub struct AudioInputComponent {}
 
-impl CloverComponent for AudioInputComponent {}
+impl CloverComponentTrait for AudioInputComponent {}
