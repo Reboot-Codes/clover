@@ -243,7 +243,7 @@ pub async fn modman_main(
           if modules.len() > 0 {
             for (id, module) in modules.iter() {
               if module.initialized {
-                info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.pretty_name.clone());
+                info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.get_name());
                 // let (de_initialized, _components_de_initialized) = de_init_module(&store, id.clone(), module.clone()).await;
                 let de_initialized = true;
 
