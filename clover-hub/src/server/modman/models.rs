@@ -87,3 +87,7 @@ pub struct GestureParameters {
   multiplier: f64,
   offset: f64,
 }
+
+pub struct ModManStore {
+  pub modules: Arc<Mutex<HashMap<String, Module>>>,
+}

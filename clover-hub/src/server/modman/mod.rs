@@ -2,14 +2,13 @@ pub mod busses;
 pub mod components;
 pub mod models;
 
-use crate::utils::send_ipc_message;
 use log::{
   debug,
   error,
   info,
   warn,
 };
-use models::Module;
+use models::{ModmanStore, Module};
 use std::sync::Arc;
 use tokio::sync::mpsc::{
   UnboundedReceiver,
@@ -18,14 +17,13 @@ use tokio::sync::mpsc::{
 };
 use tokio_util::sync::CancellationToken;
 use url::Url;
-
-use super::evtbuzz::models::{
-  CoreUserConfig,
+use nexus::server::models::{
+  ApiKeyWithKey,
   IPCMessageWithId,
-  Store,
 };
+use nexus::{server::models::UserConfig, arbiter::models::ApiKeyWithoutUID, user::NexusUser};
 
-async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize) {
+async fn init_module(store: &ModmanStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut initialized_module_components = 0;
 
@@ -147,18 +145,30 @@ async fn init_module(store: &Store, id: String, module: Module) -> (bool, usize)
   (initialized_module, initialized_module_components)
 }
 
+pub async fn gen_user() -> UserConfig {
+  UserConfig {
+    user_type: "com.reboot-codes.com.clover.modman",
+    pretty_name: "Clover: ModMan",
+    api_keys: vec![
+      ApiKeyWithoutUID {
+        allowed_events_to: "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$"
+        allowed_events_from: "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$",
+        echo: false,
+        proxy: false
+      }
+    ]
+  }
+}
+
 pub async fn modman_main(
-  ipc_tx: UnboundedSender<IPCMessageWithId>,
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>,
-  store: Arc<Store>,
-  user_config: Arc<CoreUserConfig>,
+  store: Arc<ModmanStore>,
+  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting ModMan...");
 
   let init_store = Arc::new(store.clone());
-  let init_user = Arc::new(user_config.clone());
-  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
+  let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
@@ -178,11 +188,8 @@ pub async fn modman_main(
         info!("No pre-configured modules to initialize.");
       }
 
-      let _ = send_ipc_message(
-        &init_store,
-        &init_user,
-        Arc::new(init_from_tx),
-        "clover://modman.clover.reboot-codes.com/status".to_string(),
+      init_user.send(
+        "nexus://com.reboot-codes.clover.modman/status".to_string(),
         "finished-init".to_string(),
       )
       .await;
@@ -190,17 +197,18 @@ pub async fn modman_main(
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
+  let (ipc_rx, ipc_handle) = client.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
         debug!("ipc_recv exited");
       },
       _ = async move {
-        while let Some(msg) = ipc_rx.recv().await {
+        while let Ok(msg) = ipc_rx.recv().await {
           let kind = Url::parse(&msg.kind.clone()).unwrap();
 
           // Verify that we care about this event.
-          if kind.host().unwrap() == url::Host::Domain("modman.clover.reboot-codes.com") {
+          if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.modman") {
             debug!("Processing: {}", msg.kind.clone());
           }
         }
@@ -208,31 +216,11 @@ pub async fn modman_main(
     }
   });
 
-  let ipc_trans_token = cancellation_tokens.0.clone();
-  let ipc_trans_tx = Arc::new(ipc_tx.clone());
-  let ipc_trans_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = async move {
-        while let Some(msg) = init_from_rx.recv().await {
-          match ipc_trans_tx.send(msg) {
-            Ok(_) => {},
-            Err(_) => {
-              debug!("Failed to send message to IPC bus!");
-            }
-          }
-        }
-      } => {},
-      _ = ipc_trans_token.cancelled() => {
-        debug!("ipc_trans exited");
-      }
-    }
-  });
-
   let mod_clean_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = mod_clean_token.cancelled() => {
       ipc_recv_handle.abort();
-      ipc_trans_handle.abort();
+      ipc_handle.abort();
 
       // Clean up all modules on shutdown.
       info!("Cleaning up modules...");

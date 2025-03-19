@@ -1,6 +1,7 @@
 pub mod config;
 pub mod db;
 pub mod repos;
+pub mod models;
 
 use crate::{
   server::evtbuzz::models::{
@@ -15,6 +16,7 @@ use log::{
   error,
   info,
 };
+use nexus::user::NexusUser;
 use os_path::OsPath;
 use repos::{
   download_repo_updates,
@@ -54,7 +56,7 @@ pub enum Error {
   FailedToUpdateRepoDirectoryStructure { error: SimpleError },
 }
 
-pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), Error> {
+pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Result<(), Error> {
   let mut err = None;
   let mut data_dir_path = OsPath::new().join(data_dir.clone());
   data_dir_path.resolve();
@@ -209,11 +211,24 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<Store>) -> Result<(), 
   }
 }
 
+pub async fn gen_user() -> UserConfig {
+  UserConfig {
+    user_type: "com.reboot-codes.com.clover.warehouse",
+    pretty_name: "Clover: Warehouse",
+    api_keys: vec![
+      ApiKeyWithoutUID {
+        allowed_events_to: "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$"
+        allowed_events_from: "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$",
+        echo: false,
+        proxy: false
+      }
+    ]
+  }
+}
+
 pub async fn warehouse_main(
-  ipc_tx: UnboundedSender<IPCMessageWithId>,
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>,
-  store: Arc<Store>,
-  user_config: Arc<CoreUserConfig>,
+  store: Arc<WarehouseStore>,
+  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting Warehouse...");
@@ -225,8 +240,7 @@ pub async fn warehouse_main(
   .await;
 
   let init_store = Arc::new(store.clone());
-  let init_user = Arc::new(user_config.clone());
-  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
+  let init_user = Arc::new(user.clone());
   let init_tokens = cancellation_tokens.clone();
   cancellation_tokens
     .0
@@ -241,17 +255,15 @@ pub async fn warehouse_main(
         }
       }
 
-      let _ = send_ipc_message(
-        &init_store,
-        &init_user,
-        Arc::new(init_from_tx),
-        "clover://warehouse.clover.reboot-codes.com/status".to_string(),
+      let _ = user.send(
+        "nexus://com.reboot-codes.clover.warehouse/status".to_string(),
         "finished-init".to_string(),
       )
       .await;
     })
     .await;
 
+  let (ipx_rx, nexus_recv_handle) = user.subscribe();
   let ipc_recv_token = cancellation_tokens.0.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
@@ -259,11 +271,11 @@ pub async fn warehouse_main(
         debug!("ipc_recv exited");
       },
       _ = async move {
-        while let Some(msg) = ipc_rx.recv().await {
+        while let Ok(msg) = ipc_rx.recv().await {
           let kind = Url::parse(&msg.kind.clone()).unwrap();
 
           // Verify that we care about this event.
-          if kind.host().unwrap() == url::Host::Domain("warehouse.clover.reboot-codes.com") {
+          if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.warehouse") {
             debug!("Processing: {}", msg.kind.clone());
           }
         }
@@ -271,31 +283,11 @@ pub async fn warehouse_main(
     }
   });
 
-  let ipc_trans_token = cancellation_tokens.0.clone();
-  let ipc_trans_tx = Arc::new(ipc_tx.clone());
-  let ipc_trans_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = async move {
-        while let Some(msg) = init_from_rx.recv().await {
-          match ipc_trans_tx.send(msg) {
-            Ok(_) => {},
-            Err(_) => {
-              debug!("Failed to send message to IPC bus!");
-            }
-          }
-        }
-      } => {},
-      _ = ipc_trans_token.cancelled() => {
-        debug!("ipc_trans exited");
-      }
-    }
-  });
-
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
       ipc_recv_handle.abort();
-      ipc_trans_handle.abort();
+      nexus_recv_handle.abort();
 
       info!("Buttoning up storage...");
       // TODO: Lock db and clean up when done.

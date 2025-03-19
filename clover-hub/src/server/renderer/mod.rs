@@ -16,6 +16,7 @@ use log::{
   debug,
   info,
 };
+use nexus::user::NexusUser;
 use queues::*;
 use std::sync::Arc;
 use system_ui::{
@@ -29,12 +30,29 @@ use tokio::sync::mpsc::{
 };
 use tokio_util::sync::CancellationToken;
 use url::Url;
+use nexus::{server::models::UserConfig, arbiter::models::ApiKeyWithoutUID, user::NexusUser};
+
+pub async fn gen_user() -> UserConfig {
+  UserConfig {
+    user_type: "com.reboot-codes.com.clover.renderer",
+    pretty_name: "Clover: Renderer",
+    api_keys: vec![
+      ApiKeyWithoutUID {
+        allowed_events_to: "^nexus://com.reboot-codes.clover.renderer(\\.(.*))*(\\/.*)*$"
+        allowed_events_from: "^nexus://com.reboot-codes.clover.renderer(\\.(.*))*(\\/.*)*$",
+        echo: false,
+        proxy: false
+      }
+    ]
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct RendererStore {}
 
 pub async fn renderer_main(
-  ipc_tx: UnboundedSender<IPCMessageWithId>,
-  mut ipc_rx: UnboundedReceiver<IPCMessageWithId>,
-  store: Arc<Store>,
-  user_config: Arc<CoreUserConfig>,
+  store: Arc<RendererStore>,
+  user_config: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting Renderer...");
@@ -50,17 +68,12 @@ pub async fn renderer_main(
   // let display_handles = Arc::new(HashMap::new());
   let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
 
-  let init_store = Arc::new(store.clone());
-  let init_user = Arc::new(user_config.clone());
-  let init_from_tx = from_tx.clone();
+  let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      let _ = send_ipc_message(
-        &init_store,
-        &init_user,
-        Arc::new(init_from_tx),
-        "clover://renderer.clover.reboot-codes.com/status".to_string(),
+      client.send(
+        "nexus://com.reboot-codes.clover.renderer/status".to_string(),
         "finished-init".to_string(),
       )
       .await;
@@ -68,17 +81,18 @@ pub async fn renderer_main(
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
+  let (ipc_rx, ipc_handle) = client.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
         _ = ipc_recv_token.cancelled() => {
             debug!("ipc_recv exited");
         },
         _ = async move {
-            while let Some(msg) = ipc_rx.recv().await {
+            while let Ok(msg) = ipc_rx.recv().await {
                 let kind = Url::parse(&msg.kind.clone()).unwrap();
 
                 // Verify that we care about this event.
-                if kind.host().unwrap() == url::Host::Domain("renderer.clover.reboot-codes.com") {
+                if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.renderer") {
                     debug!("Processing: {}", msg.kind.clone());
 
                     if kind.path() == "/register-display" {
@@ -90,34 +104,11 @@ pub async fn renderer_main(
     }
   });
 
-  let ipc_trans_token = cancellation_tokens.0.clone();
-  let ipc_trans_tx = Arc::new(ipc_tx.clone());
-  let ipc_trans_handle = tokio::task::spawn(async move {
-    tokio::select! {
-        _ = async move {
-            while let Some(msg) = from_rx.recv().await {
-            debug!("Sending message {} to IPC bus!", msg.kind.clone());
-            match ipc_trans_tx.send(msg) {
-                Ok(_) => {
-                debug!("Sent message to IPC bus!");
-                },
-                Err(_) => {
-                debug!("Failed to send message to IPC bus!");
-                }
-            }
-            }
-        } => {},
-        _ = ipc_trans_token.cancelled() => {
-            debug!("ipc_trans exited");
-        }
-    }
-  });
-
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
-      _ = cleanup_token.cancelled() => {
+    _ = cleanup_token.cancelled() => {
       ipc_recv_handle.abort();
-      ipc_trans_handle.abort();
+      ipc_handle.abort();
 
       info!("Cleaning up displays...");
 
@@ -128,7 +119,7 @@ pub async fn renderer_main(
       std::mem::drop(store);
 
       cancellation_tokens.1.cancel();
-      }
+    }
   }
 
   info!("Renderer has stopped!");

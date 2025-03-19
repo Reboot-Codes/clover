@@ -65,3 +65,7 @@ pub struct RepoCreds {
   /// Either API key or password.
   pub key: RequiredString,
 }
+
+pub struct AppDStore {
+  pub applications: Arc<Mutex<HashMap<String, Application>>>,
+}

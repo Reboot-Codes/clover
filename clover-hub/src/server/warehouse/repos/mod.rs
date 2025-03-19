@@ -42,6 +42,8 @@ use tokio_stream::{
   wrappers::ReadDirStream,
 };
 
+use super::models::WarehouseStore;
+
 #[derive(PartialEq)]
 pub struct Error(pub SimpleError);
 
@@ -295,7 +297,7 @@ where
 
 pub async fn update_repo_dir_structure(
   repo_dir_path: OsPath,
-  store: Arc<Store>,
+  store: Arc<WarehouseStore>,
 ) -> Result<(), Error> {
   let mut err = None;
   let repos = store.config.lock().await.repos.clone();
@@ -484,7 +486,7 @@ pub async fn resolve_entry_value(
   }
 }
 
-pub async fn download_repo_updates(store: Arc<Store>, repo_dir_path: OsPath) -> Result<(), Error> {
+pub async fn download_repo_updates(store: Arc<WarehouseStore>, repo_dir_path: OsPath) -> Result<(), Error> {
   let mut err = None;
   let mut repos_updated = 0;
   let repos = store.config.lock().await.repos.clone();
