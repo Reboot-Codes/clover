@@ -1,22 +1,20 @@
 pub mod config;
 pub mod db;
-pub mod repos;
 pub mod models;
+pub mod repos;
 
-use crate::{
-  server::evtbuzz::models::{
-    IPCMessageWithId,
-    Store,
-  },
-  utils::send_ipc_message,
-};
 use config::models::Config;
 use log::{
   debug,
   error,
   info,
 };
+use models::WarehouseStore;
 use nexus::user::NexusUser;
+use nexus::{
+  arbiter::models::ApiKeyWithoutUID,
+  server::models::UserConfig,
+};
 use os_path::OsPath;
 use repos::{
   download_repo_updates,
@@ -26,21 +24,12 @@ use sea_orm::Database;
 use simple_error::SimpleError;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::{
-  io::{
-    AsyncReadExt,
-    AsyncWriteExt,
-  },
-  sync::mpsc::{
-    UnboundedReceiver,
-    UnboundedSender,
-    unbounded_channel,
-  },
+use tokio::io::{
+  AsyncReadExt,
+  AsyncWriteExt,
 };
 use tokio_util::sync::CancellationToken;
 use url::Url;
-
-use super::evtbuzz::models::CoreUserConfig;
 
 // TODO: Move to snafu crate.
 #[derive(Debug, Clone)]
@@ -213,16 +202,18 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
 
 pub async fn gen_user() -> UserConfig {
   UserConfig {
-    user_type: "com.reboot-codes.com.clover.warehouse",
-    pretty_name: "Clover: Warehouse",
-    api_keys: vec![
-      ApiKeyWithoutUID {
-        allowed_events_to: "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$"
-        allowed_events_from: "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$",
-        echo: false,
-        proxy: false
-      }
-    ]
+    user_type: "com.reboot-codes.com.clover.warehouse".to_string(),
+    pretty_name: "Clover: Warehouse".to_string(),
+    api_keys: vec![ApiKeyWithoutUID {
+      allowed_events_to: vec![
+        "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$".to_string(),
+      ],
+      allowed_events_from: vec![
+        "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$".to_string(),
+      ],
+      echo: false,
+      proxy: false,
+    }],
   }
 }
 
@@ -255,15 +246,14 @@ pub async fn warehouse_main(
         }
       }
 
-      let _ = user.send(
-        "nexus://com.reboot-codes.clover.warehouse/status".to_string(),
-        "finished-init".to_string(),
-      )
-      .await;
+      let _ = init_user.send(
+        &"nexus://com.reboot-codes.clover.warehouse/status".to_string(),
+        &"finished-init".to_string(),
+      );
     })
     .await;
 
-  let (ipx_rx, nexus_recv_handle) = user.subscribe();
+  let (mut ipc_rx, nexus_recv_handle) = user.subscribe();
   let ipc_recv_token = cancellation_tokens.0.clone();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
@@ -271,7 +261,7 @@ pub async fn warehouse_main(
         debug!("ipc_recv exited");
       },
       _ = async move {
-        while let Ok(msg) = ipc_rx.recv().await {
+        while let Some(msg) = ipc_rx.recv().await {
           let kind = Url::parse(&msg.kind.clone()).unwrap();
 
           // Verify that we care about this event.

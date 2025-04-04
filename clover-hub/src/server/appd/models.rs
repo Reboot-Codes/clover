@@ -1,14 +1,21 @@
-use crate::server::warehouse::repos::models::{
-  Optional,
-  OptionalString,
-  RequiredString,
+use crate::server::warehouse::{
+  config::models::Config,
+  repos::models::{
+    Optional,
+    OptionalString,
+    RequiredString,
+  },
 };
 use bollard::container;
 use serde::{
   Deserialize,
   Serialize,
 };
-use std::collections::HashMap;
+use std::{
+  collections::HashMap,
+  sync::Arc,
+};
+use tokio::sync::Mutex;
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -66,6 +73,22 @@ pub struct RepoCreds {
   pub key: RequiredString,
 }
 
+#[derive(Debug, Clone)]
 pub struct AppDStore {
   pub applications: Arc<Mutex<HashMap<String, Application>>>,
+  pub config: Arc<Mutex<Config>>,
+}
+
+impl AppDStore {
+  pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
+    let config = match optional_config {
+      Some(cfg) => cfg,
+      None => Arc::new(Mutex::new(Config::default())),
+    };
+
+    AppDStore {
+      applications: Arc::new(Mutex::new(HashMap::new())),
+      config,
+    }
+  }
 }

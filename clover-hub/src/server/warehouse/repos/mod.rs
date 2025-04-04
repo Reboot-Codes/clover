@@ -1,14 +1,11 @@
 pub mod impls;
 pub mod models;
 
-use crate::{
-  server::evtbuzz::models::Store,
-  utils::read_file,
-};
+use crate::utils::read_file;
 use git2::{
+  build::CheckoutBuilder,
   BranchType,
   Repository,
-  build::CheckoutBuilder,
 };
 use log::{
   debug,
@@ -38,8 +35,8 @@ use tokio::{
   io::AsyncReadExt,
 };
 use tokio_stream::{
-  StreamExt,
   wrappers::ReadDirStream,
+  StreamExt,
 };
 
 use super::models::WarehouseStore;
@@ -486,7 +483,10 @@ pub async fn resolve_entry_value(
   }
 }
 
-pub async fn download_repo_updates(store: Arc<WarehouseStore>, repo_dir_path: OsPath) -> Result<(), Error> {
+pub async fn download_repo_updates(
+  store: Arc<WarehouseStore>,
+  repo_dir_path: OsPath,
+) -> Result<(), Error> {
   let mut err = None;
   let mut repos_updated = 0;
   let repos = store.config.lock().await.repos.clone();

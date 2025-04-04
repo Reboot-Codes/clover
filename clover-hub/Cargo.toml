@@ -54,7 +54,7 @@ overflow-proof = "0.1.0"
 decorum = "0.4.0"
 
 # HTTP/WS
-nexus = { git = "https://codeberg.org/Reboot-Codes/nexus" }
+nexus = { git = "https://github.com/Reboot-Codes/nexus" }
 url = "2.5.0"
 image = { version = "0.25.5", features = ["serde"] }
 

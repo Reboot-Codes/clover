@@ -1,20 +1,23 @@
-use crate::server::modman::components::{
-  audio::models::{
-    AudioInputComponent,
-    AudioOutputComponent,
-  },
-  movement::models::MovementComponent,
-  sensors::models::{
-    InputSensorComponent,
-    OutputSensorComponent,
-  },
-  video::{
-    cameras::models::CameraComponent,
-    displays::models::{
-      DisplayComponent,
-      VirtualDisplayComponent,
+use crate::server::{
+  modman::components::{
+    audio::models::{
+      AudioInputComponent,
+      AudioOutputComponent,
+    },
+    movement::models::MovementComponent,
+    sensors::models::{
+      InputSensorComponent,
+      OutputSensorComponent,
+    },
+    video::{
+      cameras::models::CameraComponent,
+      displays::models::{
+        DisplayComponent,
+        VirtualDisplayComponent,
+      },
     },
   },
+  warehouse::config::models::Config,
 };
 use serde::{
   Deserialize,
@@ -22,6 +25,7 @@ use serde::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 // TODO: Define defaults via `Default` trait impl.
 
@@ -88,6 +92,22 @@ pub struct GestureParameters {
   offset: f64,
 }
 
+#[derive(Debug, Clone)]
 pub struct ModManStore {
   pub modules: Arc<Mutex<HashMap<String, Module>>>,
+  pub config: Arc<Mutex<Config>>,
+}
+
+impl ModManStore {
+  pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
+    let config = match optional_config {
+      Some(cfg) => cfg,
+      None => Arc::new(Mutex::new(Config::default())),
+    };
+
+    ModManStore {
+      modules: Arc::new(Mutex::new(HashMap::new())),
+      config,
+    }
+  }
 }

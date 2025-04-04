@@ -4606,7 +4606,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "nexus"
 version = "0.1.0"
-source = "git+https://codeberg.org/Reboot-Codes/nexus#3aafbb86a8b0ae4513e1bf6f452f8fd9c5e070e0"
+source = "git+https://github.com/Reboot-Codes/nexus#b3ba882ac1f6cb5f8a5389e8513a9019b4aff4f9"
 dependencies = [
  "anyhow",
  "api_key",

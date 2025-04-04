@@ -2,10 +2,9 @@ pub mod docker;
 pub mod models;
 
 use self::docker::init_app;
-use crate::utils::send_ipc_message;
 use bollard::{
-  API_DEFAULT_VERSION,
   Docker,
+  API_DEFAULT_VERSION,
 };
 use docker::remove_app;
 use log::{
@@ -14,36 +13,42 @@ use log::{
   info,
   warn,
 };
-use std::sync::Arc;
-use tokio::sync::mpsc::{
-  UnboundedReceiver,
-  UnboundedSender,
-  unbounded_channel,
+use models::AppDStore;
+use nexus::{
+  arbiter::models::ApiKeyWithoutUID,
+  server::models::{
+    IPCMessageWithId,
+    UserConfig,
+  },
+  user::NexusUser,
 };
+use std::sync::Arc;
+use tokio::sync::mpsc::unbounded_channel;
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use nexus::{server::models::UserConfig, arbiter::models::ApiKeyWithoutUID, user::NexusUser};
 
 // TODO: Create application manifest schema/models
 
 pub async fn gen_user() -> UserConfig {
   UserConfig {
-    user_type: "com.reboot-codes.com.clover.appd",
-    pretty_name: "Clover: AppD",
-    api_keys: vec![
-      ApiKeyWithoutUID {
-        allowed_events_to: "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$"
-        allowed_events_from: "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$",
-        echo: false,
-        proxy: false
-      }
-    ]
+    user_type: "com.reboot-codes.com.clover.appd".to_string(),
+    pretty_name: "Clover: AppD".to_string(),
+    api_keys: vec![ApiKeyWithoutUID {
+      allowed_events_to: vec![
+        "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$".to_string()
+      ],
+      allowed_events_from: vec![
+        "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$".to_string()
+      ],
+      echo: false,
+      proxy: false,
+    }],
   }
 }
 
 pub async fn appd_main(
-  appd_store: Arc<AppDStore>,
-  client: NexusUser,
+  store: AppDStore,
+  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting AppDaemon...");
@@ -98,29 +103,27 @@ pub async fn appd_main(
             );
 
             init_user.send(
-              "nexus://com.reboot-codes.clover.appd/status".to_string(),
-              "incomplete-init".to_string(),
-            )
-            .await;
+              &"nexus://com.reboot-codes.clover.appd/status".to_string(),
+              &"incomplete-init".to_string(),
+            );
           } else {
             init_user.send(
-              "nexus://com.reboot-codes.clover.appd/status".to_string(),
-              "finished-init".to_string(),
-            )
-            .await;
+              &"nexus://com.reboot-codes.clover.appd/status".to_string(),
+              &"finished-init".to_string(),
+            );
           }
         })
         .await;
 
       let ipc_recv_token = cancellation_tokens.0.clone();
-      let (ipc_rx, ipc_handle) = client.subscribe();
+      let (mut ipc_rx, ipc_handle) = user.subscribe();
       let ipc_recv_handle = tokio::task::spawn(async move {
         tokio::select! {
           _ = ipc_recv_token.cancelled() => {
             debug!("ipc_recv exited");
           },
           _ = async move {
-            while let Ok(msg) = ipc_rx.recv().await {
+            while let Some(msg) = ipc_rx.recv().await {
               let kind = Url::parse(&msg.kind.clone()).unwrap();
 
               // Verify that we care about this event.

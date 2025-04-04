@@ -8,22 +8,20 @@ use log::{
   info,
   warn,
 };
-use models::{ModmanStore, Module};
-use std::sync::Arc;
-use tokio::sync::mpsc::{
-  UnboundedReceiver,
-  UnboundedSender,
-  unbounded_channel,
+use models::{
+  ModManStore,
+  Module,
 };
+use nexus::{
+  arbiter::models::ApiKeyWithoutUID,
+  server::models::UserConfig,
+  user::NexusUser,
+};
+use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use url::Url;
-use nexus::server::models::{
-  ApiKeyWithKey,
-  IPCMessageWithId,
-};
-use nexus::{server::models::UserConfig, arbiter::models::ApiKeyWithoutUID, user::NexusUser};
 
-async fn init_module(store: &ModmanStore, id: String, module: Module) -> (bool, usize) {
+async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut initialized_module_components = 0;
 
@@ -147,21 +145,23 @@ async fn init_module(store: &ModmanStore, id: String, module: Module) -> (bool, 
 
 pub async fn gen_user() -> UserConfig {
   UserConfig {
-    user_type: "com.reboot-codes.com.clover.modman",
-    pretty_name: "Clover: ModMan",
-    api_keys: vec![
-      ApiKeyWithoutUID {
-        allowed_events_to: "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$"
-        allowed_events_from: "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$",
-        echo: false,
-        proxy: false
-      }
-    ]
+    user_type: "com.reboot-codes.com.clover.modman".to_string(),
+    pretty_name: "Clover: ModMan".to_string(),
+    api_keys: vec![ApiKeyWithoutUID {
+      allowed_events_to: vec![
+        "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$".to_string()
+      ],
+      allowed_events_from: vec![
+        "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$".to_string()
+      ],
+      echo: false,
+      proxy: false,
+    }],
   }
 }
 
 pub async fn modman_main(
-  store: Arc<ModmanStore>,
+  store: ModManStore,
   user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
@@ -189,22 +189,21 @@ pub async fn modman_main(
       }
 
       init_user.send(
-        "nexus://com.reboot-codes.clover.modman/status".to_string(),
-        "finished-init".to_string(),
-      )
-      .await;
+        &"nexus://com.reboot-codes.clover.modman/status".to_string(),
+        &"finished-init".to_string(),
+      );
     })
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = client.subscribe();
+  let (mut ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
         debug!("ipc_recv exited");
       },
       _ = async move {
-        while let Ok(msg) = ipc_rx.recv().await {
+        while let Some(msg) = ipc_rx.recv().await {
           let kind = Url::parse(&msg.kind.clone()).unwrap();
 
           // Verify that we care about this event.
