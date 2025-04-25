@@ -1,8 +1,14 @@
+use anyhow::anyhow;
 use chrono::prelude::{
   DateTime,
   Utc,
 };
+use log::{
+  debug,
+  error,
+};
 use os_path::OsPath;
+use serde::Deserialize;
 use simple_error::SimpleError;
 use std::hash::{
   DefaultHasher,
@@ -59,6 +65,46 @@ pub async fn read_file(path: OsPath) -> Result<String, SimpleError> {
       None => Err(SimpleError::new(
         "Impossible state, no error reported but return value is missing!",
       )),
+    },
+  }
+}
+
+pub fn deserialize_base64<T>(slice: &[u8]) -> Result<T, anyhow::Error>
+where
+  T: for<'a> Deserialize<'a>,
+{
+  let mut ret = None;
+  let mut err: Option<anyhow::Error> = None;
+
+  debug!("Input: {}", std::str::from_utf8(slice).unwrap());
+
+  match base64::Engine::decode(&base64::prelude::BASE64_STANDARD, slice) {
+    Ok(msg_vec) => match std::str::from_utf8(&msg_vec) {
+      Ok(msg_str) => match serde_jsonc::from_str(msg_str) {
+        Ok(msg_obj) => {
+          ret = Some(msg_obj);
+        }
+        Err(e) => {
+          error!("Failed to deserialize data...");
+          err = Some(e.into());
+        }
+      },
+      Err(e) => {
+        error!("Failed to turn base64 into a UTF-8 String...");
+        err = Some(e.into());
+      }
+    },
+    Err(e) => {
+      error!("Failed to turn data into base64 bytes...");
+      err = Some(e.into());
+    }
+  }
+
+  match ret {
+    Some(obj) => return Ok(obj),
+    None => match err {
+      Some(e) => Err(e.into()),
+      None => Err(anyhow!("Damn... no error but couldn't return an object?")),
     },
   }
 }

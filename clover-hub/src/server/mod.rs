@@ -54,27 +54,40 @@ pub async fn server_main(
       let modman_store = ModManStore::new(Some(warehouse_store.config.clone()));
       let inference_engine_store = InferenceEngineStore::new(Some(warehouse_store.config.clone()));
       let appd_store = AppDStore::new(Some(warehouse_store.config.clone()));
+      let primary_api_key = warehouse_store
+        .clone()
+        .config
+        .clone()
+        .lock()
+        .await
+        .primary_api_key
+        .clone();
 
       // Add users to nexus
-      let (mut nexus_store, master_user_config) = NexusStore::new(&"Owner".to_string()).await;
+      let (mut nexus_store, master_user_config) =
+        NexusStore::new(&"Owner".to_string(), &primary_api_key.clone()).await;
+
+      debug!(
+        "Master User api key: {}",
+        master_user_config.api_keys[0].clone()
+      );
+
       let warehouse_user_config = Arc::new(
         nexus_store
           .add_user(
             warehouse::gen_user().await,
             Some(master_user_config.id.clone()),
+            None,
           )
           .await
           .unwrap(),
-      );
-      debug!(
-        "Master User api key: {}",
-        master_user_config.api_keys[0].clone()
       );
       let renderer_user_config = Arc::new(
         nexus_store
           .add_user(
             renderer::gen_user().await,
             Some(master_user_config.id.clone()),
+            None,
           )
           .await
           .unwrap(),
@@ -84,6 +97,7 @@ pub async fn server_main(
           .add_user(
             modman::gen_user().await,
             Some(master_user_config.id.clone()),
+            None,
           )
           .await
           .unwrap(),
@@ -93,13 +107,18 @@ pub async fn server_main(
           .add_user(
             inference_engine::gen_user().await,
             Some(master_user_config.id.clone()),
+            None,
           )
           .await
           .unwrap(),
       );
       let appd_user_config = Arc::new(
         nexus_store
-          .add_user(appd::gen_user().await, Some(master_user_config.id.clone()))
+          .add_user(
+            appd::gen_user().await,
+            Some(master_user_config.id.clone()),
+            None,
+          )
           .await
           .unwrap(),
       );

@@ -93,3 +93,5 @@ i2cdev = { version = "0.6.1", optional = true }
 queues = "1.1.0"
 anyhow = "1.0.97"
 strum = { version = "0.27.1", features = ["derive"] }
+base64 = "0.22.1"
+dyn_serde = "1.0.2"

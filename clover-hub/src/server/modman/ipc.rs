@@ -1,6 +1,8 @@
 use log::{
   debug,
+  error,
   info,
+  warn,
 };
 use nexus::server::models::IPCMessageWithId;
 use serde::{
@@ -11,14 +13,19 @@ use strum::VariantNames;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
+use crate::{
+  server::modman::models::GestureCommand,
+  utils::deserialize_base64,
+};
+
 #[derive(Deserialize, Serialize, VariantNames)]
 pub enum Events {
   #[serde(rename = "/status")]
   #[strum(serialize = "/status")]
   Status,
-  #[serde(rename = "/gesture/begin")]
-  #[strum(serialize = "/gesture/begin")]
-  GestureBegin,
+  #[serde(rename = "/gesture")]
+  #[strum(serialize = "/gesture")]
+  Gesture,
 }
 
 pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
@@ -35,7 +42,9 @@ pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
             Events::Status => {
               debug!("Return status?");
             }
-            Events::GestureBegin => {
+            Events::Gesture => {
+              debug!("Parsing event data...");
+
               let mut gesture_id = None;
               for (key, val) in kind.query_pairs() {
                 if key == "gesture_id" {
@@ -45,10 +54,33 @@ pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
 
               match gesture_id {
                 Some(gesture_id_str) => {
-                  info!("Begining gesture \"{}\"...", gesture_id_str.clone());
+                  debug!("Parsed gesture id: {}", gesture_id_str.clone());
+                  let mut gesture_command = None;
+
+                  match deserialize_base64::<GestureCommand>(msg.message.clone().as_bytes()) {
+                    Ok(obj) => gesture_command = Some(obj),
+                    Err(e) => {
+                      // TODO
+                      error!("Error when parsing gesture command data: {}", e);
+                    }
+                  }
+
+                  match gesture_command {
+                    Some(cmd) => {
+                      info!(
+                        "Gesture \"{}\" and state: {:#?}",
+                        gesture_id_str.clone(),
+                        cmd.clone()
+                      );
+                    }
+                    None => {
+                      error!("Parsed gesture ID and data, but it was not set??");
+                    }
+                  }
                 }
                 None => {
-                  // TODO
+                  // TODO reply!
+                  warn!("Gesture ID not included! Use state event instead.");
                 }
               }
             }

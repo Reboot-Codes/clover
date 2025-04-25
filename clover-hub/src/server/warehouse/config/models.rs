@@ -1,3 +1,4 @@
+use nexus::utils;
 use os_path::OsPath;
 use sea_orm::DatabaseConnection;
 use serde::{
@@ -17,6 +18,7 @@ pub struct Config {
   pub data_dir: OsPath,
   #[serde(skip)]
   pub db: Option<Arc<DatabaseConnection>>,
+  pub primary_api_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +38,7 @@ impl Default for Config {
       repos: HashMap::new(),
       data_dir: OsPath::new(),
       db: None,
+      primary_api_key: utils::gen_api_key(),
     }
   }
 }

@@ -25,6 +25,7 @@ use serde::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use strum::VariantNames;
 use tokio::sync::Mutex;
 
 // TODO: Define defaults via `Default` trait impl.
@@ -110,4 +111,28 @@ impl ModManStore {
       config,
     }
   }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
+pub enum GestureState {
+  #[serde(rename = "begin")]
+  #[strum(serialize = "begin")]
+  Begin,
+  #[serde(rename = "continue")]
+  #[strum(serialize = "continue")]
+  Continue,
+  #[serde(rename = "pause")]
+  #[strum(serialize = "end")]
+  Pause,
+  #[serde(rename = "end")]
+  #[strum(serialize = "end")]
+  End,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GestureCommand {
+  state: GestureState,
+  intensity: f64,
+  speed: f64,
+  areas: Option<Vec<String>>,
 }

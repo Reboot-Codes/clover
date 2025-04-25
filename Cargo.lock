@@ -1939,6 +1939,7 @@ name = "clover-hub"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bevy",
  "bluer",
  "bollard",
@@ -1947,6 +1948,7 @@ dependencies = [
  "clap",
  "crossterm 0.28.1",
  "decorum",
+ "dyn_serde",
  "env_logger",
  "futures",
  "git2",
@@ -2627,6 +2629,15 @@ name = "dpi"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
+
+[[package]]
+name = "dyn_serde"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42501063765b768d479b7c61ff59de45bbe9ab37675d13a253647f2d4748a1d6"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "either"

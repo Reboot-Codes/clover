@@ -136,6 +136,8 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
               })
             }
           }
+
+          std::mem::drop(config_file);
         }
         Err(e) => {
           err = Some(Error::FailedToOpenConfigFile {
@@ -274,7 +276,38 @@ pub async fn warehouse_main(
 
       info!("Buttoning up storage...");
       // TODO: Lock db and clean up when done.
+      debug!("Writing Config File...");
+      let config = store.config.lock().await;
+      match fs::File::open(config.data_dir.join("/config.jsonc")).await {
+        Ok(mut config_file) => {
+          debug!("Config file opened!");
 
+          match config_file
+            .write_all(
+              serde_jsonc::to_string::<Config>(&config.clone() as &Config)
+                .unwrap()
+                .as_bytes(),
+            )
+            .await
+          {
+            Ok(_) => {
+              debug!("Wrote config from store state!");
+            }
+            Err(e) => {
+              error!("Failed to write config file");
+              // TODO!
+            }
+          }
+
+          std::mem::drop(config_file);
+        }
+        Err(e) => {
+          error!("Unable to open config file");
+          // TODO!
+        }
+      }
+
+      std::mem::drop(config);
       std::mem::drop(store);
 
       cancellation_tokens.1.cancel();
