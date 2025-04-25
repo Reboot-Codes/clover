@@ -1,3 +1,6 @@
+pub mod ipc;
+
+use ipc::handle_ipc_msg;
 use log::{
   debug,
   info,
@@ -12,7 +15,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 use super::warehouse::config::models::Config;
 
@@ -75,16 +77,7 @@ pub async fn inference_engine_main(
       _ = ipc_recv_token.cancelled() => {
         debug!("ipc_recv exited");
       },
-      _ = async move {
-        while let Some(msg) = ipc_rx.recv().await {
-          let kind = Url::parse(&msg.kind.clone()).unwrap();
-
-          // Verify that we care about this event.
-          if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.inference-engine") {
-            debug!("Processing: {}", msg.kind.clone());
-          }
-        }
-      } => {}
+      _ = handle_ipc_msg(ipc_rx) => {}
     }
   });
 

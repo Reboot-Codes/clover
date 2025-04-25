@@ -54,7 +54,7 @@ overflow-proof = "0.1.0"
 decorum = "0.4.0"
 
 # HTTP/WS
-nexus = { git = "https://github.com/Reboot-Codes/nexus" }
+nexus = { path = "/home/reboot/dev/nexus" }
 url = "2.5.0"
 image = { version = "0.25.5", features = ["serde"] }
 
@@ -92,3 +92,4 @@ i2c = { version = "0.1.0", optional = true }
 i2cdev = { version = "0.6.1", optional = true }
 queues = "1.1.0"
 anyhow = "1.0.97"
+strum = { version = "0.27.1", features = ["derive"] }

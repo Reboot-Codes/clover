@@ -1,7 +1,9 @@
-mod system_ui;
+pub mod ipc;
+pub mod system_ui;
 
 use self::system_ui::system_ui_main;
 use crate::utils::RecvSync;
+use ipc::handle_ipc_msg;
 use log::{
   debug,
   info,
@@ -21,7 +23,6 @@ use system_ui::{
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 use super::warehouse::config::models::Config;
 
@@ -71,7 +72,8 @@ pub async fn renderer_main(
     display_registration_queue: queue![],
   };
 
-  std::thread::spawn(|| system_ui_main(bevy_cancel_ipc));
+  // TODO: Add this as a CLI/Config option!
+  std::thread::spawn(|| system_ui_main(bevy_cancel_ipc, Some(true)));
 
   // let display_handles = Arc::new(HashMap::new());
   let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
@@ -94,20 +96,7 @@ pub async fn renderer_main(
         _ = ipc_recv_token.cancelled() => {
             debug!("ipc_recv exited");
         },
-        _ = async move {
-            while let Some(msg) = ipc_rx.recv().await {
-                let kind = Url::parse(&msg.kind.clone()).unwrap();
-
-                // Verify that we care about this event.
-                if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.renderer") {
-                    debug!("Processing: {}", msg.kind.clone());
-
-                    if kind.path() == "/register-display" {
-
-                    }
-                }
-            }
-        } => {}
+        _ = handle_ipc_msg(ipc_rx) => {}
     }
   });
 

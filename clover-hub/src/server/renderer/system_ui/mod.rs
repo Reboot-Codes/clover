@@ -37,7 +37,7 @@ pub struct CustomBevyIPC {
   pub display_registration_queue: Queue<DisplayComponent>,
 }
 
-pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC) {
+pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC, disable_winit: Option<bool>) {
   let mut app = App::new();
 
   app
@@ -46,56 +46,61 @@ pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC) {
     .add_systems(Update, (vdisplay_registrar, display_registrar).chain());
 
   #[cfg(feature = "compositor")]
-  {
-    use bevy::{
-      DefaultPlugins,
-      window::{
-        PresentMode,
-        Window,
-        WindowPlugin,
-        WindowTheme,
-      },
-      winit::{
-        WakeUp,
-        WinitPlugin,
-      },
-    };
-    use systems::simulated_controls::{
-      make_visible,
-      update_scroll_position,
-    };
+  match disable_winit {
+    Some(disable_winit_bool) => {
+      if !disable_winit_bool {
+        use bevy::{
+          window::{
+            PresentMode,
+            Window,
+            WindowPlugin,
+            WindowTheme,
+          },
+          winit::{
+            WakeUp,
+            WinitPlugin,
+          },
+          DefaultPlugins,
+        };
+        use systems::simulated_controls::{
+          make_visible,
+          update_scroll_position,
+        };
 
-    let mut modded_winit: WinitPlugin<WakeUp> = Default::default();
-    modded_winit.run_on_any_thread = true;
+        let mut modded_winit: WinitPlugin<WakeUp> = Default::default();
+        modded_winit.run_on_any_thread = true;
 
-    app
-      .add_plugins((
-        DefaultPlugins
-          .set(WindowPlugin {
-            primary_window: Some(Window {
-              title: "Clover Simulated Controls".into(),
-              resolution: (500., 200.).into(),
-              present_mode: PresentMode::AutoVsync,
-              // Tells Wasm to resize the window according to the available canvas
-              fit_canvas_to_parent: true,
-              // Tells Wasm not to override default event handling, like F5, Ctrl+R etc.
-              prevent_default_event_handling: false,
-              window_theme: Some(WindowTheme::Dark),
-              enabled_buttons: bevy::window::EnabledButtons {
-                maximize: false,
+        app
+          .add_plugins((
+            DefaultPlugins
+              .set(WindowPlugin {
+                primary_window: Some(Window {
+                  title: "Clover Simulated Controls".into(),
+                  resolution: (500., 200.).into(),
+                  present_mode: PresentMode::AutoVsync,
+                  // Tells Wasm to resize the window according to the available canvas
+                  fit_canvas_to_parent: true,
+                  // Tells Wasm not to override default event handling, like F5, Ctrl+R etc.
+                  prevent_default_event_handling: false,
+                  window_theme: Some(WindowTheme::Dark),
+                  enabled_buttons: bevy::window::EnabledButtons {
+                    maximize: false,
+                    ..Default::default()
+                  },
+                  visible: false,
+                  ..Default::default()
+                }),
                 ..Default::default()
-              },
-              visible: false,
-              ..Default::default()
-            }),
-            ..Default::default()
-          })
-          .set(modded_winit)
-          .disable::<LogPlugin>(),
-        LogDiagnosticsPlugin::default(),
-        FrameTimeDiagnosticsPlugin,
-      ))
-      .add_systems(Update, (make_visible, update_scroll_position));
+              })
+              .set(modded_winit)
+              .disable::<LogPlugin>(),
+            LogDiagnosticsPlugin::default(),
+            FrameTimeDiagnosticsPlugin,
+          ))
+          .add_systems(Update, (make_visible, update_scroll_position));
+      }
+    }
+    None => {}
   }
 
   app.run();

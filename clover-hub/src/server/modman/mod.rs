@@ -1,7 +1,9 @@
 pub mod busses;
 pub mod components;
+pub mod ipc;
 pub mod models;
 
+use ipc::handle_ipc_msg;
 use log::{
   debug,
   error,
@@ -202,16 +204,7 @@ pub async fn modman_main(
       _ = ipc_recv_token.cancelled() => {
         debug!("ipc_recv exited");
       },
-      _ = async move {
-        while let Some(msg) = ipc_rx.recv().await {
-          let kind = Url::parse(&msg.kind.clone()).unwrap();
-
-          // Verify that we care about this event.
-          if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.modman") {
-            debug!("Processing: {}", msg.kind.clone());
-          }
-        }
-      } => {}
+      _ = handle_ipc_msg(ipc_rx) => {}
     }
   });
 

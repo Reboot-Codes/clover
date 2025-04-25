@@ -1,4 +1,5 @@
 pub mod docker;
+pub mod ipc;
 pub mod models;
 
 use self::docker::init_app;
@@ -7,6 +8,7 @@ use bollard::{
   API_DEFAULT_VERSION,
 };
 use docker::remove_app;
+use ipc::handle_ipc_msg;
 use log::{
   debug,
   error,
@@ -122,16 +124,7 @@ pub async fn appd_main(
           _ = ipc_recv_token.cancelled() => {
             debug!("ipc_recv exited");
           },
-          _ = async move {
-            while let Some(msg) = ipc_rx.recv().await {
-              let kind = Url::parse(&msg.kind.clone()).unwrap();
-
-              // Verify that we care about this event.
-              if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.appd") {
-                debug!("Processing: {}", msg.kind.clone());
-              }
-            }
-          } => {}
+          _ = handle_ipc_msg(ipc_rx) => {}
         }
       });
 

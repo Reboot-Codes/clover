@@ -13,6 +13,7 @@ use inference_engine::{
   InferenceEngineStore,
 };
 use log::{
+  debug,
   error,
   info,
 };
@@ -64,6 +65,10 @@ pub async fn server_main(
           )
           .await
           .unwrap(),
+      );
+      debug!(
+        "Master User api key: {}",
+        master_user_config.api_keys[0].clone()
       );
       let renderer_user_config = Arc::new(
         nexus_store
