@@ -253,6 +253,7 @@ pub async fn warehouse_main(
       let _ = init_user.send(
         &"nexus://com.reboot-codes.clover.warehouse/status".to_string(),
         &"finished-init".to_string(),
+        &None,
       );
     })
     .await;

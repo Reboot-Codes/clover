@@ -1,7 +1,7 @@
 pub mod plugins;
 pub mod systems;
 
-use crate::server::modman::components::video::displays::models::DisplayComponent;
+use crate::server::modman::components::video::displays::models::PhysicalDisplayComponent;
 use crate::utils::RecvSync;
 use bevy::{
   app::{
@@ -34,7 +34,7 @@ unsafe impl Sync for ExitState {}
 #[derive(Resource)]
 pub struct CustomBevyIPC {
   pub exit_channel: RecvSync<ExitState>,
-  pub display_registration_queue: Queue<DisplayComponent>,
+  pub display_registration_queue: Queue<PhysicalDisplayComponent>,
 }
 
 pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC, disable_winit: Option<bool>) {

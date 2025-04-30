@@ -19,6 +19,8 @@ pub struct Config {
   #[serde(skip)]
   pub db: Option<Arc<DatabaseConnection>>,
   pub primary_api_key: String,
+  /// Default gesture pack to use
+  pub default_gesture_pack: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +41,7 @@ impl Default for Config {
       data_dir: OsPath::new(),
       db: None,
       primary_api_key: utils::gen_api_key(),
+      default_gesture_pack: "com.reboot-codes.clover.CORE.default".to_string(),
     }
   }
 }

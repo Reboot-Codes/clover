@@ -11,6 +11,7 @@ use bevy::window::{
   WindowMode,
   WindowRef,
 };
+use log::warn;
 use queues::*;
 
 pub fn vdisplay_registrar(mut commands: Commands, mut ipc: ResMut<CustomBevyIPC>) {}
@@ -37,7 +38,7 @@ pub fn display_registrar(
     for display in displays {
       match display.connection {
         #[cfg(feature = "compositor")]
-        crate::server::modman::components::video::displays::models::ConnectionType::GPUDirect(
+        crate::server::modman::components::video::displays::models::ConnectionType::Direct(
           direct_connection,
         ) => {
           let monitor = if direct_connection.display_id.clone() == "@primary" {
@@ -53,7 +54,11 @@ pub fn display_registrar(
 
             match chosen_monitor {
               Some(monitor) => MonitorSelection::Entity(monitor),
-              None => MonitorSelection::Primary,
+              None => {
+                // TODO: Is this really the best behaviour?
+                warn!("Requested display not found, defaulting to primary display...");
+                MonitorSelection::Primary
+              }
             }
           };
 
@@ -111,6 +116,9 @@ pub fn display_registrar(
         }
         crate::server::modman::components::video::displays::models::ConnectionType::ModManProxy(
           proxied_connection,
+        ) => {}
+        crate::server::modman::components::video::displays::models::ConnectionType::Stream(
+          stream_config,
         ) => {}
       }
     }

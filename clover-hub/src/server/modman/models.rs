@@ -12,7 +12,7 @@ use crate::server::{
     video::{
       cameras::models::CameraComponent,
       displays::models::{
-        DisplayComponent,
+        PhysicalDisplayComponent,
         VirtualDisplayComponent,
       },
     },
@@ -71,7 +71,7 @@ pub enum CloverComponent {
   InputSensorComponent(InputSensorComponent),
   OutputSensorComponent(OutputSensorComponent),
   CameraComponent(CameraComponent),
-  DisplayComponent(DisplayComponent),
+  PhysicalDisplayComponent(PhysicalDisplayComponent),
   VirtualDisplayComponent(VirtualDisplayComponent),
 }
 
@@ -135,4 +135,28 @@ pub struct GestureCommand {
   intensity: f64,
   speed: f64,
   areas: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GestureConfig {
+  Static(String),
+  Reactive(ReactiveGestureConfig),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReactiveGestureConfig {
+  /// The primary gesture pack to use for this component
+  pub primary_gesture_pack: Option<String>,
+  /// The default gesture for the component to use when idle.
+  pub default_gesture: Option<String>,
+  pub gesture_parameters: Option<GestureParameters>,
+  /// Override gestures (use different pack, adjust gesture parameters, etc)
+  pub gesture_overrides: HashMap<String, GestureOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GestureOverride {
+  /// Gesture id in `gesture_RFQDN@gesture_pack_RFQDN` format, where `@` and everything after can be ommitted to use the default gesture pack.
+  pub gesture_preset_id: String,
+  pub gesture_parameters: Option<GestureParameters>,
 }

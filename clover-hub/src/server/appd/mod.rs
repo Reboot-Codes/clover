@@ -107,11 +107,13 @@ pub async fn appd_main(
             init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"incomplete-init".to_string(),
+              &None,
             );
           } else {
             init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"finished-init".to_string(),
+              &None,
             );
           }
         })

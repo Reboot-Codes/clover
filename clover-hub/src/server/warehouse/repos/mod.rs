@@ -1,6 +1,8 @@
 pub mod impls;
 pub mod models;
 
+// TODO: Implement YAML and TOML parsing as well.
+
 use crate::utils::read_file;
 use git2::{
   build::CheckoutBuilder,

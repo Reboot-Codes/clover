@@ -85,6 +85,7 @@ pub async fn renderer_main(
       init_user.send(
         &"nexus://com.reboot-codes.clover.renderer/status".to_string(),
         &"finished-init".to_string(),
+        &None,
       );
     })
     .await;

@@ -193,6 +193,7 @@ pub async fn modman_main(
       init_user.send(
         &"nexus://com.reboot-codes.clover.modman/status".to_string(),
         &"finished-init".to_string(),
+        &None,
       );
     })
     .await;

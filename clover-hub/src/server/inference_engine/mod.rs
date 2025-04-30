@@ -66,6 +66,7 @@ pub async fn inference_engine_main(
       init_user.send(
         &"nexus://com.reboot-codes.clover.inference-engine/status".to_string(),
         &"finished-init".to_string(),
+        &None,
       );
     })
     .await;

@@ -1,19 +1,38 @@
-use crate::server::modman::components::models::CloverComponentTrait;
+use crate::server::modman::components::{
+  models::{
+    CloverComponentTrait,
+    ProxiedConnection,
+    StreamingConnection,
+  },
+  video::VideoResolution,
+};
 use serde::{
   Deserialize,
   Serialize,
 };
+use strum::VariantNames;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
 pub enum CameraType {
+  /// Path to device file, ex: `/dev/video0`
+  #[serde(rename = "v4l")]
+  #[strum(serialize = "v4l")]
   Video4Linux(String),
-  RTMP(String),
-  RTSP(String),
+  #[serde(rename = "modman-proxy")]
+  #[strum(serialize = "modman-proxy")]
+  ModManProxy(ProxiedConnection),
+  #[serde(rename = "stream")]
+  #[strum(serialize = "stream")]
+  Stream(StreamingConnection),
 }
 
 #[derive(Debug, Clone)]
 pub struct CameraComponent {
-  camera_type: CameraType,
+  pub source: CameraType,
+  pub max_resolution: VideoResolution,
+  /// Default resolution to scale to when accessing this video device, defaults to max_resolution if not set.
+  pub default_resolution: Option<VideoResolution>,
+  pub internal: bool,
 }
 
 impl CloverComponentTrait for CameraComponent {}

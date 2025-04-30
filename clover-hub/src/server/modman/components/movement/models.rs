@@ -1,6 +1,10 @@
 use crate::server::modman::{
   components::models::CloverComponentTrait,
-  models::GestureParameters,
+  models::{
+    GestureConfig,
+    GestureOverride,
+    GestureParameters,
+  },
 };
 use serde::{
   Deserialize,
@@ -115,9 +119,9 @@ pub enum DegreesOfFreedomGestureParams {
 #[derive(Debug, Clone)]
 pub struct MovementComponent {
   /// The inital position of this component, also determines how many degrees of freedom it uses. **NON OPTIONAL!**
-  inital_position: DegreesOfFreedom,
-  /// Gesture synthesis parameters to use for each coordinate value for each gesture.
-  gesture_params: HashMap<String, DegreesOfFreedomGestureParams>,
+  pub inital_position: DegreesOfFreedom,
+  pub gesture_config: GestureConfig,
+  pub internal: bool,
 }
 
 impl CloverComponentTrait for MovementComponent {}

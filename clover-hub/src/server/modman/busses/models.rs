@@ -1,4 +1,13 @@
-#[derive(Debug, Clone)]
+use nexus::server::models::{
+  IPCMessage,
+  IPCMessageWithId,
+};
+use serde::{
+  Deserialize,
+  Serialize,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BusTypes {
   App,
   #[cfg(feature = "can_fd")]
@@ -17,4 +26,10 @@ pub enum BusTypes {
   UART,
 }
 
-pub trait Bus {}
+pub trait Bus {
+  /// Send a message to the Bus.
+  fn send_message(msg: IPCMessageWithId) -> Result<(), anyhow::Error>;
+  /// Send a message and expect a reply to that message.
+  /// Listen to the Bus (does NOT contain IDs.)
+  fn subscribe_to_bus() -> tokio::sync::broadcast::Receiver<IPCMessage>;
+}
