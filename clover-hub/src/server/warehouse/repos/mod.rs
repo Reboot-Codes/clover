@@ -164,7 +164,7 @@ where
                   "Resolved only one file for glob key import, import the root key instead!",
                 ));
               } else {
-                match serde_jsonc::from_str::<T>(&raw_obj) {
+                match serde_json_lenient::from_str::<T>(&raw_obj) {
                   Ok(obj_spec) => {
                     match K::compile(
                       obj_spec,
@@ -204,7 +204,7 @@ where
             Resolution::ImportedMultiple((here, raw_objs)) => {
               if is_glob {
                 for (obj_key_seg, raw_obj) in raw_objs {
-                  match serde_jsonc::from_str::<T>(&raw_obj) {
+                  match serde_json_lenient::from_str::<T>(&raw_obj) {
                     Ok(obj_spec) => {
                       match K::compile(
                         obj_spec,
@@ -242,7 +242,7 @@ where
                 }
               }
             }
-            Resolution::NoImport(raw_obj) => match serde_jsonc::from_str::<T>(&raw_obj) {
+            Resolution::NoImport(raw_obj) => match serde_json_lenient::from_str::<T>(&raw_obj) {
               Ok(obj_spec) => {
                 match K::compile(obj_spec, resolution_ctx.clone(), repo_dir_path.clone()).await {
                   Ok(obj) => {
@@ -700,7 +700,7 @@ pub async fn download_repo_updates(
               Ok(_) => {
                 debug!("{}", contents.clone());
 
-                match serde_jsonc::from_str::<ManifestSpec>(&contents) {
+                match serde_json_lenient::from_str::<ManifestSpec>(&contents) {
                   Ok(raw_manifest_values) => {
                     debug!("{:#?}", raw_manifest_values.clone());
 

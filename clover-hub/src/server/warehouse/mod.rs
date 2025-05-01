@@ -84,7 +84,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
           Ok(mut file) => {
             match file
               .write_all(
-                serde_jsonc::to_string::<Config>(&Default::default())
+                serde_json_lenient::to_string::<Config>(&Default::default())
                   .unwrap()
                   .as_bytes(),
               )
@@ -119,7 +119,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
 
           // TODO: Add repair option to fix broken config files.
           match config_file.read_to_string(&mut contents).await {
-            Ok(_) => match serde_jsonc::from_str::<Config>(&contents) {
+            Ok(_) => match serde_json_lenient::from_str::<Config>(&contents) {
               Ok(config_values) => {
                 *store.config.lock().await = config_values;
                 debug!("Loaded config!");
@@ -285,7 +285,7 @@ pub async fn warehouse_main(
 
           match config_file
             .write_all(
-              serde_jsonc::to_string::<Config>(&config.clone() as &Config)
+              serde_json_lenient::to_string::<Config>(&config.clone() as &Config)
                 .unwrap()
                 .as_bytes(),
             )

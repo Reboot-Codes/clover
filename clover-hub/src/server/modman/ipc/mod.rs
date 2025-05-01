@@ -39,7 +39,7 @@ pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
     if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.modman") {
       debug!("Processing: {}", msg.kind.clone());
 
-      match serde_jsonc::from_str::<Events>(&format!("\"{}\"", kind.path())) {
+      match serde_json_lenient::from_str::<Events>(&format!("\"{}\"", kind.path())) {
         Ok(event_type) => {
           match event_type {
             Events::Status => {

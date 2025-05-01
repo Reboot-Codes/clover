@@ -1,5 +1,0 @@
-{
-  "modules": "@import('./modules/manifest.clover.jsonc')",
-  "applications": "@import('./applications/manifest.clover.jsonc')",
-  "gesture-packs": "@import('./modules/manifest.clover.jsonc')",
-}

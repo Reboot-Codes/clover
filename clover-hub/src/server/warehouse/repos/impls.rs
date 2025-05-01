@@ -37,7 +37,7 @@ impl ManifestCompilationFrom<Option<String>> for OptionalString {
               OptionalString::None
             }
             Resolution::ImportedSingle((here, imported)) => {
-              match serde_jsonc::from_str::<String>(&imported) {
+              match serde_json_lenient::from_str::<String>(&imported) {
                 Ok(val) => OptionalString::Some(val),
                 Err(e) => {
                   err = Some(SimpleError::new(format!(
@@ -102,7 +102,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>>
               Optional::None
             }
             Resolution::ImportedSingle((here, imported)) => {
-              match serde_jsonc::from_str(&imported) {
+              match serde_json_lenient::from_str(&imported) {
                 Ok(raw_val) => {
                   match K::compile(
                     raw_val,
@@ -136,7 +136,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T>>
                 }
               }
             }
-            Resolution::NoImport(val_str) => match serde_jsonc::from_str(&val_str) {
+            Resolution::NoImport(val_str) => match serde_json_lenient::from_str(&val_str) {
               Ok(raw_val) => {
                 match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await {
                   Ok(val) => Optional::Some(val),
@@ -192,7 +192,7 @@ impl ManifestCompilationFrom<String> for RequiredString {
           Default::default()
         }
         Resolution::ImportedSingle((here, imported)) => {
-          match serde_jsonc::from_str::<String>(&imported) {
+          match serde_json_lenient::from_str::<String>(&imported) {
             Ok(val) => RequiredString(val),
             Err(e) => {
               err = Some(SimpleError::new(format!(
@@ -254,7 +254,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
                 break;
               }
               Resolution::ImportedSingle((here, imported)) => {
-                match serde_jsonc::from_str::<String>(&imported) {
+                match serde_json_lenient::from_str::<String>(&imported) {
                   Ok(val) => {
                     entries.insert(intent_id, val);
                   }
@@ -292,7 +292,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
         match resolve_entry_value(import_str, resolution_ctx.clone(), repo_dir_path.clone()).await {
           Ok(resolution) => match resolution {
             Resolution::ImportedSingle((here, raw_val)) => {
-              match serde_jsonc::from_str::<HashMap<String, String>>(&raw_val) {
+              match serde_json_lenient::from_str::<HashMap<String, String>>(&raw_val) {
                 Ok(val) => OptionalStrStrHashMap::Some(val),
                 Err(e) => {
                   err = Some(SimpleError::new(format!(
@@ -312,7 +312,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
               let mut entries = HashMap::new();
 
               for (val_key, raw_val) in raw_vals {
-                match serde_jsonc::from_str::<String>(&raw_val) {
+                match serde_json_lenient::from_str::<String>(&raw_val) {
                   Ok(val) => {
                     entries.insert(val_key, val);
                   }
@@ -337,7 +337,7 @@ impl ManifestCompilationFrom<OptionalStringListManifestSpecEntry> for OptionalSt
               }
             }
             Resolution::NoImport(raw_val) => {
-              match serde_jsonc::from_str::<HashMap<String, String>>(&raw_val) {
+              match serde_json_lenient::from_str::<HashMap<String, String>>(&raw_val) {
                 Ok(val) => OptionalStrStrHashMap::Some(val),
                 Err(e) => {
                   err = Some(SimpleError::new(format!(
@@ -418,7 +418,7 @@ where
         {
           Ok(resolution) => match resolution {
             Resolution::ImportedSingle((here, res_str)) => {
-              match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(
+              match serde_json_lenient::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(
                 &res_str,
               ) {
                 Ok(hash_map) => {
@@ -512,7 +512,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
               RequiredStrTHashMap(HashMap::new())
             }
             Resolution::ImportedSingle((here, imported)) => {
-              match serde_jsonc::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(
+              match serde_json_lenient::from_str::<HashMap<String, RequiredSingleManifestEntry<T>>>(
                 &imported,
               ) {
                 Ok(spec_list) => {
@@ -555,7 +555,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                         {
                           Ok(resolution) => match resolution {
                             Resolution::ImportedSingle((here, val_str)) => {
-                              match serde_jsonc::from_str(&val_str) {
+                              match serde_json_lenient::from_str(&val_str) {
                                 Ok(raw_val) => {
                                   match K::compile(
                                     raw_val,
@@ -594,7 +594,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                             }
                             Resolution::ImportedMultiple((here, hash_map)) => {
                               for (val_id, val_str) in hash_map {
-                                match serde_jsonc::from_str(&val_str) {
+                                match serde_json_lenient::from_str(&val_str) {
                                   Ok(raw_val) => {
                                     match K::compile(
                                       raw_val,
@@ -631,7 +631,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                               }
                             }
                             Resolution::NoImport(val_str) => {
-                              match serde_jsonc::from_str(&val_str) {
+                              match serde_json_lenient::from_str(&val_str) {
                                 Ok(raw_val) => {
                                   match K::compile(
                                     raw_val,
@@ -685,7 +685,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                 }
               }
             }
-            Resolution::NoImport(raw_val) => match serde_jsonc::from_str(&raw_val) {
+            Resolution::NoImport(raw_val) => match serde_json_lenient::from_str(&raw_val) {
               Ok(val) => RequiredStrTHashMap(val),
               Err(e) => {
                 err = Some(SimpleError::new(format!(
@@ -728,7 +728,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
               {
                 Ok(resolution) => match resolution {
                   Resolution::ImportedSingle((here, val_str)) => {
-                    match serde_jsonc::from_str(&val_str) {
+                    match serde_json_lenient::from_str(&val_str) {
                       Ok(raw_val) => {
                         match K::compile(
                           raw_val,
@@ -765,7 +765,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                   }
                   Resolution::ImportedMultiple((here, hash_map)) => {
                     for (val_id, val_str) in hash_map {
-                      match serde_jsonc::from_str(&val_str) {
+                      match serde_json_lenient::from_str(&val_str) {
                         Ok(raw_val) => {
                           match K::compile(
                             raw_val,
@@ -800,7 +800,7 @@ impl<T: Clone + for<'a> Deserialize<'a>, K: ManifestCompilationFrom<T> + for<'a>
                       }
                     }
                   }
-                  Resolution::NoImport(val_str) => match serde_jsonc::from_str(&val_str) {
+                  Resolution::NoImport(val_str) => match serde_json_lenient::from_str(&val_str) {
                     Ok(raw_val) => {
                       match K::compile(raw_val, resolution_ctx.clone(), repo_dir_path.clone()).await
                       {
@@ -867,22 +867,24 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
               ));
               OptionalBoolean::None
             }
-            Resolution::ImportedSingle((here, val_str)) => match serde_jsonc::from_str(&val_str) {
-              Ok(val) => OptionalBoolean::Some(val),
-              Err(e) => {
-                err = Some(SimpleError::new(format!(
-                  "OptionalBoolean, ctx: {:#?}\nerr: {}",
-                  ResolutionCtx {
-                    base: resolution_ctx.clone().base,
-                    builtin: resolution_ctx.clone().builtin,
-                    here
-                  },
-                  e
-                )));
-                OptionalBoolean::None
+            Resolution::ImportedSingle((here, val_str)) => {
+              match serde_json_lenient::from_str(&val_str) {
+                Ok(val) => OptionalBoolean::Some(val),
+                Err(e) => {
+                  err = Some(SimpleError::new(format!(
+                    "OptionalBoolean, ctx: {:#?}\nerr: {}",
+                    ResolutionCtx {
+                      base: resolution_ctx.clone().base,
+                      builtin: resolution_ctx.clone().builtin,
+                      here
+                    },
+                    e
+                  )));
+                  OptionalBoolean::None
+                }
               }
-            },
-            Resolution::NoImport(val_str) => match serde_jsonc::from_str(&val_str) {
+            }
+            Resolution::NoImport(val_str) => match serde_json_lenient::from_str(&val_str) {
               Ok(val) => OptionalBoolean::Some(val),
               Err(e) => {
                 err = Some(SimpleError::new(format!(
@@ -1466,27 +1468,26 @@ impl ManifestCompilationFrom<RawGestureSpec> for GestureSpec {
     let mut err = None;
 
     debug!("Resolving raw-gesture-pack");
-    let ret =
-      match spec {
-        RawGestureSpec::RawStaticGestureSpec(raw_gesture_spec) => match StaticGestureSpec::compile(
-          raw_gesture_spec,
-          resolution_ctx.clone(),
-          repo_dir_path.clone(),
-        )
-        .await
-        {
-          Ok(val) => {
-            debug!("Resolved raw-gesture-pack");
-            Self::StaticGestureSpec(val)
-          }
-          Err(e) => {
-            err = Some(e);
-            Self::StaticGestureSpec(StaticGestureSpec {
-              static_url: RequiredString(String::from("bleh")),
-            })
-          }
-        },
-      };
+    let ret = match spec {
+      RawGestureSpec::RawStaticGestureSpec(raw_gesture_spec) => match StaticGestureSpec::compile(
+        raw_gesture_spec,
+        resolution_ctx.clone(),
+        repo_dir_path.clone(),
+      )
+      .await
+      {
+        Ok(val) => {
+          debug!("Resolved raw-gesture-pack");
+          Self::StaticGestureSpec(val)
+        }
+        Err(e) => {
+          err = Some(e);
+          Self::StaticGestureSpec(StaticGestureSpec {
+            static_url: RequiredString(String::from("bleh")),
+          })
+        }
+      },
+    };
 
     match err {
       Some(e) => Err(e),

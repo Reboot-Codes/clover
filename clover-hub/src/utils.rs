@@ -80,7 +80,7 @@ where
 
   match base64::Engine::decode(&base64::prelude::BASE64_STANDARD, slice) {
     Ok(msg_vec) => match std::str::from_utf8(&msg_vec) {
-      Ok(msg_str) => match serde_jsonc::from_str(msg_str) {
+      Ok(msg_str) => match serde_json_lenient::from_str(msg_str) {
         Ok(msg_obj) => {
           ret = Some(msg_obj);
         }

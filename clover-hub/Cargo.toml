@@ -7,37 +7,40 @@ edition = "2021"
 default = ["core", "compositor", "all_busses"]
 
 # Usage specific features
-  core = []
+core = []
 
 # Hardware specific features
-  compositor = ["bevy/bevy_winit"]
+compositor = ["bevy/bevy_winit"]
 
-  # HW busses
-  all_busses = ["can", "bt", "spi", "i2c", "uart"]
+# HW busses
+all_busses = ["can", "bt", "spi", "i2c", "uart"]
 
-  can = ["can_fd", "can_2"]
+can = ["can_fd", "can_2"]
 
-    can_fd = ["dep:can", "socketcan"]
+can_fd = ["dep:can", "socketcan"]
 
-    # Includes support for CAN 2.0A and 2.0B
-    can_2 = ["dep:can", "socketcan"]
+# Includes support for CAN 2.0A and 2.0B
+can_2 = ["dep:can", "socketcan"]
 
-  bt = ["bt_classic", "bt_le"]
+bt = ["bt_classic", "bt_le"]
 
-    bt_classic = ["bluer"]
+bt_classic = ["bluer"]
 
-    bt_le = ["bluer"]
+bt_le = ["bluer"]
 
-  spi = ["spidev"]
+spi = ["spidev"]
 
-  i2c = ["dep:i2c", "i2cdev"]
+i2c = ["dep:i2c", "i2cdev"]
 
-  uart = ["uart_16550"]
+uart = ["uart_16550"]
 
 [dependencies]
 # CLI
-crossterm = { version = "0.28.1", features = [ "serde" ] }
-tui = { version = "0.19", default-features = false, features = ['crossterm', 'serde'] }
+crossterm = { version = "0.28.1", features = ["serde"] }
+tui = { version = "0.19", default-features = false, features = [
+  'crossterm',
+  'serde',
+] }
 clap = { version = "4.5.4", features = ["derive"] }
 
 # Debugging Tools
@@ -59,9 +62,14 @@ url = "2.5.0"
 image = { version = "0.25.5", features = ["serde"] }
 
 # Adding stuff to rust that shoulda been there in the first place.
-tokio = { version = "1.42.0", features = ["signal", "macros", "sync", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.15", features = ["fs"]}
-serde = {version = "1.0", features = ["derive"] }
+tokio = { version = "1.42.0", features = [
+  "signal",
+  "macros",
+  "sync",
+  "rt-multi-thread",
+] }
+tokio-stream = { version = "0.1.15", features = ["fs"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 futures = { version = "0.3", default-features = false }
 
@@ -76,8 +84,11 @@ git2 = "0.19.0"
 os_path = "0.8.0"
 
 # Storage
-serde_jsonc = "1.0.108"
-sea-orm = { version = "1.1.1", features = [ "runtime-tokio-rustls", "sqlx-sqlite" ] }
+serde_json_lenient = "0.2.4"
+sea-orm = { version = "1.1.1", features = [
+  "runtime-tokio-rustls",
+  "sqlx-sqlite",
+] }
 
 # SystemUI
 bevy = "0.15.0"

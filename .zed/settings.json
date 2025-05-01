@@ -8,5 +8,8 @@
         }
       }
     }
+  },
+  "file_types": {
+    "JSONC": ["**/*.clover.jsonc"]
   }
 }
