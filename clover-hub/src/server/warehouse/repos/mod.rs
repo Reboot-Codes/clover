@@ -407,7 +407,7 @@ pub async fn resolve_entry_value(
                 let mut file_path = OsPath::from(entry.path());
                 let cap = match import_captures.name("cap") {
                   Some(val) => val.as_str(),
-                  None => "/manifest.clover.jsonc",
+                  None => "/manifest.clover.json",
                 };
 
                 debug!(
@@ -690,7 +690,7 @@ pub async fn download_repo_updates(
 
     if (repo_err == None) && (err == None) {
       // Build manifest object and load it into the store.
-      let manifest_path = repo_path.join("/manifest.clover.jsonc");
+      let manifest_path = repo_path.join("/manifest.clover.json");
       if manifest_path.exists() {
         match fs::File::open(manifest_path.clone()).await {
           Ok(mut manifest_file) => {

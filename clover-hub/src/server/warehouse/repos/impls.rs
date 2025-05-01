@@ -394,7 +394,7 @@ where
 
         match resolve_list_entry(hash_map, resolution_ctx.clone(), repo_dir_path.clone()).await {
           Ok(list) => {
-            debug!("serde_jsonc::from_str(): {:#?}", (&list));
+            debug!("serde_json_lenient::from_str(): {:#?}", (&list));
 
             entries = OptionalStrTHashMap::Some(list);
           }
@@ -422,7 +422,7 @@ where
                 &res_str,
               ) {
                 Ok(hash_map) => {
-                  debug!("serde_jsonc::from_str(): {:#?}", hash_map.clone());
+                  debug!("serde_json_lenient::from_str(): {:#?}", hash_map.clone());
 
                   match resolve_list_entry(
                     hash_map,

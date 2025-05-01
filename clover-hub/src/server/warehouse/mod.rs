@@ -75,7 +75,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
   let warehouse_path = OsPath::from(data_dir.clone());
 
   // Read configuration and load defaults otherwise
-  let config_file_path = warehouse_path.join("/config.jsonc");
+  let config_file_path = warehouse_path.join("/config.json");
   match err {
     Some(_) => {}
     None => {
@@ -279,7 +279,7 @@ pub async fn warehouse_main(
       // TODO: Lock db and clean up when done.
       debug!("Writing Config File...");
       let config = store.config.lock().await;
-      match fs::File::open(config.data_dir.join("/config.jsonc")).await {
+      match fs::File::open(config.data_dir.join("/config.json")).await {
         Ok(mut config_file) => {
           debug!("Config file opened!");
 
