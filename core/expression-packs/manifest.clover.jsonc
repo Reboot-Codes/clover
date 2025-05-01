@@ -1,3 +1,0 @@
-{
-  "@base.*": "@import('./*/expression-pack.clover.jsonc')"
-}

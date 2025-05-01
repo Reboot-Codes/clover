@@ -1064,10 +1064,10 @@ impl ManifestCompilationFrom<RawDirectorySpec> for DirectorySpec {
       }
     };
 
-    debug!("Resolving manifest.expression-packs");
+    debug!("Resolving manifest.gesture-packs");
     #[cfg(feature = "core")]
-    let expression_packs = match OptionalStrTHashMap::compile(
-      spec.expression_packs.clone(),
+    let gesture_packs = match OptionalStrTHashMap::compile(
+      spec.gesture_packs.clone(),
       ResolutionCtx {
         base: resolution_ctx.clone().base,
         builtin: builtin_rfqdn(true),
@@ -1078,7 +1078,7 @@ impl ManifestCompilationFrom<RawDirectorySpec> for DirectorySpec {
     .await
     {
       Ok(val) => {
-        debug!("Resolved manifest.expression-packs");
+        debug!("Resolved manifest.gesture-packs");
         val
       }
       Err(e) => {
@@ -1093,7 +1093,7 @@ impl ManifestCompilationFrom<RawDirectorySpec> for DirectorySpec {
         modules,
         applications,
         #[cfg(feature = "core")]
-        expression_packs,
+        gesture_packs,
       }),
     }
   }
@@ -1399,9 +1399,9 @@ impl ManifestCompilationFrom<RawModuleSpec> for ModuleSpec {
   }
 }
 
-impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
+impl ManifestCompilationFrom<RawGesturePackSpec> for GesturePackSpec {
   async fn compile(
-    spec: RawExpressionPackSpec,
+    spec: RawGesturePackSpec,
     resolution_ctx: ResolutionCtx,
     repo_dir_path: OsPath,
   ) -> Result<Self, SimpleError>
@@ -1410,7 +1410,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
   {
     let mut err = None;
 
-    debug!("Resolving expression-pack.name");
+    debug!("Resolving gesture-pack.name");
     let name = match OptionalString::compile(
       spec.name.clone(),
       resolution_ctx.clone(),
@@ -1419,7 +1419,7 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
     .await
     {
       Ok(val) => {
-        debug!("Resolved expression-pack.name");
+        debug!("Resolved gesture-pack.name");
         val
       }
       Err(e) => {
@@ -1428,16 +1428,16 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
       }
     };
 
-    debug!("Resolving expression-pack.expressions");
-    let expressions = match OptionalStrTHashMap::compile(
-      spec.expressions.clone(),
+    debug!("Resolving gesture-pack.gestures");
+    let gestures = match OptionalStrTHashMap::compile(
+      spec.gestures.clone(),
       resolution_ctx.clone(),
       repo_dir_path.clone(),
     )
     .await
     {
       Ok(val) => {
-        debug!("Resolved expression-pack.expressions");
+        debug!("Resolved gesture-pack.gestures");
         val
       }
       Err(e) => {
@@ -1448,46 +1448,45 @@ impl ManifestCompilationFrom<RawExpressionPackSpec> for ExpressionPackSpec {
 
     match err {
       Some(e) => Err(e),
-      None => Ok(ExpressionPackSpec { name, expressions }),
+      None => Ok(GesturePackSpec { name, gestures }),
     }
   }
 }
 
-impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
+impl ManifestCompilationFrom<RawGestureSpec> for GestureSpec {
   async fn compile(
-    spec: RawExpressionSpec,
+    spec: RawGestureSpec,
     resolution_ctx: ResolutionCtx,
     repo_dir_path: OsPath,
   ) -> Result<Self, SimpleError>
   where
     Self: Sized,
-    RawExpressionSpec: for<'a> Deserialize<'a>,
+    RawGestureSpec: for<'a> Deserialize<'a>,
   {
     let mut err = None;
 
-    debug!("Resolving raw-expression-pack");
-    let ret = match spec {
-      RawExpressionSpec::RawStaticExpressionSpec(raw_expression_spec) => {
-        match StaticExpressionSpec::compile(
-          raw_expression_spec,
+    debug!("Resolving raw-gesture-pack");
+    let ret =
+      match spec {
+        RawGestureSpec::RawStaticGestureSpec(raw_gesture_spec) => match StaticGestureSpec::compile(
+          raw_gesture_spec,
           resolution_ctx.clone(),
           repo_dir_path.clone(),
         )
         .await
         {
           Ok(val) => {
-            debug!("Resolved raw-expression-pack");
-            Self::StaticExpressionSpec(val)
+            debug!("Resolved raw-gesture-pack");
+            Self::StaticGestureSpec(val)
           }
           Err(e) => {
             err = Some(e);
-            Self::StaticExpressionSpec(StaticExpressionSpec {
+            Self::StaticGestureSpec(StaticGestureSpec {
               static_url: RequiredString(String::from("bleh")),
             })
           }
-        }
-      }
-    };
+        },
+      };
 
     match err {
       Some(e) => Err(e),
@@ -1496,19 +1495,19 @@ impl ManifestCompilationFrom<RawExpressionSpec> for ExpressionSpec {
   }
 }
 
-impl ManifestCompilationFrom<RawStaticExpressionSpec> for StaticExpressionSpec {
+impl ManifestCompilationFrom<RawStaticGestureSpec> for StaticGestureSpec {
   async fn compile(
-    spec: RawStaticExpressionSpec,
+    spec: RawStaticGestureSpec,
     resolution_ctx: ResolutionCtx,
     repo_dir_path: OsPath,
   ) -> Result<Self, SimpleError>
   where
     Self: Sized,
-    RawStaticExpressionSpec: for<'a> Deserialize<'a>,
+    RawStaticGestureSpec: for<'a> Deserialize<'a>,
   {
     let mut err = None;
 
-    debug!("Resolving static-expression-pack.static-url");
+    debug!("Resolving static-gesture-pack.static-url");
     let static_url = match RequiredString::compile(
       spec.static_url.clone(),
       resolution_ctx.clone(),
@@ -1517,7 +1516,7 @@ impl ManifestCompilationFrom<RawStaticExpressionSpec> for StaticExpressionSpec {
     .await
     {
       Ok(val) => {
-        debug!("Resolved static-expression-pack.static-url");
+        debug!("Resolved static-gesture-pack.static-url");
         val
       }
       Err(e) => {

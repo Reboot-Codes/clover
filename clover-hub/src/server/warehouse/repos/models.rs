@@ -147,8 +147,8 @@ pub struct RawDirectorySpec {
   #[serde(default)]
   pub applications: OptionalListManifestSpecEntry<RawApplicationSpec>,
   #[cfg(feature = "core")]
-  #[serde(rename = "expression-packs", default)]
-  pub expression_packs: OptionalListManifestSpecEntry<RawExpressionPackSpec>,
+  #[serde(rename = "gesture-packs", default)]
+  pub gesture_packs: OptionalListManifestSpecEntry<RawGesturePackSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,22 +193,22 @@ pub struct RawRepoCreds {
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawExpressionPackSpec {
+pub struct RawGesturePackSpec {
   pub name: Option<String>,
   #[serde(default)]
-  pub expressions: OptionalListManifestSpecEntry<RawExpressionSpec>,
+  pub gestures: OptionalListManifestSpecEntry<RawGestureSpec>,
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum RawExpressionSpec {
-  RawStaticExpressionSpec(RawStaticExpressionSpec),
+pub enum RawGestureSpec {
+  RawStaticGestureSpec(RawStaticGestureSpec),
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawStaticExpressionSpec {
+pub struct RawStaticGestureSpec {
   #[serde(rename = "static-url")]
   pub static_url: String,
 }
@@ -232,7 +232,7 @@ pub struct DirectorySpec {
   pub applications: OptionalStrTHashMap<ApplicationSpec>,
   #[cfg(feature = "core")]
   #[serde(default)]
-  pub expression_packs: OptionalStrTHashMap<ExpressionPackSpec>,
+  pub gesture_packs: OptionalStrTHashMap<GesturePackSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -261,23 +261,23 @@ pub struct ContainerSpec {
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpressionPackSpec {
+pub struct GesturePackSpec {
   #[serde(default)]
   pub name: OptionalString,
   #[serde(default)]
-  pub expressions: OptionalStrTHashMap<ExpressionSpec>,
+  pub gestures: OptionalStrTHashMap<GestureSpec>,
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ExpressionSpec {
-  StaticExpressionSpec(StaticExpressionSpec),
+pub enum GestureSpec {
+  StaticGestureSpec(StaticGestureSpec),
 }
 
 #[cfg(feature = "core")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StaticExpressionSpec {
+pub struct StaticGestureSpec {
   pub static_url: RequiredString,
 }
 
