@@ -4,7 +4,6 @@ pub mod ipc;
 pub mod models;
 pub mod modules;
 
-use crate::server::modman::modules::init_module;
 use ipc::handle_ipc_msg;
 use log::{
   debug,
@@ -13,6 +12,10 @@ use log::{
 use models::{
   ModManStore,
   Module,
+};
+use modules::{
+  deinit_module,
+  init_module,
 };
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
@@ -55,13 +58,8 @@ pub async fn modman_main(
       if modules.len() > 0 {
         // Initialize modules that were registered already via configuration and persistence.
         for (id, module) in modules.iter() {
-          info!(
-            "Initializing pre configured module: {}:\n  type: {}\n  name: {}",
-            id.clone(),
-            module.module_type.clone(),
-            module.get_name()
-          );
-          let _components_initialized = init_module(&init_store, id.clone(), module.clone()).await;
+          let (initialized, _components_initialized) =
+            init_module(&init_store, id.clone(), module.clone()).await;
         }
       } else {
         info!("No pre-configured modules to initialize.");
@@ -95,31 +93,19 @@ pub async fn modman_main(
       // Clean up all modules on shutdown.
       info!("Cleaning up modules...");
 
+      // TODO: Add override cancellation token to force stop!
+
       tokio::select! {
         modules = store.modules.lock() => {
           debug!("done waiting for lock");
           if modules.len() > 0 {
             for (id, module) in modules.iter() {
               if module.initialized {
-                info!("De-initializing configured module: {}:\n  type: {}\n  name: {}", id.clone(), module.module_type.clone(), module.get_name());
-                // let (de_initialized, _components_de_initialized) = deinit_module(&store, id.clone(), module.clone()).await;
-                let de_initialized = true;
-
-                // Update the store with new state of the module.
-                if de_initialized {
-                  store.modules.lock().await.insert(id.clone(), Module {
-                    module_type: module.module_type.clone(),
-                    module_name: module.module_name.clone(),
-                    custom_name: module.custom_name.clone(),
-                    initialized: false,
-                    components: module.components.clone(),
-                    registered_by: module.registered_by.clone()
-                  });
-                }
+                let (de_initialized, _components_deinitialized) = deinit_module(&store, id.clone(), module.clone()).await;
               }
             }
           } else {
-            debug!("No modules to de-init.");
+            debug!("No modules to deinit.");
           }
         }
       }
