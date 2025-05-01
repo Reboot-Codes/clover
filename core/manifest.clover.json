@@ -1,5 +1,5 @@
 {
   "modules": "@import('./modules/manifest.clover.json')",
   "applications": "@import('./applications/manifest.clover.json')",
-  "gesture-packs": "@import('./modules/manifest.clover.json')"
+  "gesture-packs": "@import('./gesture-packs/manifest.clover.json')"
 }
