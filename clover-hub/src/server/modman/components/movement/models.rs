@@ -123,5 +123,3 @@ pub struct MovementComponent {
   pub gesture_config: GestureConfig,
   pub internal: bool,
 }
-
-impl CloverComponentTrait for MovementComponent {}

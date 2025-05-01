@@ -19,15 +19,11 @@ pub struct AudioOutputComponent {
   pub internal: bool,
 }
 
-impl CloverComponentTrait for AudioOutputComponent {}
-
 #[derive(Debug, Clone)]
 pub struct AudioInputComponent {
   pub connection: ConnectionType,
   pub internal: bool,
 }
-
-impl CloverComponentTrait for AudioInputComponent {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
 pub enum ConnectionType {

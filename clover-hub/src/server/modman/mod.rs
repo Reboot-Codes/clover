@@ -3,6 +3,7 @@ pub mod components;
 pub mod ipc;
 pub mod models;
 
+use components::models::CloverComponentTrait;
 use ipc::handle_ipc_msg;
 use log::{
   debug,
@@ -37,8 +38,12 @@ async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, 
       let mut critical_failiure = None;
 
       for (component_id, component_arc) in module.components.iter() {
-        let (component_meta, component) = &**component_arc;
-        let mut component_initalized = false;
+        let component_arc_binding = component_arc.clone();
+        let component_guard = component_arc_binding.lock().await;
+        let (component_meta, mut component) = (
+          component_guard.clone().0.clone(),
+          component_guard.clone().1.clone(),
+        );
 
         if component_meta.critical {
           info!(
@@ -54,15 +59,17 @@ async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, 
           );
         }
 
-        /*
-          component_initalized = match component.init().await {
-            Ok(_) => { true },
-            Err(error) => {
-              error(error);
-              false
-            }
+        let component_initalized = match component.init(Arc::new(store.clone())).await {
+          Ok(_) => true,
+          Err(e) => {
+            error!(
+              "Failed to initalize component \"{}\", due to: {}",
+              component_id.clone(),
+              e
+            );
+            false
           }
-        */
+        };
 
         if component_initalized {
           info!(
@@ -89,6 +96,8 @@ async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, 
           }
           None => {}
         }
+
+        std::mem::drop(component_guard);
       }
 
       match critical_failiure {

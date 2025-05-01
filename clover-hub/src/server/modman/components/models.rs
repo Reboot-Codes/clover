@@ -1,12 +1,15 @@
+use crate::server::modman::{
+  busses::models::BusTypes,
+  models::ModManStore,
+};
 use serde::{
   Deserialize,
   Serialize,
 };
-
-use crate::server::modman::busses::models::BusTypes;
+use std::sync::Arc;
 
 pub trait CloverComponentTrait: Sized {
-  // async fn init(store: Arc<Mutex<Store>>) -> Result<(), anyhow::Error>;
+  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

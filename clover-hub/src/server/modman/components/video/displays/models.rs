@@ -34,7 +34,6 @@ pub struct PhysicalDisplayComponent {
   pub internal: bool,
 }
 
-impl CloverComponentTrait for PhysicalDisplayComponent {}
 impl DisplayComponent for PhysicalDisplayComponent {}
 
 #[derive(Debug, Clone, Component)]
@@ -47,7 +46,6 @@ pub struct VirtualDisplayComponent {
   pub internal: bool,
 }
 
-impl CloverComponentTrait for VirtualDisplayComponent {}
 impl DisplayComponent for VirtualDisplayComponent {}
 
 #[derive(Debug, Clone)]

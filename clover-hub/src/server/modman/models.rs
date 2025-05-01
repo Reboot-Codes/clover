@@ -28,6 +28,8 @@ use std::sync::Arc;
 use strum::VariantNames;
 use tokio::sync::Mutex;
 
+use super::components::models::CloverComponentTrait;
+
 // TODO: Define defaults via `Default` trait impl.
 
 #[derive(Debug, Clone)]
@@ -36,7 +38,7 @@ pub struct Module {
   pub module_name: String,
   pub custom_name: Option<String>,
   pub initialized: bool,
-  pub components: HashMap<String, Arc<(CloverComponentMeta, CloverComponent)>>,
+  pub components: HashMap<String, Arc<Mutex<(CloverComponentMeta, CloverComponent)>>>,
   pub registered_by: String,
 }
 
@@ -73,6 +75,21 @@ pub enum CloverComponent {
   CameraComponent(CameraComponent),
   PhysicalDisplayComponent(PhysicalDisplayComponent),
   VirtualDisplayComponent(VirtualDisplayComponent),
+}
+
+impl CloverComponentTrait for CloverComponent {
+  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+    match self {
+      CloverComponent::AudioInputComponent(component) => component.init(store.clone()).await,
+      CloverComponent::AudioOutputComponent(component) => component.init(store.clone()).await,
+      CloverComponent::MovementComponent(component) => component.init(store.clone()).await,
+      CloverComponent::InputSensorComponent(component) => component.init(store.clone()).await,
+      CloverComponent::OutputSensorComponent(component) => component.init(store.clone()).await,
+      CloverComponent::CameraComponent(component) => component.init(store.clone()).await,
+      CloverComponent::PhysicalDisplayComponent(component) => component.init(store.clone()).await,
+      CloverComponent::VirtualDisplayComponent(component) => component.init(store.clone()).await,
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

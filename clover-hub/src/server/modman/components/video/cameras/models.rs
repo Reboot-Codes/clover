@@ -34,5 +34,3 @@ pub struct CameraComponent {
   pub default_resolution: Option<VideoResolution>,
   pub internal: bool,
 }
-
-impl CloverComponentTrait for CameraComponent {}
