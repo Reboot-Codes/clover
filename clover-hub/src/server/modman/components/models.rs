@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 pub trait CloverComponentTrait: Sized {
   async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error>;
+  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

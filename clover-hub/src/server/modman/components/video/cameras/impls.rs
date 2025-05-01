@@ -9,4 +9,11 @@ impl CloverComponentTrait for CameraComponent {
   ) -> Result<(), anyhow::Error> {
     todo!()
   }
+
+  async fn deinit(
+    &mut self,
+    store: Arc<crate::server::modman::models::ModManStore>,
+  ) -> Result<(), anyhow::Error> {
+    todo!()
+  }
 }

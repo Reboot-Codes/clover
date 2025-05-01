@@ -90,6 +90,19 @@ impl CloverComponentTrait for CloverComponent {
       CloverComponent::VirtualDisplayComponent(component) => component.init(store.clone()).await,
     }
   }
+
+  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+    match self {
+      CloverComponent::AudioInputComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::AudioOutputComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::MovementComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::InputSensorComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::OutputSensorComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::CameraComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::PhysicalDisplayComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::VirtualDisplayComponent(component) => component.deinit(store.clone()).await,
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
