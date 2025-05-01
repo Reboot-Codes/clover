@@ -1,5 +1,6 @@
 mod gestures;
 
+use gestures::handle_gesture_cmd;
 use log::{
   debug,
   error,
@@ -68,15 +69,7 @@ pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
                   }
 
                   match gesture_command {
-                    Some(cmd) => {
-                      info!(
-                        "Gesture \"{}\" and state: {:#?}",
-                        gesture_id_str.clone(),
-                        cmd.clone()
-                      );
-
-                      // TODO: Pass gesture to components in the area(s) specified.
-                    }
+                    Some(cmd) => handle_gesture_cmd(gesture_id_str.clone(), cmd.clone()),
                     None => {
                       error!("Parsed gesture ID and data, but it was not set??");
                     }

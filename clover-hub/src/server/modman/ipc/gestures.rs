@@ -60,3 +60,15 @@ Default area specification
             - ring
             - pinky
 */
+
+use log::info;
+
+use crate::server::modman::models::GestureCommand;
+
+pub fn handle_gesture_cmd(gesture_id: String, command: GestureCommand) {
+  info!(
+    "Handling gesture \"{}\" and state: {:#?}",
+    gesture_id.clone(),
+    command.clone()
+  );
+}

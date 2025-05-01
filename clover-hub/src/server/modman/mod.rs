@@ -21,7 +21,6 @@ use nexus::{
 };
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
@@ -176,7 +175,7 @@ pub async fn modman_main(
     .run_until_cancelled(async move {
       let modules = init_store.modules.lock().await;
       if modules.len() > 0 {
-        // Initialize modules that were registered already via persistence.
+        // Initialize modules that were registered already via configuration and persistence.
         for (id, module) in modules.iter() {
           info!(
             "Initializing pre configured module: {}:\n  type: {}\n  name: {}",
@@ -199,7 +198,7 @@ pub async fn modman_main(
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
-  let (mut ipc_rx, ipc_handle) = user.subscribe();
+  let (ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
