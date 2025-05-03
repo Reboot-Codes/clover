@@ -5,17 +5,15 @@ Default area specification
   - com.reboot-codes.clover.CORE.human
     - torso
       - core
-        - tail-bone
         - back
           - spine
+            - upper/middle/bottom
         - front
-          - spine
       - chest
         - font
-          - sternum
-          - right-pectoral
-          - left-pectoral
+          - right/center/left
         - back
+          - right/center/left
       - arms
         - right/left
           - shoulder
@@ -41,13 +39,17 @@ Default area specification
                 - upper/lower
               - eyebrow
         - ears
+          right/left
         - top
         - back
     - pelivs
       - waist
+        - left/right/upper/lower
       - front
+        - upper/lower
       - bottom
       - rear
+        - right/left
     - legs
       - right/left
         - thigh

@@ -9,10 +9,7 @@ use log::{
   debug,
   info,
 };
-use models::{
-  ModManStore,
-  Module,
-};
+use models::ModManStore;
 use modules::{
   deinit_module,
   init_module,

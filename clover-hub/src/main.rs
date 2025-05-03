@@ -147,8 +147,8 @@ fn get_signal_handle(
 async fn wait_for_signal_impl(server_token: Option<CancellationToken>) {
   use log::debug;
   use tokio::signal::unix::{
-    SignalKind,
     signal,
+    SignalKind,
   };
 
   // Infos here:

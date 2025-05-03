@@ -1,7 +1,7 @@
 use crate::server::appd::models::Application;
 use bollard::{
-  Docker,
   image::BuildImageOptions,
+  Docker,
 };
 use futures::TryStreamExt;
 use log::{

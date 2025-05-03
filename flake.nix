@@ -13,6 +13,7 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          config.allowUnfree = true;
         };
       in
       {
@@ -31,6 +32,8 @@
             kdePackages.qtbase
             nodejs_23
             yarn-berry
+            trunk-io
+            rust-analyzer
           ];
 
           shellHook = ''
@@ -41,7 +44,9 @@
                   pkgs.vulkan-loader
                   pkgs.libxkbcommon
                 ]
-              }"'';
+              }"
+              RUST_SRC_PATH = "${pkgs.rust-bin.nightly.latest.default}/lib/rustlib/src/rust/library";
+              '';
         };
       }
     );
