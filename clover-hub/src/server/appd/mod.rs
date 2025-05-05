@@ -18,16 +18,11 @@ use log::{
 use models::AppDStore;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
-  server::models::{
-    IPCMessageWithId,
-    UserConfig,
-  },
+  server::models::UserConfig,
   user::NexusUser,
 };
 use std::sync::Arc;
-use tokio::sync::mpsc::unbounded_channel;
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 // TODO: Create application manifest schema/models
 
@@ -59,11 +54,11 @@ pub async fn appd_main(
   // TODO: Move to parameterized config from store!
   match Docker::connect_with_unix(&docker_path, 120, API_DEFAULT_VERSION) {
     Ok(docker_conn) => {
+      info!("Connected to docker on {}!", docker_path.clone());
       let docker = Arc::new(docker_conn);
 
       let init_store = Arc::new(store.clone());
       let init_user = Arc::new(user.clone());
-      let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
       let init_docker = docker.clone();
       cancellation_tokens
         .0
@@ -99,17 +94,19 @@ pub async fn appd_main(
 
           if apps_initialized != init_apps.len() {
             warn!(
-              "Only initialized {} apps out of {}!",
+              "Initialized {} apps out of {}!",
               apps_initialized,
               init_apps.len()
             );
-
             init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"incomplete-init".to_string(),
               &None,
             );
           } else {
+            if apps_initialized != 0 {
+              info!("Initialized all {} apps!", apps_initialized);
+            }
             init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"finished-init".to_string(),
@@ -120,7 +117,7 @@ pub async fn appd_main(
         .await;
 
       let ipc_recv_token = cancellation_tokens.0.clone();
-      let (mut ipc_rx, ipc_handle) = user.subscribe();
+      let (ipc_rx, ipc_handle) = user.subscribe();
       let ipc_recv_handle = tokio::task::spawn(async move {
         tokio::select! {
           _ = ipc_recv_token.cancelled() => {
@@ -170,7 +167,10 @@ pub async fn appd_main(
       }
     }
     Err(e) => {
-      error!("Failed to setup docker connection!\n{}", e);
+      error!(
+        "Failed to setup docker connection on {}, due to:\n{}",
+        docker_path, e
+      );
     }
   }
 

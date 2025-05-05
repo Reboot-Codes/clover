@@ -46,7 +46,7 @@ impl Module {
   pub fn get_name(self: &Self) -> String {
     match self.custom_name.clone() {
       Some(name) => name.clone(),
-      None => self.module_name.clone(),
+      Option::None => self.module_name.clone(),
     }
   }
 }
@@ -133,7 +133,7 @@ impl ModManStore {
   pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
     let config = match optional_config {
       Some(cfg) => cfg,
-      None => Arc::new(Mutex::new(Config::default())),
+      Option::None => Arc::new(Mutex::new(Config::default())),
     };
 
     ModManStore {
@@ -189,4 +189,9 @@ pub struct GestureOverride {
   /// Gesture id in `gesture_RFQDN@gesture_pack_RFQDN` format, where `@` and everything after can be ommitted to use the default gesture pack.
   pub gesture_preset_id: String,
   pub gesture_parameters: Option<GestureParameters>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModManConfig {
+  pub uart_ports: Vec<(String, u32)>,
 }

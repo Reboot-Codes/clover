@@ -10,6 +10,8 @@ use std::{
   sync::Arc,
 };
 
+use crate::server::modman::models::ModManConfig;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
   pub docker_daemon: String,
@@ -21,6 +23,7 @@ pub struct Config {
   pub primary_api_key: String,
   /// Default gesture pack to use
   pub default_gesture_pack: String,
+  pub modman: ModManConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +45,7 @@ impl Default for Config {
       db: None,
       primary_api_key: utils::gen_api_key(),
       default_gesture_pack: "com.reboot-codes.clover.CORE.default".to_string(),
+      modman: Default::default(),
     }
   }
 }

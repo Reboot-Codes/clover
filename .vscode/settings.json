@@ -8,5 +8,9 @@
     "./docs"
   ],
   "rust-analyzer.check.workspace": false,
-  "rust-analyzer.numThreads": 4
+  "rust-analyzer.numThreads": 4,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  }
 }

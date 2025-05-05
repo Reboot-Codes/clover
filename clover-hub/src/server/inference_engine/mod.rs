@@ -5,14 +5,12 @@ use log::{
   debug,
   info,
 };
-use nexus::server::models::IPCMessageWithId;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
   server::models::UserConfig,
   user::NexusUser,
 };
 use std::sync::Arc;
-use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -44,7 +42,7 @@ impl InferenceEngineStore {
   pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
     let config = match optional_config {
       Some(cfg) => cfg,
-      None => Arc::new(Mutex::new(Config::default())),
+      Option::None => Arc::new(Mutex::new(Config::default())),
     };
 
     InferenceEngineStore { config }
@@ -59,7 +57,6 @@ pub async fn inference_engine_main(
   info!("Starting Inference Engine...");
 
   let init_user = Arc::new(user.clone());
-  let (init_from_tx, mut init_from_rx) = unbounded_channel::<IPCMessageWithId>();
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
@@ -72,7 +69,7 @@ pub async fn inference_engine_main(
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
-  let (mut ipc_rx, ipc_handle) = user.subscribe();
+  let (ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {

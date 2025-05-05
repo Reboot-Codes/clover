@@ -90,7 +90,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
           Some(_) => {
             break;
           }
-          None => {}
+          Option::None => {}
         }
 
         std::mem::drop(component_guard);
@@ -104,7 +104,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
             component_id.clone()
           );
         }
-        None => {
+        Option::None => {
           if initialized_module_components != module.components.len() {
             if initialized_module_components > 0 {
               warn!(
@@ -227,7 +227,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
           Some(_) => {
             break;
           }
-          None => {}
+          Option::None => {}
         }
 
         std::mem::drop(component_guard);
@@ -241,7 +241,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
             component_id.clone()
           );
         }
-        None => {
+        Option::None => {
           if deinitialized_module_components != module.components.len() {
             if deinitialized_module_components > 0 {
               warn!(
@@ -283,5 +283,5 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
     }
   }
 
-  (initialized_module, deinitialized_module_components)
+  (!initialized_module, deinitialized_module_components)
 }

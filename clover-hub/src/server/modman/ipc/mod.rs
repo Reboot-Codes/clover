@@ -4,7 +4,6 @@ use gestures::handle_gesture_cmd;
 use log::{
   debug,
   error,
-  info,
   warn,
 };
 use nexus::server::models::IPCMessageWithId;
@@ -13,7 +12,7 @@ use serde::{
   Serialize,
 };
 use strum::VariantNames;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::broadcast::Sender;
 use url::Url;
 
 use crate::{
@@ -31,8 +30,8 @@ pub enum Events {
   Gesture,
 }
 
-pub async fn handle_ipc_msg(mut ipc_rx: UnboundedReceiver<IPCMessageWithId>) {
-  while let Some(msg) = ipc_rx.recv().await {
+pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
+  while let Ok(msg) = ipc_rx.subscribe().recv().await {
     let kind = Url::parse(&msg.kind.clone()).unwrap();
 
     // Verify that we care about this event.

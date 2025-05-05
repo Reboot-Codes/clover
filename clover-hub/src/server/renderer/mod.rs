@@ -8,7 +8,6 @@ use log::{
   debug,
   info,
 };
-use nexus::server::models::IPCMessageWithId;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
   server::models::UserConfig,
@@ -20,7 +19,6 @@ use system_ui::{
   CustomBevyIPC,
   ExitState,
 };
-use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -52,7 +50,7 @@ impl RendererStore {
   pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
     let config = match optional_config {
       Some(cfg) => cfg,
-      None => Arc::new(Mutex::new(Config::default())),
+      Option::None => Arc::new(Mutex::new(Config::default())),
     };
 
     RendererStore { config }
@@ -76,7 +74,6 @@ pub async fn renderer_main(
   std::thread::spawn(|| system_ui_main(bevy_cancel_ipc, Some(true)));
 
   // let display_handles = Arc::new(HashMap::new());
-  let (from_tx, mut from_rx) = unbounded_channel::<IPCMessageWithId>();
 
   let init_user = Arc::new(user.clone());
   cancellation_tokens
@@ -91,7 +88,7 @@ pub async fn renderer_main(
     .await;
 
   let ipc_recv_token = cancellation_tokens.0.clone();
-  let (mut ipc_rx, ipc_handle) = user.subscribe();
+  let (ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
         _ = ipc_recv_token.cancelled() => {

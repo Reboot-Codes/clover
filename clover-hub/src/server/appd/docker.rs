@@ -34,7 +34,7 @@ pub async fn init_app(
     let mut build_errored = None;
 
     match container_config.build {
-      None => {}
+      Option::None => {}
       Some(build_config) => {
         let image_tag = format!(
           "{}/{}:{}",
@@ -62,7 +62,7 @@ pub async fn init_app(
           debug!("{}: {:?}", image_tag.clone(), response.clone());
 
           match response.error {
-            None => match response.progress_detail {
+            Option::None => match response.progress_detail {
               Some(progress) => {
                 info!(
                   "{}, Building: {}, {:?}/{:?}",
@@ -72,7 +72,7 @@ pub async fn init_app(
                   progress.total
                 );
               }
-              None => {}
+              Option::None => {}
             },
             Some(e) => {
               error!(
@@ -89,7 +89,7 @@ pub async fn init_app(
         }
 
         match build_errored {
-          None => {
+          Option::None => {
             info!(
               "{}: Finished building: {}!",
               container_str.clone(),
@@ -106,7 +106,7 @@ pub async fn init_app(
         app_init_errored = Some(e);
         break;
       }
-      None => {
+      Option::None => {
         debug!("{}, Creating...", container_str.clone());
         match docker
           .create_container(
@@ -156,7 +156,7 @@ pub async fn init_app(
   }
 
   match app_init_errored {
-    None => {
+    Option::None => {
       app_spec.initialized = true;
       Ok(())
     }
@@ -216,7 +216,7 @@ pub async fn remove_app(
   }
 
   match app_removal_errored {
-    None => Ok(()),
+    Option::None => Ok(()),
     Some(e) => Err(e),
   }
 }

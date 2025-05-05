@@ -2,16 +2,14 @@ use crate::server::modman::busses::models::{
   Bus,
   BusTypes,
 };
-use bluer;
 use nexus::server::{
   models::IPCMessageWithId,
   websockets::WsIn,
 };
 
-#[derive(Debug, Clone)]
-pub struct BluetoothBus {}
+pub struct AppBus {}
 
-impl Bus for BluetoothBus {
+impl Bus for AppBus {
   async fn subscribe_to_bus(
     &mut self,
     from_bus: tokio::sync::broadcast::Sender<WsIn>,
@@ -21,6 +19,6 @@ impl Bus for BluetoothBus {
   }
 
   fn get_type() -> BusTypes {
-    BusTypes::BT
+    BusTypes::App
   }
 }

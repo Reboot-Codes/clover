@@ -1,6 +1,6 @@
-use nexus::server::models::{
-  IPCMessage,
-  IPCMessageWithId,
+use nexus::server::{
+  models::IPCMessageWithId,
+  websockets::WsIn,
 };
 use serde::{
   Deserialize,
@@ -15,7 +15,7 @@ pub enum BusTypes {
   #[cfg(feature = "can_2")]
   CAN2,
   #[cfg(feature = "bt_classic")]
-  BTClassic,
+  BT,
   #[cfg(feature = "bt_le")]
   BTLE,
   #[cfg(feature = "spi")]
@@ -27,9 +27,12 @@ pub enum BusTypes {
 }
 
 pub trait Bus {
-  /// Send a message to the Bus.
-  fn send_message(msg: IPCMessageWithId) -> Result<(), anyhow::Error>;
   /// Send a message and expect a reply to that message.
   /// Listen to the Bus (does NOT contain IDs.)
-  fn subscribe_to_bus() -> tokio::sync::broadcast::Receiver<IPCMessage>;
+  async fn subscribe_to_bus(
+    &mut self,
+    from_bus: tokio::sync::broadcast::Sender<WsIn>,
+    to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
+  ) -> Result<Vec<tokio::task::JoinHandle<()>>, anyhow::Error>;
+  fn get_type() -> BusTypes;
 }
