@@ -20,6 +20,7 @@ pub async fn start_busses(
   let mut handles = vec![];
   let (tx, mut rx) = tokio::sync::broadcast::channel::<WsIn>(MAX_SIZE);
 
+  // TODO: ASAP: Move to creating a sub-user for each module!
   let proxy_user = user.clone();
   handles.push(tokio::task::spawn(async move {
     while let Ok(raw_msg) = rx.recv().await {

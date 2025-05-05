@@ -97,7 +97,7 @@ impl Bus for UARTBus {
                       }
                     }));
 
-                    futures::future::join_all(sub_handles);
+                    futures::future::join_all(sub_handles).await;
                   }));
                 }
                 Err(_) => todo!(),
