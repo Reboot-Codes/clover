@@ -1,15 +1,29 @@
 use crate::server::modman::{
-  components::models::CloverComponentTrait,
+  components::models::ProxiedConnection,
   models::GestureConfig,
 };
+use serde::{
+  Deserialize,
+  Serialize,
+};
+use strum::VariantNames;
 
 #[derive(Debug, Clone)]
 pub struct InputSensorComponent {
   pub internal: bool,
+  pub connection: ConnectionType,
 }
 
 #[derive(Debug, Clone)]
 pub struct OutputSensorComponent {
   pub gesture_config: Option<GestureConfig>,
   pub internal: bool,
+  pub connection: ConnectionType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, VariantNames)]
+pub enum ConnectionType {
+  #[serde(rename = "modman-proxy")]
+  #[strum(serialize = "modman-proxy")]
+  ModManProxy(ProxiedConnection),
 }

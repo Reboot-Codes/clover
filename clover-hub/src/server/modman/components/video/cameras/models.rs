@@ -1,6 +1,5 @@
 use crate::server::modman::components::{
   models::{
-    CloverComponentTrait,
     ProxiedConnection,
     StreamingConnection,
   },
@@ -13,7 +12,7 @@ use serde::{
 use strum::VariantNames;
 
 #[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
-pub enum CameraType {
+pub enum ConnectionType {
   /// Path to device file, ex: `/dev/video0`
   #[serde(rename = "v4l")]
   #[strum(serialize = "v4l")]
@@ -28,7 +27,7 @@ pub enum CameraType {
 
 #[derive(Debug, Clone)]
 pub struct CameraComponent {
-  pub source: CameraType,
+  pub connection: ConnectionType,
   pub max_resolution: VideoResolution,
   /// Default resolution to scale to when accessing this video device, defaults to max_resolution if not set.
   pub default_resolution: Option<VideoResolution>,

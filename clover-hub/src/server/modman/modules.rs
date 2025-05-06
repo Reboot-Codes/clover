@@ -12,6 +12,69 @@ use log::{
 };
 use std::sync::Arc;
 
+pub async fn init_component(
+  store: &ModManStore,
+  module_id: String,
+  component_id: String,
+  is_critical: &bool,
+) -> Result<(), anyhow::Error> {
+  let components = store.components.lock().await;
+  let mut failiure = None;
+
+  match components.get(&component_id.clone()) {
+    Some(component_tuple) => {
+      let (component_meta, mut component) = (
+        component_tuple.clone().0.clone(),
+        component_tuple.clone().1.clone(),
+      );
+
+      if component_meta.critical {
+        info!(
+          "Module: {}, initalizing CRITICAL component: {}...",
+          module_id.clone(),
+          component_id.clone()
+        );
+      } else {
+        info!(
+          "Module: {}, initalizing component: {}...",
+          module_id.clone(),
+          component_id.clone()
+        );
+      }
+
+      let component_initalized = match component.init(Arc::new(store.clone())).await {
+        Ok(_) => true,
+        Err(e) => {
+          failiure = Some(e);
+          false
+        }
+      };
+
+      if component_initalized {
+        info!(
+          "Module: {}, successfully initalized component: {}!",
+          module_id.clone(),
+          component_id.clone()
+        );
+      } else {
+        if !is_critical.to_owned() {
+          warn!(
+            "Module: {}, failed to initialize component: {}!",
+            module_id.clone(),
+            component_id.clone()
+          );
+        }
+      }
+    }
+    None => todo!(),
+  }
+
+  match failiure {
+    Some(e) => Err(e),
+    Option::None => Ok(()),
+  }
+}
+
 pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut initialized_module_components = 0;
@@ -33,75 +96,41 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
     } else {
       let mut critical_failiure = None;
 
-      for (component_id, component_arc) in module.components.iter() {
-        let component_arc_binding = component_arc.clone();
-        let component_guard = component_arc_binding.lock().await;
-        let (component_meta, mut component) = (
-          component_guard.clone().0.clone(),
-          component_guard.clone().1.clone(),
-        );
-
-        if component_meta.critical {
-          info!(
-            "Module: {}, initalizing CRITICAL component: {}...",
-            id.clone(),
-            component_id.clone()
-          );
-        } else {
-          info!(
-            "Module: {}, initalizing component: {}...",
-            id.clone(),
-            component_id.clone()
-          );
-        }
-
-        let component_initalized = match component.init(Arc::new(store.clone())).await {
-          Ok(_) => true,
+      for (component_id, is_critical) in module.components.iter() {
+        match init_component(
+          &store.clone(),
+          id.clone(),
+          component_id.clone(),
+          is_critical,
+        )
+        .await
+        {
+          Ok(_) => {
+            initialized_module_components += 1;
+          }
           Err(e) => {
-            error!(
-              "Failed to initalize component \"{}\", due to: {}",
-              component_id.clone(),
-              e
-            );
-            false
-          }
-        };
-
-        if component_initalized {
-          info!(
-            "Module: {}, successfully initalized component: {}!",
-            id.clone(),
-            component_id.clone()
-          );
-          initialized_module_components += 1;
-        } else {
-          if component_meta.critical {
-            critical_failiure = Some(component_id.clone());
-          } else {
-            warn!(
-              "Module: {}, failed to initialize component: {}!",
-              id.clone(),
-              component_id.clone()
-            );
+            if is_critical.to_owned() {
+              critical_failiure = Some((component_id.clone(), e));
+            } else {
+              error!(
+                "Module: {}, Failed to initalize component \"{}\", due to: {}",
+                id.clone(),
+                component_id.clone(),
+                e
+              );
+            }
           }
         }
-
-        match critical_failiure {
-          Some(_) => {
-            break;
-          }
-          Option::None => {}
-        }
-
-        std::mem::drop(component_guard);
       }
 
       match critical_failiure {
-        Some(component_id) => {
+        Some(failiure) => {
+          let (component_id, e) = failiure;
           error!(
-            "Module: {}, failed to initalize critical component: {}!",
+            "Module: {}, failed to initalize critical component: {}, due to: {}\nSkipping rest of Module init...",
             id.clone(),
-            component_id.clone()
+            component_id,
+            e
           );
         }
         Option::None => {
@@ -149,6 +178,69 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
   (initialized_module, initialized_module_components)
 }
 
+pub async fn deinit_component(
+  store: &ModManStore,
+  module_id: String,
+  component_id: String,
+  is_critical: &bool,
+) -> Result<(), anyhow::Error> {
+  let components = store.components.lock().await;
+  let mut failiure = None;
+
+  match components.get(&component_id.clone()) {
+    Some(component_tuple) => {
+      let (component_meta, mut component) = (
+        component_tuple.clone().0.clone(),
+        component_tuple.clone().1.clone(),
+      );
+
+      if component_meta.critical {
+        info!(
+          "Module: {}, deinitalizing CRITICAL component: {}...",
+          module_id.clone(),
+          component_id.clone()
+        );
+      } else {
+        info!(
+          "Module: {}, deinitalizing component: {}...",
+          module_id.clone(),
+          component_id.clone()
+        );
+      }
+
+      let component_initalized = match component.deinit(Arc::new(store.clone())).await {
+        Ok(_) => true,
+        Err(e) => {
+          failiure = Some(e);
+          false
+        }
+      };
+
+      if component_initalized {
+        info!(
+          "Module: {}, successfully deinitalized component: {}!",
+          module_id.clone(),
+          component_id.clone()
+        );
+      } else {
+        if !is_critical.to_owned() {
+          warn!(
+            "Module: {}, failed to deinitialize component: {}!",
+            module_id.clone(),
+            component_id.clone()
+          );
+        }
+      }
+    }
+    None => todo!(),
+  }
+
+  match failiure {
+    Some(e) => Err(e),
+    Option::None => Ok(()),
+  }
+}
+
 pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut deinitialized_module_components = 0;
@@ -170,75 +262,41 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
     } else {
       let mut critical_failiure = None;
 
-      for (component_id, component_arc) in module.components.iter() {
-        let component_arc_binding = component_arc.clone();
-        let component_guard = component_arc_binding.lock().await;
-        let (component_meta, mut component) = (
-          component_guard.clone().0.clone(),
-          component_guard.clone().1.clone(),
-        );
-
-        if component_meta.critical {
-          info!(
-            "Module: {}, deinitalizing CRITICAL component: {}...",
-            id.clone(),
-            component_id.clone()
-          );
-        } else {
-          info!(
-            "Module: {}, deinitalizing component: {}...",
-            id.clone(),
-            component_id.clone()
-          );
-        }
-
-        let component_deinitalized = match component.deinit(Arc::new(store.clone())).await {
-          Ok(_) => true,
+      for (component_id, is_critical) in module.components.iter() {
+        match deinit_component(
+          &store.clone(),
+          id.clone(),
+          component_id.clone(),
+          is_critical,
+        )
+        .await
+        {
+          Ok(_) => {
+            deinitialized_module_components += 1;
+          }
           Err(e) => {
-            error!(
-              "Failed to deinitalize component \"{}\", due to: {}",
-              component_id.clone(),
-              e
-            );
-            false
-          }
-        };
-
-        if component_deinitalized {
-          info!(
-            "Module: {}, successfully deinitalized component: {}!",
-            id.clone(),
-            component_id.clone()
-          );
-          deinitialized_module_components += 1;
-        } else {
-          if component_meta.critical {
-            critical_failiure = Some(component_id.clone());
-          } else {
-            warn!(
-              "Module: {}, failed to deinitialize component: {}!",
-              id.clone(),
-              component_id.clone()
-            );
+            if is_critical.to_owned() {
+              critical_failiure = Some((component_id.clone(), e));
+            } else {
+              error!(
+                "Module: {}, Failed to deinitalize component \"{}\", due to: {}",
+                id.clone(),
+                component_id.clone(),
+                e
+              );
+            }
           }
         }
-
-        match critical_failiure {
-          Some(_) => {
-            break;
-          }
-          Option::None => {}
-        }
-
-        std::mem::drop(component_guard);
       }
 
       match critical_failiure {
-        Some(component_id) => {
+        Some(failiure) => {
+          let (component_id, e) = failiure;
           error!(
-            "Module: {}, failed to deinitalize critical component: {}!",
+            "Module: {}, failed to deinitalize critical component: {}, due to: {}\nSkipping rest of Module init...",
             id.clone(),
-            component_id.clone()
+            component_id,
+            e
           );
         }
         Option::None => {

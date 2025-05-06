@@ -1,8 +1,7 @@
 use crate::server::modman::{
-  components::models::CloverComponentTrait,
+  components::models::ProxiedConnection,
   models::{
     GestureConfig,
-    GestureOverride,
     GestureParameters,
   },
 };
@@ -10,7 +9,14 @@ use serde::{
   Deserialize,
   Serialize,
 };
-use std::collections::HashMap;
+use strum::VariantNames;
+
+#[derive(Debug, Clone, Serialize, Deserialize, VariantNames)]
+pub enum ConnectionType {
+  #[serde(rename = "modman-proxy")]
+  #[strum(serialize = "modman-proxy")]
+  ModManProxy(ProxiedConnection),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position2D {
@@ -122,4 +128,5 @@ pub struct MovementComponent {
   pub inital_position: DegreesOfFreedom,
   pub gesture_config: GestureConfig,
   pub internal: bool,
+  pub connection: ConnectionType,
 }

@@ -38,7 +38,7 @@ pub struct Module {
   pub module_name: String,
   pub custom_name: Option<String>,
   pub initialized: bool,
-  pub components: HashMap<String, Arc<Mutex<(CloverComponentMeta, CloverComponent)>>>,
+  pub components: Vec<(String, bool)>,
   pub registered_by: String,
 }
 
@@ -126,7 +126,9 @@ pub struct GestureParameters {
 #[derive(Debug, Clone)]
 pub struct ModManStore {
   pub modules: Arc<Mutex<HashMap<String, Module>>>,
+  pub components: Arc<Mutex<HashMap<String, Arc<(CloverComponentMeta, CloverComponent)>>>>,
   pub config: Arc<Mutex<Config>>,
+  pub port_statuses: PortStatuses,
 }
 
 impl ModManStore {
@@ -138,9 +140,34 @@ impl ModManStore {
 
     ModManStore {
       modules: Arc::new(Mutex::new(HashMap::new())),
+      components: Arc::new(Mutex::new(HashMap::new())),
+      port_statuses: PortStatuses {
+        uart: Arc::new(Mutex::new(HashMap::new())),
+      },
       config,
     }
   }
+}
+
+#[derive(Debug, Clone)]
+pub struct PortStatuses {
+  pub uart: Arc<Mutex<HashMap<String, PortStatus>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PortStatus {
+  /// Available but unused.
+  #[serde(rename = "available")]
+  Available,
+  /// Requested by $COMPONENT_ID, but the UART bus isn't initalized yet
+  #[serde(rename = "requested")]
+  Requested(String),
+  /// Currently being used by $COMPONENT_ID
+  #[serde(rename = "bound")]
+  Bound(String),
+  /// Unavailable, but still requested by $COMPONENT_ID
+  #[serde(rename = "unavailable")]
+  Unavailable(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
