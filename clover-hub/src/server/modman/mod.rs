@@ -24,6 +24,7 @@ use nexus::{
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
+/// The minimum required permissions and configuration for ModMan to use Nexus.
 pub async fn gen_user() -> UserConfig {
   UserConfig {
     user_type: "com.reboot-codes.com.clover.modman".to_string(),
@@ -41,6 +42,7 @@ pub async fn gen_user() -> UserConfig {
   }
 }
 
+/// Begin the ModMan threads and sub-processes to ensure module/compoent communications.
 pub async fn modman_main(
   store: ModManStore,
   user: NexusUser,

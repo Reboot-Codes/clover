@@ -32,6 +32,7 @@ use super::components::models::CloverComponentTrait;
 
 // TODO: Define defaults via `Default` trait impl.
 
+/// Modules contain [Components](CloverComponent).
 #[derive(Debug, Clone)]
 pub struct Module {
   pub module_type: String,
@@ -51,8 +52,10 @@ impl Module {
   }
 }
 
+/// Metadata for components, mostly useful for gesture configurations and security.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CloverComponentMeta {
+  /// Friendly name for this component to be shown to the User in any UI.
   pub name: String,
   /// Is this component required for the module to work? Default: yes.
   /// If any critical component fails to initalize, the module will fail to initalize entirely.
@@ -63,8 +66,10 @@ pub struct CloverComponentMeta {
   /// This is also used to determine if a gesture is supported by this component.
   /// Ignored if the component does not support recv.
   pub base_gesture_parameters: HashMap<String, GestureParameters>,
+  pub internal: bool,
 }
 
+/// Enum with all known clover component types, technically a valid "component" ([see the Component Trait](CloverComponentTrait)) itself.
 #[derive(Debug, Clone)]
 pub enum CloverComponent {
   AudioInputComponent(AudioInputComponent),
@@ -78,6 +83,7 @@ pub enum CloverComponent {
 }
 
 impl CloverComponentTrait for CloverComponent {
+  /// Passes the context to the inner-component function implementation.
   async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     match self {
       CloverComponent::AudioInputComponent(component) => component.init(store.clone()).await,
@@ -91,6 +97,7 @@ impl CloverComponentTrait for CloverComponent {
     }
   }
 
+  /// Passes the context to the inner-component function implementation.
   async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     match self {
       CloverComponent::AudioInputComponent(component) => component.deinit(store.clone()).await,
@@ -123,11 +130,13 @@ pub struct GestureParameters {
   offset: f64,
 }
 
+/// In memory data-store for components, modules, and any needed configuration.
 #[derive(Debug, Clone)]
 pub struct ModManStore {
   pub modules: Arc<Mutex<HashMap<String, Module>>>,
   pub components: Arc<Mutex<HashMap<String, Arc<(CloverComponentMeta, CloverComponent)>>>>,
   pub config: Arc<Mutex<Config>>,
+  /// Used for [Bus](super::busses::models::Bus) statuses, etc
   pub port_statuses: PortStatuses,
 }
 
@@ -149,8 +158,10 @@ impl ModManStore {
   }
 }
 
+/// Used for [Bus](super::busses::models::Bus) statuses, etc
 #[derive(Debug, Clone)]
 pub struct PortStatuses {
+  /// Used by the [UART Bus](super::busses::proxies::uart::UARTBus)
   pub uart: Arc<Mutex<HashMap<String, PortStatus>>>,
 }
 

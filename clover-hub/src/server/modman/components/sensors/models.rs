@@ -10,14 +10,12 @@ use strum::VariantNames;
 
 #[derive(Debug, Clone)]
 pub struct InputSensorComponent {
-  pub internal: bool,
   pub connection: ConnectionType,
 }
 
 #[derive(Debug, Clone)]
 pub struct OutputSensorComponent {
   pub gesture_config: Option<GestureConfig>,
-  pub internal: bool,
   pub connection: ConnectionType,
 }
 

@@ -31,5 +31,4 @@ pub struct CameraComponent {
   pub max_resolution: VideoResolution,
   /// Default resolution to scale to when accessing this video device, defaults to max_resolution if not set.
   pub default_resolution: Option<VideoResolution>,
-  pub internal: bool,
 }

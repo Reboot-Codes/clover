@@ -127,6 +127,5 @@ pub struct MovementComponent {
   /// The inital position of this component, also determines how many degrees of freedom it uses. **NON OPTIONAL!**
   pub inital_position: DegreesOfFreedom,
   pub gesture_config: GestureConfig,
-  pub internal: bool,
   pub connection: ConnectionType,
 }

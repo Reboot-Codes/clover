@@ -1,7 +1,6 @@
 use crate::server::modman::{
   components::{
     models::{
-      CloverComponentTrait,
       ProxiedConnection,
       StreamingConnection,
     },
@@ -31,7 +30,6 @@ pub struct PhysicalDisplayComponent {
   pub virtual_display: Option<u64>,
   /// If configured, how the display should react to gesture events. Will be overriden if this display is part of a virtual display.
   pub gesture_config: Option<GestureConfig>,
-  pub internal: bool,
 }
 
 impl DisplayComponent for PhysicalDisplayComponent {}
@@ -43,7 +41,6 @@ pub struct VirtualDisplayComponent {
   pub resolution: VideoResolution,
   /// If configured, how the display should react to gesture events.
   pub gesture_config: Option<GestureConfig>,
-  pub internal: bool,
 }
 
 impl DisplayComponent for VirtualDisplayComponent {}

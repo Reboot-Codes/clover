@@ -106,3 +106,4 @@ strum = { version = "0.27.1", features = ["derive"] }
 base64 = "0.22.1"
 dyn_serde = "1.0.2"
 rmp-serde = "1.3.0"
+rodio = "0.20.1"
