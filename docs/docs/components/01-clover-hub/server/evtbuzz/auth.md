@@ -1,3 +1,0 @@
-# Authentication
-
-CloverHub is based off a series of users (or, rather, different parts in the grand scheme of CLOVER) which can create API keys with allowed messages in and out. Authenticating with the event path (`/ws`) is as simple as setting the `Authentication` header to `Token $TOKEN`, where `$TOKEN` is the API key provided by CloverHub. When this client sends events, the `kind` field is checked against regular expressions that the API key is authorized to send to the bus. The same applies to receiving events, each event is checked against regular expressions to see if the API key is authorized to receive that message type. A special field of `echo` bypasses the allowed events to send to the client if the author was that client itself. 

@@ -4,7 +4,7 @@ resolver = "2"
 members = [
   "clover-hub",
   "toolbox/toolbox-lib",
-  "toolbox/ratchet",
+  "toolbox/ratchet/src-tauri",
   "tesseract"
 ]
 

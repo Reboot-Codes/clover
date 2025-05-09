@@ -34,6 +34,18 @@
             yarn-berry
             trunk-io
             rust-analyzer
+            at-spi2-atk
+            atkmm
+            cairo
+            gdk-pixbuf
+            glib
+            gtk3
+            harfbuzz
+            librsvg
+            libsoup_3
+            pango
+            webkitgtk_4_1
+            openssl
           ];
 
           shellHook = ''
