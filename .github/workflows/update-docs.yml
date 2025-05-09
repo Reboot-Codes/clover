@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - docs/**
+      - .github/workflows/**
   workflow_dispatch:
 
 permissions:
