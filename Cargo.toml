@@ -3,9 +3,10 @@ resolver = "2"
 
 members = [
   "clover-hub",
-  "toolbox/toolbox-lib",
+  "toolbox/carbon-steel",
   "toolbox/ratchet/src-tauri",
-  "tesseract"
+  "core/libs/tesseract",
+  "core/libs/carbon-fiber"
 ]
 
 [profile.dev]

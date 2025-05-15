@@ -2,25 +2,79 @@
 
 - [ ] CloverHub
   - [ ] Server
-    - [ ] Arbiter
-      - [ ] Log related message IDs to users, api keys, and clients (add a `messages` key to user in store).
-    - [ ] EVTBuzz
-      - [ ] Move to ZMQ for EVTBuzz (via `zeromq::proxy()`).
-      - [ ] Require message encryption with `pqcrypto`
-      - [ ] Setup protobuf for messages.
+    - [ ] Renderer
+      - [ ] SystemUI
+        - [ ] Custom Audio Plugin (using ModMan proxies).
+        - [ ] i18n
+    - [ ] Modman
+      - [ ] Finish proxy bindings (WIP)
+      - [ ] Finish module init and de-init methods
+      - [ ] Finish gesture event schema
+      - [ ] i18n
     - [ ] Warehouse
-      - [ ] Setup serialization and de-serialization for general store dbs.
+      - [x] Setup serialization and de-serialization for general store dbs.
       - [ ] Finish models
 - [ ] Core
-  - [ ] Write AppLIB
-    - [ ] Rust
-    - [ ] Python
-    - [ ] TypeScript
-    - [ ] Go
-  - [ ] Write ModuleLIB
-    - [ ] Rust (`no_std`)
-      - [ ] FFI bindings for C++
-        - [ ] Arduino
-        - [ ] Python
-          - [ ] Circuit Python
-        - [ ] Go
+  - [ ] Libraries
+    - [ ] Tesseract
+      - [ ] Rust
+      - [ ] Python
+      - [ ] TypeScript
+      - [ ] Go
+    - [ ] Toolbox
+      - [ ] CarbonSteel
+        - [ ] Modules
+        - [ ] Expression Packs
+        - [ ] Repo Manifests
+      - [ ] IDE Plugins
+        - [ ] VSCode
+          - [ ] i18n
+        - [ ] Zed
+          - [ ] i18n
+      - [ ] Ratchet
+        - [ ] Inital Setup Flow
+          - [ ] i18n
+        - [ ] Repos
+          - [ ] Repo registration
+            - [ ] i18n
+          - [ ] Repo creation/Manifest Management
+            - [ ] i18n
+        - [ ] Expression Packs
+          - [ ] Creation Flow
+            - [ ] i18n
+          - [ ] Modification Views
+            - [ ] i18n
+        - [ ] Modules
+          - [ ] Registration
+            - [ ] i18n
+          - [ ] Creation
+            - [ ] i18n
+      - [ ] Spanner
+        - [ ] Create mobile app template
+        - [ ] React native base
+        - [ ] Android native modules
+        - [ ] Darwin native modules
+        - [ ] Setup CarbonSteel in RN:
+          - https://medium.com/@marekkotewicz/building-a-mobile-app-in-rust-and-react-native-part-1-project-setup-b8dbcf3f539f
+          - https://medium.com/@marekkotewicz/building-a-mobile-app-in-rust-and-react-native-part-2-hello-world-60970a7d194a
+          - https://github.com/debris/rust-react-native-boilerplate
+        - [ ] i18n
+    - [ ] CarbonFiber
+      - [ ] Rust (`no_std`)
+        - [ ] i18n
+        - [ ] FFI bindings for C++
+          - [ ] Arduino
+          - [ ] Python
+            - [ ] Circuit Python
+          - [ ] Go
+    - [ ] Applications
+      - [ ] Home
+      - [ ] Settings
+      - [ ] FLIPr
+- [ ] Docs
+  - [ ] i18n
+  - [ ] Remove references to Arbiter and Modman (move the latter to nexus docs)
+  - [ ] CloverHub
+    - [ ] Module proxy config
+  - [ ] User setup
+    - [ ] Inital config tutorial (WIP, actually)

@@ -294,18 +294,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
-]
-
-[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1943,6 +1931,14 @@ dependencies = [
  "embedded-can 0.3.0",
  "socketcan 1.7.0",
 ]
+
+[[package]]
+name = "carbon-fiber"
+version = "0.1.0"
+
+[[package]]
+name = "carbon-steel"
+version = "0.1.0"
 
 [[package]]
 name = "cargo-platform"
@@ -6905,6 +6901,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60fcc7d6849342eff22c4350c8b9a989ee8ceabc4b481253e8946b9fe83d684"
 
 [[package]]
+name = "ratchet"
+version = "0.1.0"
+dependencies = [
+ "carbon-steel",
+ "log",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8015,10 +8024,6 @@ dependencies = [
  "libc",
  "system-deps",
 ]
-
-[[package]]
-name = "spanner-lib"
-version = "0.1.0"
 
 [[package]]
 name = "spidev"
