@@ -6,6 +6,9 @@ on:
     paths:
       - docs/**
       - .github/workflows/**
+      - yarn.lock
+      - .yarn/**
+      - package.json
   workflow_dispatch:
 
 permissions:
