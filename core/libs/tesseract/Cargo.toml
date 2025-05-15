@@ -1,0 +1,13 @@
+[package]
+name = "tesseract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quote = "1.0.38"
+serde = "1.0.217"
+syn = "2.0.93"
+tokio = "1.42.0"
+
+[lib]
+proc-macro = true
