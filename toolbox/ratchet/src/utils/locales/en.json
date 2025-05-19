@@ -1,0 +1,6 @@
+{
+  "welcome": {
+    "hello": "Hello there!",
+    "version": "You're running Ratchet v{{version}}."
+  }
+}w

@@ -1,3 +1,13 @@
-export default function Page() {
-  return <h1>Welcome Screen</h1>;
+import { getT } from "../index";
+
+export default async function Page() {
+  const { t } = await getT();
+  const version = require("../../../package.json").version;
+
+  return (
+    <>
+      <h1>{t("welcome.hello")}</h1>
+      <p>{t("welcome.version", { version })}</p>
+    </>
+  );
 }
