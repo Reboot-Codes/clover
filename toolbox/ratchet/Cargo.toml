@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 iced = { version = "0.13.1", features = ["tokio"] }
 carbon-steel = { path = "../carbon-steel" }
-tokio = "1.45.1"
+tokio = { version = "1.45.1", features = ["full"] }
 serde = "1.0.219"
 env_logger = "0.11.8"
 anyhow = "1.0.98"

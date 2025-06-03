@@ -1,15 +1,9 @@
-use iced::Element;
-
-use crate::{
-  MainAppState,
-  Message,
-  screens::{
-    configurator::ConfiguratorScreen,
-    welcome::WelcomeScreen,
-    wizard::{
-      WizardScreen,
-      WizardStartingPoints,
-    },
+use crate::screens::{
+  configurator::ConfiguratorScreen,
+  welcome::WelcomeScreen,
+  wizard::{
+    WizardScreen,
+    WizardStep,
   },
 };
 
@@ -33,11 +27,6 @@ impl Default for CurrentTopLevelScreen {
 #[derive(Debug, Clone)]
 pub enum MoveToScreen {
   Welcome,
-  Wizard(WizardStartingPoints),
+  Wizard(WizardStep),
   Configurator(String),
-}
-
-pub trait TopLevelScreen {
-  fn view(&self, state: &MainAppState) -> Element<Message>;
-  fn update(&mut self, message: Message);
 }
