@@ -4,8 +4,10 @@ use iced::{
   widget::{
     button,
     column,
+    horizontal_space,
     row,
     text,
+    vertical_space,
   },
 };
 use log::debug;
@@ -44,6 +46,7 @@ impl WizardScreen {
         .on_press(crate::Message::MoveToScreen(MoveToScreen::Welcome))
         .into(),
     );
+    controls.push(horizontal_space().into());
 
     match self.step {
       WizardStep::Intro => {
@@ -81,8 +84,15 @@ impl WizardScreen {
       }
     }
 
-    elements.push(row(controls).into());
-    column(elements).into()
+    elements.push(vertical_space().into());
+    elements.push(
+      row(controls)
+        .spacing(12)
+        .padding(12)
+        .width(iced::Length::Fill)
+        .into(),
+    );
+    column(elements).spacing(12).padding(12).into()
   }
 
   pub fn update(&mut self, message: crate::Message) -> Action {
@@ -101,6 +111,7 @@ impl WizardScreen {
         self.step = wizard_step;
         Action::None
       }
+      crate::Message::SetConfiguratorTab(_tab) => Action::None,
     }
   }
 }

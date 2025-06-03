@@ -38,7 +38,8 @@ impl WelcomeScreen {
           Action::MoveToScreen(MoveToScreen::Configurator(id))
         }
       },
-      crate::Message::SetWizardStep(_wizard_step) => Action::None,
+      crate::Message::SetWizardStep(_step) => Action::None,
+      crate::Message::SetConfiguratorTab(_tab) => Action::None,
     }
   }
 
@@ -90,10 +91,11 @@ impl WelcomeScreen {
           )))
           .into(),
       ])
+      .spacing(12)
       .into(),
     );
 
-    column(elements).into()
+    column(elements).spacing(12).padding(12).into()
   }
 }
 

@@ -23,7 +23,10 @@ use log::{
 use crate::screens::{
   CurrentTopLevelScreen,
   MoveToScreen,
-  configurator::ConfiguratorScreen,
+  configurator::{
+    ConfiguratorScreen,
+    ConfiguratorTab,
+  },
   wizard::{
     WizardScreen,
     WizardStep,
@@ -71,6 +74,7 @@ impl Default for MainAppState {
 pub enum Message {
   MoveToScreen(MoveToScreen),
   SetWizardStep(WizardStep),
+  SetConfiguratorTab(ConfiguratorTab),
 }
 
 impl MainAppState {
@@ -118,6 +122,7 @@ impl MainAppState {
                   task
                 }
               },
+              screens::configurator::Action::SetTab(_configurator_tab) => Task::none(),
             }
           }
         },
@@ -163,6 +168,7 @@ impl MainAppState {
                   task
                 }
               },
+              screens::configurator::Action::SetTab(_configurator_tab) => Task::none(),
             }
           }
         },
@@ -213,7 +219,7 @@ impl MainAppState {
           CurrentTopLevelScreen::Configurator(_configurator_screen) => Task::none(),
         },
       },
-      Message::SetWizardStep(_wizard_step) => match &mut self.screen {
+      Message::SetWizardStep(_step) => match &mut self.screen {
         CurrentTopLevelScreen::Welcome(_welcome_screen) => Task::none(),
         CurrentTopLevelScreen::Wizard(wizard_screen) => {
           let action = wizard_screen.update(message.clone());
@@ -229,6 +235,23 @@ impl MainAppState {
           }
         }
         CurrentTopLevelScreen::Configurator(_configurator_screen) => Task::none(),
+      },
+      Message::SetConfiguratorTab(_tab) => match &mut self.screen {
+        CurrentTopLevelScreen::Welcome(_welcome_screen) => Task::none(),
+        CurrentTopLevelScreen::Wizard(_wizard_screen) => Task::none(),
+        CurrentTopLevelScreen::Configurator(configurator_screen) => {
+          let action = configurator_screen.update(message.clone());
+
+          match action {
+            screens::configurator::Action::None => Task::none(),
+            screens::configurator::Action::MoveToScreen(_move_to_screen) => {
+              warn!("Not moving to screen since this is not the message that should cause that!");
+              Task::none()
+            }
+
+            screens::configurator::Action::SetTab(_tab) => Task::none(),
+          }
+        }
       },
     }
   }
