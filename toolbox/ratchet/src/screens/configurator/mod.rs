@@ -1,7 +1,10 @@
 use iced::{
+  Border,
   Element,
+  Padding,
   Task,
   Theme,
+  border::Radius,
   widget::{
     button,
     column,
@@ -12,6 +15,8 @@ use iced::{
     vertical_space,
   },
 };
+use iced_aw::badge;
+use log::debug;
 
 use crate::{
   Message,
@@ -57,6 +62,20 @@ impl ConfiguratorScreen {
   pub fn view(&self, _state: &crate::MainAppState) -> iced::Element<crate::Message> {
     let mut elements: Vec<Element<Message>> = vec![];
     let sidebar = vec![
+      column(vec![
+        text("$ConnectionName").size(24).into(),
+        badge("Connected")
+          .style(iced_aw::style::badge::success)
+          .into(),
+      ])
+      .spacing(12)
+      .padding(Padding {
+        top: 0.0,
+        bottom: 12.0,
+        left: 0.0,
+        right: 0.0,
+      })
+      .into(),
       button("Overview")
         .on_press_maybe({
           if self.tab != ConfiguratorTab::Overview {
@@ -107,15 +126,19 @@ impl ConfiguratorScreen {
 
     match self.tab {
       ConfiguratorTab::Overview => {
+        debug!("Overview Tab");
         content.push(text("Overview").into());
       }
       ConfiguratorTab::Modules => {
+        debug!("Modules Tab");
         content.push(text("Modules").into());
       }
       ConfiguratorTab::Apps => {
+        debug!("Apps Tab");
         content.push(text("Apps").into());
       }
       ConfiguratorTab::Repos => {
+        debug!("Repos Tab");
         content.push(text("Repositories").into());
       }
     }
@@ -131,7 +154,12 @@ impl ConfiguratorScreen {
       .style(|theme: &Theme| {
         let palette = theme.extended_palette();
 
-        iced::widget::container::Style::default().background(palette.primary.base.text)
+        iced::widget::container::Style::default()
+          .background(palette.primary.base.text)
+          .border(Border {
+            radius: Radius::from(12),
+            ..Default::default()
+          })
       })
       .into(),
     );
@@ -139,8 +167,13 @@ impl ConfiguratorScreen {
       scrollable(
         column(content)
           .width(iced::Length::Fill)
-          .spacing(12)
-          .padding(12),
+          .padding(Padding {
+            left: 6.0,
+            right: 0.0,
+            top: 0.0,
+            bottom: 0.0,
+          })
+          .spacing(12),
       )
       .width(iced::Length::Fill)
       .into(),
@@ -150,6 +183,7 @@ impl ConfiguratorScreen {
       row(elements)
         .height(iced::Length::Fill)
         .width(iced::Length::Fill)
+        .padding(6)
         .into(),
     ])
     .into()

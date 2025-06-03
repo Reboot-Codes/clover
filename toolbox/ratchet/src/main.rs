@@ -46,6 +46,7 @@ pub fn main() -> iced::Result {
     .init();
 
   iced::application(APP_NAME, MainAppState::update, MainAppState::view)
+    .font(iced_fonts::REQUIRED_FONT_BYTES)
     .theme(theme)
     .run()
 }
