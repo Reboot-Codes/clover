@@ -1,7 +1,8 @@
 #![feature(iter_collect_into)]
+#![feature(stmt_expr_attributes)]
 
 pub mod screens;
-// pub mod util;
+pub mod util;
 
 use std::{
   collections::HashMap,
@@ -34,7 +35,7 @@ use crate::screens::{
 };
 
 fn theme(_state: &MainAppState) -> Theme {
-  Theme::TokyoNight
+  Theme::Oxocarbon
 }
 
 pub const APP_NAME: &str = "Ratchet";
@@ -72,6 +73,7 @@ impl Default for MainAppState {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+  None,
   MoveToScreen(MoveToScreen),
   SetWizardStep(WizardStep),
   SetConfiguratorTab(ConfiguratorTab),
@@ -253,6 +255,7 @@ impl MainAppState {
           }
         }
       },
+      Message::None => Task::none(),
     }
   }
 

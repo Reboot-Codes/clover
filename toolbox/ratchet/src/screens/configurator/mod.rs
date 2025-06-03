@@ -1,8 +1,11 @@
 use iced::{
+  Element,
   Task,
+  Theme,
   widget::{
     button,
     column,
+    container,
     row,
     scrollable,
     text,
@@ -13,6 +16,7 @@ use iced::{
 use crate::{
   Message,
   screens::MoveToScreen,
+  util::menu::gen_menu_bar,
 };
 
 #[derive(Debug, Clone)]
@@ -51,11 +55,8 @@ impl ConfiguratorScreen {
   }
 
   pub fn view(&self, _state: &crate::MainAppState) -> iced::Element<crate::Message> {
-    let mut elements = Vec::new();
-    let mut sidebar = Vec::new();
-    let mut content: Vec<iced::Element<crate::Message>> = Vec::new();
-
-    sidebar.push(
+    let mut elements: Vec<Element<Message>> = vec![];
+    let sidebar = vec![
       button("Overview")
         .on_press_maybe({
           if self.tab != ConfiguratorTab::Overview {
@@ -66,8 +67,6 @@ impl ConfiguratorScreen {
         })
         .width(iced::Length::Fill)
         .into(),
-    );
-    sidebar.push(
       button("Modules")
         .on_press_maybe({
           if self.tab != ConfiguratorTab::Modules {
@@ -78,8 +77,6 @@ impl ConfiguratorScreen {
         })
         .width(iced::Length::Fill)
         .into(),
-    );
-    sidebar.push(
       button("Apps")
         .on_press_maybe({
           if self.tab != ConfiguratorTab::Apps {
@@ -90,8 +87,6 @@ impl ConfiguratorScreen {
         })
         .width(iced::Length::Fill)
         .into(),
-    );
-    sidebar.push(
       button("Repos")
         .on_press_maybe({
           if self.tab != ConfiguratorTab::Repos {
@@ -102,14 +97,13 @@ impl ConfiguratorScreen {
         })
         .width(iced::Length::Fill)
         .into(),
-    );
-    sidebar.push(vertical_space().into());
-    sidebar.push(
+      vertical_space().into(),
       button("Instances")
         .on_press(Message::MoveToScreen(MoveToScreen::Welcome))
         .width(iced::Length::Fill)
         .into(),
-    );
+    ];
+    let mut content: Vec<iced::Element<crate::Message>> = Vec::new();
 
     match self.tab {
       ConfiguratorTab::Overview => {
@@ -127,12 +121,19 @@ impl ConfiguratorScreen {
     }
 
     elements.push(
-      column(sidebar)
-        .height(iced::Length::Fill)
-        .width(256)
-        .spacing(12)
-        .padding(12)
-        .into(),
+      container(
+        column(sidebar)
+          .height(iced::Length::Fill)
+          .width(128)
+          .spacing(12)
+          .padding(12),
+      )
+      .style(|theme: &Theme| {
+        let palette = theme.extended_palette();
+
+        iced::widget::container::Style::default().background(palette.primary.base.text)
+      })
+      .into(),
     );
     elements.push(
       scrollable(
@@ -144,26 +145,31 @@ impl ConfiguratorScreen {
       .width(iced::Length::Fill)
       .into(),
     );
-    row(elements)
-      .height(iced::Length::Fill)
-      .width(iced::Length::Fill)
-      .into()
+    column(vec![
+      gen_menu_bar(),
+      row(elements)
+        .height(iced::Length::Fill)
+        .width(iced::Length::Fill)
+        .into(),
+    ])
+    .into()
   }
 
-  pub fn update(&mut self, message: crate::Message) -> Action {
+  pub fn update(&mut self, message: Message) -> Action {
     match message {
-      crate::Message::MoveToScreen(target_screen) => match target_screen {
-        super::MoveToScreen::Welcome => Action::MoveToScreen(MoveToScreen::Welcome),
-        super::MoveToScreen::Configurator(_id) => Action::None,
-        super::MoveToScreen::Wizard(starting_point) => {
+      Message::MoveToScreen(target_screen) => match target_screen {
+        MoveToScreen::Welcome => Action::MoveToScreen(MoveToScreen::Welcome),
+        MoveToScreen::Wizard(starting_point) => {
           Action::MoveToScreen(MoveToScreen::Wizard(starting_point))
         }
+        _ => Action::None,
       },
-      crate::Message::SetWizardStep(_wizard_step) => Action::None,
-      crate::Message::SetConfiguratorTab(tab) => {
+      Message::SetWizardStep(_wizard_step) => Action::None,
+      Message::SetConfiguratorTab(tab) => {
         self.tab = tab;
         Action::None
       }
+      Message::None => Action::None,
     }
   }
 }

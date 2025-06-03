@@ -1,4 +1,7 @@
-use crate::screens::MoveToScreen;
+use crate::{
+  screens::MoveToScreen,
+  util::menu::gen_menu_bar,
+};
 use iced::{
   Task,
   widget::{
@@ -84,15 +87,26 @@ impl WizardScreen {
       }
     }
 
-    elements.push(vertical_space().into());
-    elements.push(
+    column(vec![
+      gen_menu_bar(),
+      column(elements)
+        .padding(iced::Padding {
+          top: 12.0,
+          bottom: 0.0,
+          right: 12.0,
+          left: 12.0,
+        })
+        .spacing(12)
+        .into(),
+      vertical_space().into(),
       row(controls)
         .spacing(12)
         .padding(12)
         .width(iced::Length::Fill)
         .into(),
-    );
-    column(elements).spacing(12).padding(12).into()
+    ])
+    .spacing(12)
+    .into()
   }
 
   pub fn update(&mut self, message: crate::Message) -> Action {
@@ -112,6 +126,7 @@ impl WizardScreen {
         Action::None
       }
       crate::Message::SetConfiguratorTab(_tab) => Action::None,
+      crate::Message::None => Action::None,
     }
   }
 }

@@ -11,9 +11,12 @@ use log::{
 };
 use std::collections::HashMap;
 
-use crate::screens::{
-  MoveToScreen,
-  wizard::WizardStep,
+use crate::{
+  screens::{
+    MoveToScreen,
+    wizard::WizardStep,
+  },
+  util::menu::gen_menu_bar,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -38,8 +41,7 @@ impl WelcomeScreen {
           Action::MoveToScreen(MoveToScreen::Configurator(id))
         }
       },
-      crate::Message::SetWizardStep(_step) => Action::None,
-      crate::Message::SetConfiguratorTab(_tab) => Action::None,
+      _ => Action::None,
     }
   }
 
@@ -95,7 +97,11 @@ impl WelcomeScreen {
       .into(),
     );
 
-    column(elements).spacing(12).padding(12).into()
+    column(vec![
+      gen_menu_bar(),
+      column(elements).padding(12).spacing(12).into(),
+    ])
+    .into()
   }
 }
 
