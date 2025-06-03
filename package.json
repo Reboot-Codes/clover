@@ -3,6 +3,6 @@
   "packageManager": "yarn@4.9.1",
   "workspaces": [
     "docs",
-    "toolbox/spanner"
+    "toolbox/screwdriver"
   ]
 }

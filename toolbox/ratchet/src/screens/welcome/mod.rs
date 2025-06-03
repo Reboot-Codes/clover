@@ -8,10 +8,7 @@ use log::{
   debug,
   info,
 };
-use std::{
-  collections::HashMap,
-  sync::Arc,
-};
+use std::collections::HashMap;
 
 use crate::screens::MoveToScreen;
 
