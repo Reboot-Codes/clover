@@ -43,7 +43,7 @@ pub fn gen_menu_bar<'a>() -> iced::Element<'a, Message> {
   let menu_tpl_1 = |items| Menu::new(items).max_width(180.0).offset(15.0).spacing(5.0);
   let menu_tpl_2 = |items| Menu::new(items).max_width(180.0).offset(0.0).spacing(5.0);
 
-  let file_menu = {
+  let file_menu = || {
     #[rustfmt::skip]
     let sub1 = menu_tpl_2(menu_items!(
       (debug_button("Item"))
@@ -66,15 +66,20 @@ pub fn gen_menu_bar<'a>() -> iced::Element<'a, Message> {
     .width(140.0)
   };
 
-  let mb = menu_bar!((debug_button_s("File"), file_menu))
-    .draw_path(menu::DrawPath::Backdrop)
-    .style(|theme: &iced::Theme, status: Status| menu::Style {
-      path_border: Border {
-        radius: Radius::new(6.0),
-        ..Default::default()
-      },
-      ..primary(theme, status)
-    });
+  let mb = menu_bar!((debug_button_s("File"), file_menu())(
+    debug_button_s("Edit"),
+    file_menu()
+  )(debug_button_s("View"), file_menu())(
+    debug_button_s("Tools"), file_menu()
+  )(debug_button_s("Help"), file_menu()))
+  .draw_path(menu::DrawPath::Backdrop)
+  .style(|theme: &iced::Theme, status: Status| menu::Style {
+    path_border: Border {
+      radius: Radius::new(6.0),
+      ..Default::default()
+    },
+    ..primary(theme, status)
+  });
 
   mb.into()
 }
@@ -101,7 +106,10 @@ fn labeled_button(
   label: &str,
   msg: Option<Message>,
 ) -> button::Button<Message, iced::Theme, iced::Renderer> {
-  base_button(text(label).align_y(alignment::Vertical::Center), msg)
+  base_button(
+    text(label).align_y(alignment::Vertical::Center).size(12),
+    msg,
+  )
 }
 
 fn submenu_button(label: &str) -> button::Button<Message, iced::Theme, iced::Renderer> {
@@ -109,11 +117,13 @@ fn submenu_button(label: &str) -> button::Button<Message, iced::Theme, iced::Ren
     row![
       text(label)
         .width(Length::Fill)
-        .align_y(alignment::Vertical::Center),
+        .align_y(alignment::Vertical::Center)
+        .size(12),
       text(icon_to_string(RequiredIcons::CaretRightFill))
         .font(REQUIRED_FONT)
         .width(Length::Shrink)
-        .align_y(alignment::Vertical::Center),
+        .align_y(alignment::Vertical::Center)
+        .size(12),
     ]
     .align_y(iced::Alignment::Center),
     Some(Message::None),

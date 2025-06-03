@@ -124,7 +124,7 @@ impl ConfiguratorScreen {
       container(
         column(sidebar)
           .height(iced::Length::Fill)
-          .width(128)
+          .width(175)
           .spacing(12)
           .padding(12),
       )
