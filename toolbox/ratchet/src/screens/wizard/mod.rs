@@ -1,6 +1,14 @@
-use iced::Task;
-
 use crate::screens::MoveToScreen;
+use iced::{
+  Task,
+  widget::{
+    button,
+    column,
+    row,
+    text,
+  },
+};
+use log::debug;
 
 #[derive(Default, Debug, Clone)]
 pub struct WizardScreen {
@@ -12,6 +20,7 @@ pub enum Action {
   #[default]
   None,
   MoveToScreen(MoveToScreen),
+  SetStep(WizardStep),
 }
 
 impl WizardScreen {
@@ -25,7 +34,55 @@ impl WizardScreen {
   }
 
   pub fn view(&self, _state: &crate::MainAppState) -> iced::Element<crate::Message> {
-    todo!()
+    let mut elements = Vec::new();
+
+    elements.push(text("Configuration Wizard").into());
+    let mut controls = Vec::new();
+
+    controls.push(
+      button("Cancel")
+        .on_press(crate::Message::MoveToScreen(MoveToScreen::Welcome))
+        .into(),
+    );
+
+    match self.step {
+      WizardStep::Intro => {
+        elements.push(text("introduction").into());
+
+        controls.push(button("Back").into());
+        controls.push(
+          button("Forward")
+            .on_press(crate::Message::SetWizardStep(WizardStep::ConnectionType))
+            .into(),
+        );
+      }
+      WizardStep::ConnectionType => {
+        elements.push(text("existing connection type").into());
+
+        controls.push(
+          button("Back")
+            .on_press(crate::Message::SetWizardStep(WizardStep::Intro))
+            .into(),
+        );
+        controls.push(
+          button("Finish")
+            .on_press(crate::Message::SetWizardStep(WizardStep::Finishing))
+            .into(),
+        );
+      }
+      WizardStep::Finishing => {
+        elements.push(text("Connecting to: ").into());
+
+        controls.push(
+          button("Back")
+            .on_press(crate::Message::SetWizardStep(WizardStep::ConnectionType))
+            .into(),
+        );
+      }
+    }
+
+    elements.push(row(controls).into());
+    column(elements).into()
   }
 
   pub fn update(&mut self, message: crate::Message) -> Action {
@@ -37,6 +94,13 @@ impl WizardScreen {
           Action::MoveToScreen(MoveToScreen::Configurator(id))
         }
       },
+      crate::Message::SetWizardStep(wizard_step) => {
+        debug!("Moving to wizard step: {:?}", wizard_step);
+
+        // TODO: Do validation on step move
+        self.step = wizard_step;
+        Action::None
+      }
     }
   }
 }
@@ -44,5 +108,7 @@ impl WizardScreen {
 #[derive(Default, Debug, Clone, Copy)]
 pub enum WizardStep {
   #[default]
-  ConnectionType,
+  Intro = 0,
+  ConnectionType = 1,
+  Finishing = 3,
 }

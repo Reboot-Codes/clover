@@ -2,6 +2,7 @@ use carbon_steel::connections::ConnectionConfiguration;
 use iced::widget::{
   button,
   column,
+  row,
   text,
 };
 use log::{
@@ -10,7 +11,10 @@ use log::{
 };
 use std::collections::HashMap;
 
-use crate::screens::MoveToScreen;
+use crate::screens::{
+  MoveToScreen,
+  wizard::WizardStep,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct WelcomeScreen {}
@@ -34,6 +38,7 @@ impl WelcomeScreen {
           Action::MoveToScreen(MoveToScreen::Configurator(id))
         }
       },
+      crate::Message::SetWizardStep(_wizard_step) => Action::None,
     }
   }
 
@@ -71,7 +76,22 @@ impl WelcomeScreen {
       elements.push(text("No existing connections!").into());
     }
 
-    elements.push(text("Create a new...").into());
+    elements.push(text("Create a New Connection...").into());
+    elements.push(
+      row(vec![
+        button("From Scratch")
+          .on_press(crate::Message::MoveToScreen(MoveToScreen::Wizard(
+            WizardStep::Intro,
+          )))
+          .into(),
+        button("to an Existing Instance")
+          .on_press(crate::Message::MoveToScreen(MoveToScreen::Wizard(
+            WizardStep::ConnectionType,
+          )))
+          .into(),
+      ])
+      .into(),
+    );
 
     column(elements).into()
   }

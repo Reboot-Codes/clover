@@ -15,13 +15,19 @@ use iced::{
   Task,
   Theme,
 };
-use log::debug;
+use log::{
+  debug,
+  warn,
+};
 
 use crate::screens::{
   CurrentTopLevelScreen,
   MoveToScreen,
   configurator::ConfiguratorScreen,
-  wizard::WizardScreen,
+  wizard::{
+    WizardScreen,
+    WizardStep,
+  },
 };
 
 fn theme(_state: &MainAppState) -> Theme {
@@ -64,6 +70,7 @@ impl Default for MainAppState {
 #[derive(Debug, Clone)]
 pub enum Message {
   MoveToScreen(MoveToScreen),
+  SetWizardStep(WizardStep),
 }
 
 impl MainAppState {
@@ -90,6 +97,7 @@ impl MainAppState {
                   task
                 }
               },
+              screens::wizard::Action::SetStep(_wizard_step) => Task::none(),
             }
           }
           CurrentTopLevelScreen::Configurator(configurator_screen) => {
@@ -199,10 +207,28 @@ impl MainAppState {
                   task
                 }
               },
+              screens::wizard::Action::SetStep(_wizard_step) => Task::none(),
             }
           }
           CurrentTopLevelScreen::Configurator(_configurator_screen) => Task::none(),
         },
+      },
+      Message::SetWizardStep(_wizard_step) => match &mut self.screen {
+        CurrentTopLevelScreen::Welcome(_welcome_screen) => Task::none(),
+        CurrentTopLevelScreen::Wizard(wizard_screen) => {
+          let action = wizard_screen.update(message.clone());
+
+          match action {
+            screens::wizard::Action::None => Task::none(),
+            screens::wizard::Action::MoveToScreen(_move_to_screen) => {
+              warn!("Not moving to screen since this is not the message that should cause that!");
+              Task::none()
+            }
+
+            screens::wizard::Action::SetStep(_wizard_step) => Task::none(),
+          }
+        }
+        CurrentTopLevelScreen::Configurator(_configurator_screen) => Task::none(),
       },
     }
   }
@@ -210,15 +236,15 @@ impl MainAppState {
   fn view(&self) -> Element<Message> {
     match &self.screen {
       CurrentTopLevelScreen::Welcome(welcome_screen) => {
-        debug!("Switching to Welcome Screen...");
+        debug!("Showing: Welcome Screen...");
         welcome_screen.view(self)
       }
       CurrentTopLevelScreen::Wizard(wizard_screen) => {
-        debug!("Switching to Configuration Generation Wizard...");
+        debug!("Showing: Configuration Generation Wizard...");
         wizard_screen.view(self)
       }
       CurrentTopLevelScreen::Configurator(configurator_screen) => {
-        debug!("Switching to Instance Configurator");
+        debug!("Showing: Instance Configurator");
         configurator_screen.view(self)
       }
     }

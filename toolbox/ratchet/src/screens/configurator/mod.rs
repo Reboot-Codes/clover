@@ -37,6 +37,7 @@ impl ConfiguratorScreen {
           Action::MoveToScreen(MoveToScreen::Wizard(starting_point))
         }
       },
+      crate::Message::SetWizardStep(_wizard_step) => Action::None,
     }
   }
 }
