@@ -21,7 +21,10 @@
           buildInputs = with pkgs; [
             openssl
             pkg-config
-            rust-bin.nightly.latest.default
+            (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+              extensions = [ "rust-src" ];
+              targets = [ "arm-unknown-linux-gnueabihf" "x86_64-pc-windows-gnu" ];
+            }))
             alsa-lib
             udev
             vulkan-loader
@@ -30,7 +33,7 @@
             xorg.libXcursor
             xorg.libXi
             kdePackages.qtbase
-            nodejs_23
+            nodejs_22
             yarn-berry
             trunk-io
             rust-analyzer
@@ -46,6 +49,9 @@
             pango
             webkitgtk_4_1
             openssl
+            wayland
+            waylandpp
+            fontconfig
           ];
 
           shellHook = ''
@@ -55,6 +61,7 @@
                   pkgs.alsa-lib
                   pkgs.vulkan-loader
                   pkgs.libxkbcommon
+                  pkgs.wayland
                 ]
               }"
               RUST_SRC_PATH = "${pkgs.rust-bin.nightly.latest.default}/lib/rustlib/src/rust/library";
