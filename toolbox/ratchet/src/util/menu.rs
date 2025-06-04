@@ -131,7 +131,7 @@ fn submenu_button(label: &str) -> button::Button<Message, iced::Theme, iced::Ren
   .width(Length::Fill)
 }
 
-fn separator() -> quad::Quad {
+pub fn separator() -> quad::Quad {
   quad::Quad {
     quad_color: Color::from([0.5; 3]).into(),
     quad_border: Border {
@@ -144,7 +144,7 @@ fn separator() -> quad::Quad {
   }
 }
 
-fn dot_separator<'a>(theme: &iced::Theme) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+pub fn dot_separator<'a>(theme: &iced::Theme) -> Element<'a, Message, iced::Theme, iced::Renderer> {
   row((0..20).map(|_| {
     quad::Quad {
       quad_color: theme.extended_palette().background.base.text.into(),
@@ -157,7 +157,7 @@ fn dot_separator<'a>(theme: &iced::Theme) -> Element<'a, Message, iced::Theme, i
   .into()
 }
 
-fn labeled_separator(label: &'_ str) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+pub fn labeled_separator(label: &'_ str) -> Element<'_, Message, iced::Theme, iced::Renderer> {
   let q_1 = quad::Quad {
     height: Length::Fill,
     ..separator()
@@ -178,7 +178,7 @@ fn labeled_separator(label: &'_ str) -> Element<'_, Message, iced::Theme, iced::
   .into()
 }
 
-fn circle(color: Color) -> quad::Quad {
+pub fn circle(color: Color) -> quad::Quad {
   let radius = 10.0;
 
   quad::Quad {

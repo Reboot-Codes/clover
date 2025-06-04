@@ -239,7 +239,7 @@ impl MainAppState {
         }
         CurrentTopLevelScreen::Configurator(_configurator_screen) => Task::none(),
       },
-      Message::SetConfiguratorTab(_tab) => match &mut self.screen {
+      Message::SetConfiguratorTab(ref _tab) => match &mut self.screen {
         CurrentTopLevelScreen::Welcome(_welcome_screen) => Task::none(),
         CurrentTopLevelScreen::Wizard(_wizard_screen) => Task::none(),
         CurrentTopLevelScreen::Configurator(configurator_screen) => {
