@@ -29,9 +29,23 @@ pub fn apps_tab(configurator_screen: &ConfiguratorScreen, content: &mut Vec<Elem
 
   let mut apps = HashMap::new();
 
-  for (repo_id, repo_config) in configurator_screen.repos.clone().iter() {
-    for (app_id, app_config) in repo_config.apps.clone().iter() {
+  if configurator_screen.focused_on_repo {
+    let repo_id = configurator_screen.current_repo.clone().unwrap();
+    for (app_id, app_config) in configurator_screen
+      .repos
+      .get(&repo_id)
+      .unwrap()
+      .apps
+      .clone()
+      .iter()
+    {
       apps.insert((repo_id.clone(), app_id.clone()), app_config.clone());
+    }
+  } else {
+    for (repo_id, repo_config) in configurator_screen.repos.clone().iter() {
+      for (app_id, app_config) in repo_config.apps.clone().iter() {
+        apps.insert((repo_id.clone(), app_id.clone()), app_config.clone());
+      }
     }
   }
 

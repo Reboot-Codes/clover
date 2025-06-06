@@ -45,18 +45,20 @@ pub fn repo_detail_tab(
 
   content.push(
     row(vec![
-      button(row(vec![
-        text(icon_to_string(RequiredIcons::CaretLeftFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-        text("Back").into(),
-      ]))
-      .on_press(Message::SetConfiguratorTab(*prev_screen.clone()))
-      .into(),
+      (match &**prev_screen {
+        ConfiguratorTab::None => horizontal_space().into(),
+        _ => button(row(vec![
+          text(icon_to_string(RequiredIcons::CaretLeftFill))
+            .font(REQUIRED_FONT)
+            .width(iced::Length::Shrink)
+            .align_y(alignment::Vertical::Center)
+            .into(),
+          text("Back").into(),
+        ]))
+        .on_press(Message::SetConfiguratorTab(*prev_screen.clone()))
+        .into(),
+      }),
       horizontal_space().into(),
-      button("Settings").into(),
     ])
     .into(),
   );

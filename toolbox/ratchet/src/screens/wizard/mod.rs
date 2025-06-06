@@ -134,7 +134,7 @@ impl WizardScreen {
 #[derive(Default, Debug, Clone, Copy)]
 pub enum WizardStep {
   #[default]
-  Intro = 0,
-  ConnectionType = 1,
-  Finishing = 3,
+  Intro,
+  ConnectionType,
+  Finishing,
 }

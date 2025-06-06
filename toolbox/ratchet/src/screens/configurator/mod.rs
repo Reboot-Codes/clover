@@ -57,6 +57,7 @@ pub struct ConfiguratorScreen {
   pub repos: HashMap<String, Repo>,
   pub tab: ConfiguratorTab,
   pub current_repo: Option<String>,
+  pub focused_on_repo: bool,
 }
 
 // TODO: Setup setting to save this in app state or use the default here.
@@ -64,6 +65,7 @@ pub struct ConfiguratorScreen {
 pub enum ConfiguratorTab {
   #[default]
   Overview,
+  None,
   Modules,
   // TODO: ModuleDetail(String),
   Gestures,
@@ -132,13 +134,15 @@ impl ConfiguratorScreen {
           repos,
           tab: Default::default(),
           current_repo: None,
+          focused_on_repo: false,
         },
         ConfiguratorFocus::Repo(repo_id) => ConfiguratorScreen {
           instance_id: None,
           // TODO: load repos from connection instead of hardcoding them, obviously.
           repos,
-          tab: Default::default(),
-          current_repo: Some(repo_id),
+          tab: ConfiguratorTab::RepoDetail(repo_id.clone(), Box::new(ConfiguratorTab::None)),
+          current_repo: Some(repo_id.clone()),
+          focused_on_repo: true,
         },
       }),
       Task::none(),
@@ -162,6 +166,7 @@ impl ConfiguratorScreen {
       ConfiguratorTab::AppDetail(repo_id, app_id, prev_screen) => {
         app_detail_tab(self, &mut content, repo_id, app_id, prev_screen)
       }
+      ConfiguratorTab::None => {}
     }
 
     elements.push(
@@ -223,6 +228,9 @@ impl ConfiguratorScreen {
       Message::SetConfiguratorTab(tab) => match tab {
         ConfiguratorTab::RepoDetail(ref repo_id, _) => match self.repos.get(repo_id) {
           Some(_) => {
+            self.focused_on_repo = true;
+            self.current_repo = Some(repo_id.to_string());
+
             self.tab = tab.clone();
             Action::None
           }
@@ -252,6 +260,22 @@ impl ConfiguratorScreen {
             Action::SetTab(ConfiguratorTab::Repos)
           }
         },
+        ConfiguratorTab::Overview => {
+          // Reset the focus
+          self.focused_on_repo = false;
+          self.current_repo = None;
+
+          self.tab = tab;
+          Action::None
+        }
+        ConfiguratorTab::Repos => {
+          // Reset the focus
+          self.focused_on_repo = false;
+          self.current_repo = None;
+
+          self.tab = tab;
+          Action::None
+        }
         _ => {
           self.tab = tab;
           Action::None
