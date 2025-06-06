@@ -1,6 +1,10 @@
-use std::collections::HashMap;
+pub mod apps;
+pub mod gestures;
+pub mod modules;
+pub mod overview;
+pub mod repos;
+pub mod sidebar;
 
-use anyhow::Context;
 use carbon_steel::repos::{
   App,
   GesturePack,
@@ -13,41 +17,43 @@ use iced::{
   Padding,
   Task,
   Theme,
-  alignment,
   border::Radius,
   widget::{
-    button,
     column,
     container,
-    horizontal_space,
     row,
     scrollable,
-    text,
-    vertical_space,
   },
 };
-use iced_aw::badge;
-use iced_fonts::{
-  REQUIRED_FONT,
-  required::{
-    RequiredIcons,
-    icon_to_string,
-  },
-};
-use log::{
-  debug,
-  error,
-};
+use log::error;
+use std::collections::HashMap;
 
 use crate::{
   Message,
-  screens::MoveToScreen,
+  screens::{
+    ConfiguratorFocus,
+    MoveToScreen,
+    configurator::{
+      apps::{
+        apps_tab,
+        detail::app_detail_tab,
+      },
+      gestures::gestures_tab,
+      modules::modules_tab,
+      overview::overview_tab,
+      repos::{
+        detail::repo_detail_tab,
+        repos_tab,
+      },
+      sidebar::gen_sidebar,
+    },
+  },
   util::menu::gen_menu_bar,
 };
 
 #[derive(Debug, Clone)]
 pub struct ConfiguratorScreen {
-  pub instance_id: String,
+  pub instance_id: Option<String>,
   pub repos: HashMap<String, Repo>,
   pub tab: ConfiguratorTab,
   pub current_repo: Option<String>,
@@ -59,10 +65,13 @@ pub enum ConfiguratorTab {
   #[default]
   Overview,
   Modules,
+  // TODO: ModuleDetail(String),
   Gestures,
+  // TODO: GestureDetail(String),
   Apps,
+  AppDetail(String, String, Box<ConfiguratorTab>),
   Repos,
-  RepoDetail(String),
+  RepoDetail(String, Box<ConfiguratorTab>),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -74,7 +83,7 @@ pub enum Action {
 }
 
 impl ConfiguratorScreen {
-  pub fn new(id: String) -> (Self, Task<crate::Message>) {
+  pub fn new(id: ConfiguratorFocus) -> (Self, Task<crate::Message>) {
     let mut repos = HashMap::new();
 
     let mut gesture_packs = HashMap::new();
@@ -116,236 +125,42 @@ impl ConfiguratorScreen {
     );
 
     (
-      ConfiguratorScreen {
-        instance_id: id,
-        // TODO: load repos from connection
-        repos,
-        tab: Default::default(),
-        current_repo: None,
-      },
+      (match id {
+        ConfiguratorFocus::Instance(instance_id) => ConfiguratorScreen {
+          instance_id: Some(instance_id),
+          // TODO: load repos from connection instead of hardcoding them, obviously.
+          repos,
+          tab: Default::default(),
+          current_repo: None,
+        },
+        ConfiguratorFocus::Repo(repo_id) => ConfiguratorScreen {
+          instance_id: None,
+          // TODO: load repos from connection instead of hardcoding them, obviously.
+          repos,
+          tab: Default::default(),
+          current_repo: Some(repo_id),
+        },
+      }),
       Task::none(),
     )
   }
 
   pub fn view(&self, _state: &crate::MainAppState) -> iced::Element<crate::Message> {
     let mut elements: Vec<Element<Message>> = vec![];
-    let sidebar = vec![
-      column(vec![
-        text("$ConnectionName").size(24).into(),
-        badge("Connected")
-          .style(iced_aw::style::badge::success)
-          .into(),
-      ])
-      .spacing(12)
-      .padding(Padding {
-        top: 0.0,
-        bottom: 12.0,
-        left: 0.0,
-        right: 0.0,
-      })
-      .into(),
-      button(row([
-        text("Overview").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press_maybe({
-        if self.tab != ConfiguratorTab::Overview {
-          Some(Message::SetConfiguratorTab(ConfiguratorTab::Overview))
-        } else {
-          None
-        }
-      })
-      .width(iced::Length::Fill)
-      .into(),
-      button(row([
-        text("Modules").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press_maybe({
-        if self.tab != ConfiguratorTab::Modules {
-          Some(Message::SetConfiguratorTab(ConfiguratorTab::Modules))
-        } else {
-          None
-        }
-      })
-      .width(iced::Length::Fill)
-      .into(),
-      button(row([
-        text("Gestures").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press_maybe({
-        if self.tab != ConfiguratorTab::Gestures {
-          Some(Message::SetConfiguratorTab(ConfiguratorTab::Gestures))
-        } else {
-          None
-        }
-      })
-      .width(iced::Length::Fill)
-      .into(),
-      button(row([
-        text("Apps").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press_maybe({
-        if self.tab != ConfiguratorTab::Apps {
-          Some(Message::SetConfiguratorTab(ConfiguratorTab::Apps))
-        } else {
-          None
-        }
-      })
-      .width(iced::Length::Fill)
-      .into(),
-      button(row([
-        text("Repos").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press_maybe({
-        if self.tab != ConfiguratorTab::Repos {
-          Some(Message::SetConfiguratorTab(ConfiguratorTab::Repos))
-        } else {
-          None
-        }
-      })
-      .width(iced::Length::Fill)
-      .into(),
-      vertical_space().into(),
-      button(row([
-        text("Instances").into(),
-        horizontal_space().into(),
-        // TODO: Replace with actual icon
-        text(icon_to_string(RequiredIcons::CaretRightFill))
-          .font(REQUIRED_FONT)
-          .width(iced::Length::Shrink)
-          .align_y(alignment::Vertical::Center)
-          .into(),
-      ]))
-      .on_press(Message::MoveToScreen(MoveToScreen::Welcome))
-      .width(iced::Length::Fill)
-      .into(),
-    ];
+    let sidebar = gen_sidebar(&self);
     let mut content: Vec<iced::Element<crate::Message>> = Vec::new();
 
     match &self.tab {
-      ConfiguratorTab::Overview => {
-        debug!("Overview Tab");
-        content.push(text("Overview").into());
+      ConfiguratorTab::Overview => overview_tab(self, &mut content),
+      ConfiguratorTab::Modules => modules_tab(self, &mut content),
+      ConfiguratorTab::Gestures => gestures_tab(self, &mut content),
+      ConfiguratorTab::Apps => apps_tab(self, &mut content),
+      ConfiguratorTab::Repos => repos_tab(self, &mut content),
+      ConfiguratorTab::RepoDetail(repo_id, prev_screen) => {
+        repo_detail_tab(self, &mut content, repo_id, prev_screen)
       }
-      ConfiguratorTab::Modules => {
-        debug!("Modules Tab");
-        content.push(text("Modules").into());
-      }
-      ConfiguratorTab::Gestures => {
-        debug!("Gestures Tab");
-
-        content.push(text("Gestures").into());
-      }
-      ConfiguratorTab::Apps => {
-        debug!("Apps Tab");
-        content.push(text("Apps").into());
-      }
-      ConfiguratorTab::Repos => {
-        debug!("All Repos Tab");
-
-        content.push(text("Repositories").size(24).into());
-
-        let repos = &self.repos.clone();
-
-        content.push(
-          column(
-            <HashMap<String, Repo> as Clone>::clone(&repos)
-              .into_iter()
-              .map(|(id, repo)| {
-                debug!("Found \"{}\", with config: {:?}", id.clone(), repo.clone());
-
-                let mut badges = vec![];
-
-                if !repo.modules.is_empty() {
-                  badges.push(badge("Modules").into());
-                }
-
-                if !repo.gesture_packs.is_empty() {
-                  badges.push(badge("Gesture Packs").into());
-                }
-
-                if !repo.apps.is_empty() {
-                  badges.push(badge("Apps").into());
-                }
-
-                button(
-                  row(vec![
-                    column(vec![
-                      column(vec![
-                        text(repo.name).size(18).into(),
-                        text(repo.url).size(14).into(),
-                      ])
-                      .into(),
-                      row(badges).spacing(3).into(),
-                    ])
-                    .spacing(3)
-                    .into(),
-                    horizontal_space().into(),
-                  ])
-                  .spacing(3),
-                )
-                // TODO: Repo management sub_screen
-                .on_press(Message::SetConfiguratorTab(ConfiguratorTab::RepoDetail(
-                  id.clone(),
-                )))
-                .into()
-              })
-              .collect::<Vec<Element<Message>>>(),
-          )
-          .into(),
-        );
-      }
-      ConfiguratorTab::RepoDetail(repo_id) => {
-        let repo = self.repos.get(repo_id).with_context(|| format!("ConfiguratorScreen::update() should've ensured that \"{}\" existed in the repo cache", repo_id)).unwrap();
-
-        content.push(
-          button(row(vec![
-            text(icon_to_string(RequiredIcons::CaretLeftFill))
-              .font(REQUIRED_FONT)
-              .width(iced::Length::Shrink)
-              .align_y(alignment::Vertical::Center)
-              .into(),
-            text("Back to All Repos").into(),
-          ]))
-          .on_press(Message::SetConfiguratorTab(ConfiguratorTab::Repos))
-          .into(),
-        );
-
-        content.push(text(repo.name.clone()).size(24).into());
+      ConfiguratorTab::AppDetail(repo_id, app_id, prev_screen) => {
+        app_detail_tab(self, &mut content, repo_id, app_id, prev_screen)
       }
     }
 
@@ -406,10 +221,30 @@ impl ConfiguratorScreen {
       },
       Message::SetWizardStep(_wizard_step) => Action::None,
       Message::SetConfiguratorTab(tab) => match tab {
-        ConfiguratorTab::RepoDetail(ref repo_id) => match self.repos.get(repo_id) {
+        ConfiguratorTab::RepoDetail(ref repo_id, _) => match self.repos.get(repo_id) {
           Some(_) => {
             self.tab = tab.clone();
             Action::None
+          }
+          None => {
+            error!("Repo ID set, but it does not exist!");
+            // TODO: show pop-up!
+            Action::SetTab(ConfiguratorTab::Repos)
+          }
+        },
+        ConfiguratorTab::AppDetail(ref repo_id, ref app_id, _) => match self.repos.get(repo_id) {
+          Some(repo) => {
+            match repo.apps.get(app_id) {
+              Some(_) => {
+                self.tab = tab.clone();
+                Action::None
+              }
+              None => {
+                error!("Found repo, but the referenced app does not exist!");
+                // TODO: show pop-up!
+                Action::SetTab(ConfiguratorTab::Repos)
+              }
+            }
           }
           None => {
             error!("Repo ID set, but it does not exist!");

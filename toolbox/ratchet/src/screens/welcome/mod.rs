@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use crate::{
   screens::{
+    ConfiguratorFocus,
     MoveToScreen,
     wizard::WizardStep,
   },
@@ -69,7 +70,7 @@ impl WelcomeScreen {
 
           button("Connection")
             .on_press(crate::Message::MoveToScreen(
-              super::MoveToScreen::Configurator(id.clone()),
+              super::MoveToScreen::Configurator(ConfiguratorFocus::Instance(id)),
             ))
             .into()
         })
@@ -94,6 +95,19 @@ impl WelcomeScreen {
           .into(),
       ])
       .spacing(12)
+      .into(),
+    );
+
+    // TODO: Fix this.
+    elements.push(
+      row(vec![
+        text("Or manage a repo").into(),
+        button("TEST REPO")
+          .on_press(crate::Message::MoveToScreen(MoveToScreen::Configurator(
+            ConfiguratorFocus::Repo("com.reboot-codes.clover.CORE".to_string()),
+          )))
+          .into(),
+      ])
       .into(),
     );
 

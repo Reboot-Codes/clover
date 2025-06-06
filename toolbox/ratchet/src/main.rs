@@ -271,7 +271,7 @@ impl MainAppState {
         wizard_screen.view(self)
       }
       CurrentTopLevelScreen::Configurator(configurator_screen) => {
-        debug!("Showing: Instance Configurator");
+        debug!("Showing: Configurator");
         configurator_screen.view(self)
       }
     }

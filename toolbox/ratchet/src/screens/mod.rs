@@ -28,5 +28,11 @@ impl Default for CurrentTopLevelScreen {
 pub enum MoveToScreen {
   Welcome,
   Wizard(WizardStep),
-  Configurator(String),
+  Configurator(ConfiguratorFocus),
+}
+
+#[derive(Debug, Clone)]
+pub enum ConfiguratorFocus {
+  Instance(String),
+  Repo(String),
 }
