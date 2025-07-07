@@ -85,7 +85,7 @@ impl WelcomeScreen {
       row(vec![
         button("From Scratch")
           .on_press(crate::Message::MoveToScreen(MoveToScreen::Wizard(
-            WizardStep::Intro,
+            WizardStep::FromScratchIntro,
           )))
           .into(),
         button("to an Existing Instance")

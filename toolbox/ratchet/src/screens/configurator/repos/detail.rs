@@ -68,9 +68,19 @@ pub fn repo_detail_tab(
   if !repo_config.modules.is_empty() {
     let mut section = vec![text("Modules").size(20).into()];
 
-    for (_module_id, module_config) in repo_config.modules.iter() {
-      // TODO: Go to module detail tab
-      section.push(button(column(vec![text(module_config.name.clone()).into()])).into());
+    for (module_id, module_config) in repo_config.modules.iter() {
+      section.push(
+        button(column(vec![text(module_config.name.clone()).into()]))
+          .on_press(Message::SetConfiguratorTab(ConfiguratorTab::ModuleDetail(
+            repo_id.clone(),
+            module_id.clone(),
+            Box::new(ConfiguratorTab::RepoDetail(
+              repo_id.clone(),
+              prev_screen.clone(),
+            )),
+          )))
+          .into(),
+      );
     }
 
     content.push(column(section).spacing(6).into());
@@ -79,9 +89,21 @@ pub fn repo_detail_tab(
   if !repo_config.gesture_packs.is_empty() {
     let mut section = vec![text("Gesture Packs").size(20).into()];
 
-    for (_pack_id, pack_config) in repo_config.gesture_packs.iter() {
-      // TODO: Go to gesture pack detail tab
-      section.push(button(column(vec![text(pack_config.name.clone()).into()])).into());
+    for (gesture_pack_id, gesture_pack_config) in repo_config.gesture_packs.iter() {
+      section.push(
+        button(column(vec![text(gesture_pack_config.name.clone()).into()]))
+          .on_press(Message::SetConfiguratorTab(
+            ConfiguratorTab::GesturePackDetail(
+              repo_id.clone(),
+              gesture_pack_id.clone(),
+              Box::new(ConfiguratorTab::RepoDetail(
+                repo_id.clone(),
+                prev_screen.clone(),
+              )),
+            ),
+          ))
+          .into(),
+      );
     }
 
     content.push(column(section).spacing(6).into());

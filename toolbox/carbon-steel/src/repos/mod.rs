@@ -17,6 +17,7 @@ pub struct Module {
 #[derive(Debug, Clone)]
 pub struct App {
   pub name: String,
+  pub installed: bool,
 }
 
 #[derive(Debug, Clone)]

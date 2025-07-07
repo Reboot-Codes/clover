@@ -38,8 +38,14 @@ use crate::{
         apps_tab,
         detail::app_detail_tab,
       },
-      gestures::gestures_tab,
-      modules::modules_tab,
+      gestures::{
+        gestures_tab,
+        pack_detail::gesture_pack_detail_tab,
+      },
+      modules::{
+        detail::module_detail_tab,
+        modules_tab,
+      },
       overview::overview_tab,
       repos::{
         detail::repo_detail_tab,
@@ -67,9 +73,9 @@ pub enum ConfiguratorTab {
   Overview,
   None,
   Modules,
-  // TODO: ModuleDetail(String),
+  ModuleDetail(String, String, Box<ConfiguratorTab>),
   Gestures,
-  // TODO: GestureDetail(String),
+  GesturePackDetail(String, String, Box<ConfiguratorTab>),
   Apps,
   AppDetail(String, String, Box<ConfiguratorTab>),
   Repos,
@@ -112,6 +118,7 @@ impl ConfiguratorScreen {
       "com.reboot-codes.clover.CORE.home".to_string(),
       App {
         name: "Home".to_string(),
+        installed: true,
       },
     );
 
@@ -165,6 +172,12 @@ impl ConfiguratorScreen {
       }
       ConfiguratorTab::AppDetail(repo_id, app_id, prev_screen) => {
         app_detail_tab(self, &mut content, repo_id, app_id, prev_screen)
+      }
+      ConfiguratorTab::ModuleDetail(repo_id, module_id, prev_screen) => {
+        module_detail_tab(self, &mut content, repo_id, module_id, prev_screen)
+      }
+      ConfiguratorTab::GesturePackDetail(repo_id, module_id, prev_screen) => {
+        gesture_pack_detail_tab(self, &mut content, repo_id, module_id, prev_screen)
       }
       ConfiguratorTab::None => {}
     }

@@ -1,5 +1,14 @@
+pub mod steps;
+
 use crate::{
-  screens::MoveToScreen,
+  screens::{
+    MoveToScreen,
+    wizard::steps::{
+      connection_type::connection_type,
+      from_scratch_intro::from_scratch_intro,
+      use_case::use_case,
+    },
+  },
   util::menu::gen_menu_bar,
 };
 use iced::{
@@ -17,7 +26,8 @@ use log::debug;
 
 #[derive(Default, Debug, Clone)]
 pub struct WizardScreen {
-  step: WizardStep,
+  pub step: WizardStep,
+  pub first_step: WizardStep,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -33,6 +43,7 @@ impl WizardScreen {
     (
       WizardScreen {
         step: starting_point,
+        first_step: starting_point,
       },
       Task::none(),
     )
@@ -52,30 +63,9 @@ impl WizardScreen {
     controls.push(horizontal_space().into());
 
     match self.step {
-      WizardStep::Intro => {
-        elements.push(text("introduction").into());
-
-        controls.push(button("Back").into());
-        controls.push(
-          button("Forward")
-            .on_press(crate::Message::SetWizardStep(WizardStep::ConnectionType))
-            .into(),
-        );
-      }
-      WizardStep::ConnectionType => {
-        elements.push(text("existing connection type").into());
-
-        controls.push(
-          button("Back")
-            .on_press(crate::Message::SetWizardStep(WizardStep::Intro))
-            .into(),
-        );
-        controls.push(
-          button("Finish")
-            .on_press(crate::Message::SetWizardStep(WizardStep::Finishing))
-            .into(),
-        );
-      }
+      WizardStep::FromScratchIntro => from_scratch_intro(self, &mut elements, &mut controls),
+      WizardStep::UseCase => use_case(self, &mut elements, &mut controls),
+      WizardStep::ConnectionType => connection_type(self, &mut elements, &mut controls),
       WizardStep::Finishing => {
         elements.push(text("Connecting to: ").into());
 
@@ -134,7 +124,8 @@ impl WizardScreen {
 #[derive(Default, Debug, Clone, Copy)]
 pub enum WizardStep {
   #[default]
-  Intro,
+  FromScratchIntro,
+  UseCase,
   ConnectionType,
   Finishing,
 }
