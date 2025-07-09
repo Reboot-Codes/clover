@@ -26,7 +26,6 @@ use systems::{
 
 pub enum ExitState {
   Success,
-  Error,
 }
 
 unsafe impl Sync for ExitState {}

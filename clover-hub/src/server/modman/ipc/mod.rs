@@ -1,5 +1,6 @@
 mod gestures;
 
+use anyhow::anyhow;
 use gestures::handle_gesture_cmd;
 use log::{
   debug,
@@ -16,29 +17,49 @@ use tokio::sync::broadcast::Sender;
 use url::Url;
 
 use crate::{
-  server::modman::models::GestureCommand,
+  server::modman::models::{
+    GestureCommand,
+    ModManStore,
+  },
   utils::deserialize_base64,
 };
+use std::{
+  str::FromStr,
+  sync::Arc,
+};
 
-#[derive(Deserialize, Serialize, VariantNames)]
+#[derive(Debug, PartialEq)]
 pub enum Events {
-  #[serde(rename = "/status")]
-  #[strum(serialize = "/status")]
   Status,
-  #[serde(rename = "/gesture")]
-  #[strum(serialize = "/gesture")]
   Gesture,
+  None,
 }
 
-pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
+impl FromStr for Events {
+  type Err = anyhow::Error;
+
+  fn from_str(input: &str) -> Result<Events, Self::Err> {
+    match input {
+      "/gesture" => Ok(Events::Gesture),
+      "/status" => Ok(Events::Status),
+      "" => Ok(Events::None),
+      "/" => Ok(Events::None),
+      _ => Err(anyhow!("String \"{}\" not part of enum!", input)),
+    }
+  }
+}
+
+pub async fn handle_ipc_msg(store: ModManStore, ipc_rx: Sender<IPCMessageWithId>) {
+  let store_arc = Arc::new(store.clone());
+
   while let Ok(msg) = ipc_rx.subscribe().recv().await {
     let kind = Url::parse(&msg.kind.clone()).unwrap();
 
     // Verify that we care about this event.
     if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.modman") {
-      debug!("Processing: {}", msg.kind.clone());
+      debug!("Processing: \"{}\"...", kind.path());
 
-      match serde_json_lenient::from_str::<Events>(&format!("\"{}\"", kind.path())) {
+      match Events::from_str(kind.path()) {
         Ok(event_type) => {
           match event_type {
             Events::Status => {
@@ -68,7 +89,14 @@ pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
                   }
 
                   match gesture_command {
-                    Some(cmd) => handle_gesture_cmd(gesture_id_str.clone(), cmd.clone()),
+                    Some(cmd) => {
+                      handle_gesture_cmd(
+                        &mut store_arc.clone(),
+                        gesture_id_str.clone(),
+                        cmd.clone(),
+                      )
+                      .await
+                    }
                     None => {
                       error!("Parsed gesture ID and data, but it was not set??");
                     }
@@ -80,9 +108,14 @@ pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
                 }
               }
             }
+            _ => {
+              debug!("Blank event... doing nothing.");
+            }
           }
         }
-        Err(e) => {}
+        Err(e) => {
+          debug!("Failed to parse path: {}, due to: {}", kind.path(), e);
+        }
       }
     }
   }

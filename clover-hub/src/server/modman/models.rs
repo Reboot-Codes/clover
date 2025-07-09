@@ -136,6 +136,9 @@ pub struct ModManStore {
   pub modules: Arc<Mutex<HashMap<String, Module>>>,
   pub components: Arc<Mutex<HashMap<String, Arc<(CloverComponentMeta, CloverComponent)>>>>,
   pub config: Arc<Mutex<Config>>,
+  pub gesture_states: Arc<Mutex<HashMap<String, GestureStates>>>,
+  pub foreground_gesture_priority: Arc<Mutex<Vec<String>>>,
+  pub background_gesture_priority: Arc<Mutex<Vec<String>>>,
   /// Used for [Bus](super::busses::models::Bus) statuses, etc
   pub port_statuses: PortStatuses,
 }
@@ -150,6 +153,9 @@ impl ModManStore {
     ModManStore {
       modules: Arc::new(Mutex::new(HashMap::new())),
       components: Arc::new(Mutex::new(HashMap::new())),
+      gesture_states: Arc::new(Mutex::new(HashMap::new())),
+      foreground_gesture_priority: Arc::new(Mutex::new(Vec::new())),
+      background_gesture_priority: Arc::new(Mutex::new(Vec::new())),
       port_statuses: PortStatuses {
         uart: Arc::new(Mutex::new(HashMap::new())),
       },
@@ -181,14 +187,19 @@ pub enum PortStatus {
   Unavailable(String),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, VariantNames)]
+#[derive(Serialize, Deserialize, Clone, Debug, VariantNames, PartialEq)]
+#[serde(tag = "command")]
 pub enum GestureState {
   #[serde(rename = "begin")]
   #[strum(serialize = "begin")]
-  Begin,
-  #[serde(rename = "continue")]
-  #[strum(serialize = "continue")]
-  Continue,
+  Begin {
+    intensity: f64,
+    speed: f64,
+    background: Option<bool>,
+  },
+  #[serde(rename = "unpause")]
+  #[strum(serialize = "unpause")]
+  UnPause,
   #[serde(rename = "pause")]
   #[strum(serialize = "end")]
   Pause,
@@ -197,12 +208,12 @@ pub enum GestureState {
   End,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GestureCommand {
-  state: GestureState,
-  intensity: f64,
-  speed: f64,
-  areas: Option<Vec<String>>,
+  pub state: GestureState,
+  pub auto_switch: Option<f64>,
+  pub is_from_system: bool,
+  pub areas: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -232,4 +243,19 @@ pub struct GestureOverride {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModManConfig {
   pub uart_ports: Vec<(String, u32)>,
+  pub restart_gestures: bool,
+  pub gesture_states: HashMap<String, GestureStates>,
+  pub gestures_bg_by_default: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GestureStates {
+  /// Previous state of the gesture if we'd like to temporarily move back.
+  pub prev_state: Option<GestureState>,
+  /// Is this gesture paused?
+  pub paused: bool,
+  /// The current state of the gesture.
+  pub current_state: GestureState,
+  /// The next state to switch to (pre-loaded into Renderer and Modules if it loads resources), with a delay if we want to switch automatically.
+  pub next_state: Option<(f64, GestureState)>,
 }

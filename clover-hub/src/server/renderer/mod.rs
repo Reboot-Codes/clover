@@ -79,7 +79,7 @@ pub async fn renderer_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      init_user.send(
+      let _ = init_user.send(
         &"nexus://com.reboot-codes.clover.renderer/status".to_string(),
         &"finished-init".to_string(),
         &None,
