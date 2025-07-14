@@ -57,7 +57,7 @@ overflow-proof = "0.1.0"
 decorum = "0.4.0"
 
 # HTTP/WS
-nexus = { path = "/home/reboot/dev/nexus" }
+nexus = { path = "../../nexus" }
 url = "2.5.0"
 image = { version = "0.25.5", features = ["serde"] }
 
