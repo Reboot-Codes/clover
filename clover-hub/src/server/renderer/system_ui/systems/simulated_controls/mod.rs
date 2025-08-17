@@ -10,14 +10,16 @@ use bevy::{
   window::Window,
 };
 
-pub fn make_visible(mut window: Query<&mut Window>, frames: Res<FrameCount>) {
+pub fn make_visible(mut windows: Query<&mut Window>, frames: Res<FrameCount>) {
   // info!("Frame: {}", frames.0);
   // The delay may be different for your app or system.
   if frames.0 == 3 {
     // At this point the gpu is ready to show the app so we can make the window visible.
     // Alternatively, you could toggle the visibility in Startup.
     // It will work, but it will have one white frame before it starts rendering
-    window.get_single_mut().unwrap().visible = true;
+    for mut window in &mut windows {
+      window.visible = true;
+    }
   }
 }
 

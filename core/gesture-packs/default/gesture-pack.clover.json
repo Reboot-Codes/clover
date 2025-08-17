@@ -1,3 +1,29 @@
 {
   "name": "Default Gesture Pack",
+  "description": "Default/fallback gesture pack.",
+  "gestures": {
+    "@base.happy": {
+      "name": "Happy",
+      "configs": {
+        "*": {
+          "torso.head.face.eyes.*": {
+            "eyelids.*": 1.0,
+            "eyebrow": 0.75
+          }
+        },
+        "@base.furry.canine*": {
+          "torso.core.back.spine.tail": {
+            "@animation": {
+              "type": "bounce",
+              "speed": 1000.0,
+              "keyframes": [
+                { "x": -45.0, "y": "@inital" },
+                { "x": 45.0, "y": "@inital" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
 }

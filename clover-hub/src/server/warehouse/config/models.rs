@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::server::modman::models::ModManConfig;
+use crate::server::renderer::models::RendererConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -24,6 +25,7 @@ pub struct Config {
   /// Default gesture pack to use
   pub default_gesture_pack: String,
   pub modman: ModManConfig,
+  pub renderer: RendererConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +48,7 @@ impl Default for Config {
       primary_api_key: utils::gen_api_key(),
       default_gesture_pack: "com.reboot-codes.clover.CORE.default".to_string(),
       modman: Default::default(),
+      renderer: Default::default(),
     }
   }
 }

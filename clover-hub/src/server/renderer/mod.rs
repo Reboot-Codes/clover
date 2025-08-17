@@ -1,4 +1,5 @@
 pub mod ipc;
+pub mod models;
 pub mod system_ui;
 
 use self::system_ui::system_ui_main;
@@ -16,8 +17,8 @@ use nexus::{
 use queues::*;
 use std::sync::Arc;
 use system_ui::{
-  CustomBevyIPC,
   ExitState,
+  SystemUIIPC,
 };
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
@@ -65,13 +66,19 @@ pub async fn renderer_main(
   info!("Starting Renderer...");
 
   let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
-  let bevy_cancel_ipc = CustomBevyIPC {
+  let mut system_ui_ipc = SystemUIIPC {
     exit_channel: RecvSync(bevy_cancel_rx),
     display_registration_queue: queue![],
   };
 
+  for (display_id, display) in store.config.lock().await.renderer.virtual_displays.clone() {
+    system_ui_ipc
+      .display_registration_queue
+      .add(system_ui::AnyDisplayComponent::Virtual(display));
+  }
+
   // TODO: Add this as a CLI/Config option!
-  std::thread::spawn(|| system_ui_main(bevy_cancel_ipc, Some(true)));
+  std::thread::spawn(|| system_ui_main(system_ui_ipc, Some(false)));
 
   // let display_handles = Arc::new(HashMap::new());
 

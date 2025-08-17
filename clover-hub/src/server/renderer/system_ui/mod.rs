@@ -1,7 +1,10 @@
 pub mod plugins;
 pub mod systems;
 
-use crate::server::modman::components::video::displays::models::PhysicalDisplayComponent;
+use crate::server::modman::components::video::displays::models::{
+  PhysicalDisplayComponent,
+  VirtualDisplayComponent,
+};
 use crate::utils::RecvSync;
 use bevy::{
   app::{
@@ -30,13 +33,19 @@ pub enum ExitState {
 
 unsafe impl Sync for ExitState {}
 
-#[derive(Resource)]
-pub struct CustomBevyIPC {
-  pub exit_channel: RecvSync<ExitState>,
-  pub display_registration_queue: Queue<PhysicalDisplayComponent>,
+#[derive(Debug, Clone)]
+pub enum AnyDisplayComponent {
+  Physical(PhysicalDisplayComponent),
+  Virtual(VirtualDisplayComponent),
 }
 
-pub fn system_ui_main(custom_bevy_ipc: CustomBevyIPC, disable_winit: Option<bool>) {
+#[derive(Resource)]
+pub struct SystemUIIPC {
+  pub exit_channel: RecvSync<ExitState>,
+  pub display_registration_queue: Queue<AnyDisplayComponent>,
+}
+
+pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>) {
   let mut app = App::new();
 
   app

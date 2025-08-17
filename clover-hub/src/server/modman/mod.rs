@@ -1,5 +1,6 @@
 pub mod busses;
 pub mod components;
+pub mod gestures;
 pub mod ipc;
 pub mod models;
 pub mod modules;

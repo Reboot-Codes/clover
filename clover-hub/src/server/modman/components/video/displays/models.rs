@@ -34,7 +34,7 @@ pub struct PhysicalDisplayComponent {
 
 impl DisplayComponent for PhysicalDisplayComponent {}
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Serialize, Deserialize)]
 pub struct VirtualDisplayComponent {
   /// Position and Component ID of the displays that make up this Virtual Display
   pub displays: HashMap<String, DisplayPosition>,
@@ -45,7 +45,7 @@ pub struct VirtualDisplayComponent {
 
 impl DisplayComponent for VirtualDisplayComponent {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisplayPosition {
   pub x: f64,
   pub y: f64,

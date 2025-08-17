@@ -8,6 +8,6 @@ use std::num::NonZero;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoResolution {
-  pub height: NonZero<u64>,
-  pub width: NonZero<u64>,
+  pub height: NonZero<u32>,
+  pub width: NonZero<u32>,
 }
