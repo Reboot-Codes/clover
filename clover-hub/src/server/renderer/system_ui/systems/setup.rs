@@ -3,6 +3,35 @@ use bevy::prelude::*;
 use bevy::window::Monitor;
 use std::env;
 
+pub fn sim_button(parent: &mut ChildBuilder<'_>, color: Color, text: &str) {
+  let button_id = text.to_owned();
+
+  parent
+    .spawn((
+      Node {
+        width: Val::Px(50.0),
+        height: Val::Px(50.0),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+      },
+      BackgroundColor(color),
+    ))
+    .with_children(|button| {
+      button.spawn((
+        Text::new(text),
+        TextFont {
+          font_size: 10.0,
+          ..Default::default()
+        },
+        TextColor(Color::srgb(0.0, 0.0, 0.0)),
+      ));
+    })
+    .observe(move |_: Trigger<Pointer<Click>>| {
+      debug!("{} was clicked!", button_id);
+    });
+}
+
 pub fn setup(
   mut commands: Commands,
   #[cfg(feature = "compositor")] monitor_entities_query: Query<(Entity, &Monitor)>,
@@ -30,16 +59,28 @@ pub fn setup(
           justify_content: JustifyContent::SpaceBetween,
           ..default()
         })
-        .insert(PickingBehavior::IGNORE)
+        .insert(PickingBehavior {
+          should_block_lower: false,
+          is_hoverable: false,
+        })
         .with_children(|parent| {
-          parent.spawn((
-            Node {
-              width: Val::Px(200.),
-              border: UiRect::all(Val::Px(2.)),
-              ..default()
-            },
-            BackgroundColor(Color::srgb(0.65, 0.65, 0.65)),
-          ));
+          // Directions
+          sim_button(parent, Color::srgb(0.65, 0.65, 0.65), "Up");
+          sim_button(parent, Color::srgb(0.65, 0.65, 0.65), "Down");
+          sim_button(parent, Color::srgb(0.65, 0.65, 0.65), "Left");
+          sim_button(parent, Color::srgb(0.65, 0.65, 0.65), "Right");
+
+          // Primary
+          sim_button(parent, Color::srgb(0.1, 0.65, 0.1), "1");
+
+          // Seccondary
+          sim_button(parent, Color::srgb(0.1, 0.1, 0.65), "2");
+
+          // Back
+          sim_button(parent, Color::srgb(0.65, 0.1, 0.1), "Back");
+
+          // Home
+          sim_button(parent, Color::srgb(0.65, 0.65, 0.1), "Home");
         });
     }
   }

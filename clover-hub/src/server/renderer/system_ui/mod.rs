@@ -88,7 +88,7 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
               .set(WindowPlugin {
                 primary_window: Some(Window {
                   title: "Clover Simulated Controls".into(),
-                  resolution: (500., 200.).into(),
+                  resolution: (440.0, 75.0).into(),
                   present_mode: PresentMode::AutoVsync,
                   // Tells Wasm to resize the window according to the available canvas
                   fit_canvas_to_parent: true,
