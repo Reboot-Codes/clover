@@ -16,10 +16,7 @@ use nexus::{
 };
 use queues::*;
 use std::sync::Arc;
-use system_ui::{
-  ExitState,
-  SystemUIIPC,
-};
+use system_ui::SystemUIIPC;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -71,10 +68,11 @@ pub async fn renderer_main(
     display_registration_queue: queue![],
   };
 
-  for (display_id, display) in store.config.lock().await.renderer.virtual_displays.clone() {
+  for (_display_id, display) in store.config.lock().await.renderer.virtual_displays.clone() {
     system_ui_ipc
       .display_registration_queue
-      .add(system_ui::AnyDisplayComponent::Virtual(display));
+      .add(system_ui::AnyDisplayComponent::Virtual(display))
+      .unwrap();
   }
 
   // TODO: Add this as a CLI/Config option!
@@ -99,7 +97,7 @@ pub async fn renderer_main(
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
         _ = ipc_recv_token.cancelled() => {
-            debug!("ipc_recv exited");
+          debug!("ipc_recv exited");
         },
         _ = handle_ipc_msg(ipc_rx) => {}
     }
@@ -113,7 +111,7 @@ pub async fn renderer_main(
 
       info!("Cleaning up displays...");
 
-      let _ = bevy_cancel_tx.send(ExitState::Success);
+      let _ = bevy_cancel_tx.send(bevy::prelude::AppExit::Success);
 
       // TODO: Clean up registered displays when server is shutting down.
 

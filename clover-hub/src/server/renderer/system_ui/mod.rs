@@ -20,18 +20,9 @@ use bevy::{
 };
 use queues::*;
 use systems::{
-  displays::{
-    display_registrar,
-    vdisplay_registrar,
-  },
+  displays::display_registrar,
   setup::setup,
 };
-
-pub enum ExitState {
-  Success,
-}
-
-unsafe impl Sync for ExitState {}
 
 #[derive(Debug, Clone)]
 pub enum AnyDisplayComponent {
@@ -41,8 +32,20 @@ pub enum AnyDisplayComponent {
 
 #[derive(Resource)]
 pub struct SystemUIIPC {
-  pub exit_channel: RecvSync<ExitState>,
+  pub exit_channel: RecvSync<bevy::prelude::AppExit>,
   pub display_registration_queue: Queue<AnyDisplayComponent>,
+}
+
+pub fn shutdown_system(
+  ipc: Res<SystemUIIPC>,
+  mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
+) {
+  match ipc.exit_channel.0.try_recv() {
+    Ok(exit_state) => {
+      app_exit_events.send(exit_state);
+    }
+    Err(_) => {}
+  }
 }
 
 pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>) {
@@ -51,7 +54,8 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
   app
     .insert_resource(custom_bevy_ipc)
     .add_systems(Startup, setup)
-    .add_systems(Update, (vdisplay_registrar, display_registrar).chain());
+    .add_systems(Update, display_registrar)
+    .add_systems(Update, shutdown_system);
 
   #[cfg(feature = "compositor")]
   match disable_winit {

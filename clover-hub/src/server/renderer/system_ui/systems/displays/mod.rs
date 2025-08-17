@@ -19,8 +19,6 @@ use bevy::window::{
 use log::warn;
 use queues::*;
 
-pub fn vdisplay_registrar(mut commands: Commands, mut ipc: ResMut<SystemUIIPC>) {}
-
 pub fn display_registrar(
   mut commands: Commands,
   mut ipc: ResMut<SystemUIIPC>,
