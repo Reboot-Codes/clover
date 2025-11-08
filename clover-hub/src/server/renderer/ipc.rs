@@ -1,9 +1,16 @@
 use anyhow::anyhow;
 use log::debug;
 use nexus::server::models::IPCMessageWithId;
-use std::str::FromStr;
+use queues::Queue;
+use std::sync::Mutex as StdMutex;
+use std::{
+  str::FromStr,
+  sync::Arc,
+};
 use tokio::sync::broadcast::Sender;
 use url::Url;
+
+use crate::server::renderer::system_ui::AnyDisplayComponent;
 
 #[derive(Debug, PartialEq)]
 pub enum Events {
@@ -22,7 +29,10 @@ impl FromStr for Events {
   }
 }
 
-pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
+pub async fn handle_ipc_msg(
+  ipc_rx: Sender<IPCMessageWithId>,
+  display_registration_queue: Arc<StdMutex<Queue<(String, AnyDisplayComponent)>>>,
+) {
   while let Ok(msg) = ipc_rx.subscribe().recv().await {
     let kind = Url::parse(&msg.kind.clone()).unwrap();
 

@@ -33,12 +33,13 @@ use super::components::models::CloverComponentTrait;
 // TODO: Define defaults via `Default` trait impl.
 
 /// Modules contain [Components](CloverComponent).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
   pub module_type: String,
   pub module_name: String,
   pub custom_name: Option<String>,
   pub initialized: bool,
+  /// Component ID and if it's critical
   pub components: Vec<(String, bool)>,
   pub registered_by: String,
 }
@@ -70,7 +71,7 @@ pub struct CloverComponentMeta {
 }
 
 /// Enum with all known clover component types, technically a valid "component" ([see the Component Trait](CloverComponentTrait)) itself.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CloverComponent {
   AudioInputComponent(AudioInputComponent),
   AudioOutputComponent(AudioOutputComponent),
@@ -240,12 +241,126 @@ pub struct GestureOverride {
   pub gesture_parameters: Option<GestureParameters>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModManConfig {
   pub uart_ports: Vec<(String, u32)>,
   pub restart_gestures: bool,
   pub gesture_states: HashMap<String, GestureStates>,
   pub gestures_bg_by_default: bool,
+  pub static_modules: HashMap<String, Module>,
+  pub static_components: HashMap<String, (CloverComponentMeta, CloverComponent)>,
+}
+
+impl Default for ModManConfig {
+  /// Ensure that there is a display if the compositor was compiled in
+  /// and there wasn't a display defined in the config/disabled explicitly.
+  fn default() -> Self {
+    let mut static_modules = HashMap::new();
+    let mut static_components = HashMap::new();
+
+    #[cfg(feature = "compositor")]
+    {
+      use std::num::NonZero;
+
+      use crate::server::modman::components::video::{
+        displays::{
+          self,
+          models::{
+            DirectConnection,
+            DisplaySize,
+          },
+        },
+        VideoResolution,
+      };
+
+      let internal_display_id = uuid::Uuid::new_v4().to_string();
+      let external_display_id = uuid::Uuid::new_v4().to_string();
+
+      static_modules.insert(
+        uuid::Uuid::new_v4().to_string(),
+        Module {
+          module_type: "com.reboot-codes.clover.debug-display".to_string(),
+          module_name: "Debug Displays".to_string(),
+          custom_name: Default::default(),
+          initialized: false,
+          components: vec![
+            (internal_display_id.clone(), true),
+            (external_display_id.clone(), true),
+          ],
+          registered_by: "com.reboot-codes.clover.modman.default".to_string(),
+        },
+      );
+
+      static_components.insert(
+        internal_display_id.clone(),
+        (
+          CloverComponentMeta {
+            name: "Debug Internal Display".to_string(),
+            critical: true,
+            location: "none".to_string(),
+            base_gesture_parameters: HashMap::new(),
+            internal: true,
+          },
+          CloverComponent::PhysicalDisplayComponent(PhysicalDisplayComponent {
+            resolution: VideoResolution {
+              width: NonZero::new(500).unwrap(),
+              height: NonZero::new(200).unwrap(),
+            },
+            size: DisplaySize {
+              height: Some(2.0),
+              width: None,
+            },
+            connection: displays::models::ConnectionType::Direct(DirectConnection {
+              display_id: "@primary".to_string(),
+              windowed: true,
+            }),
+            virtual_display: None,
+            gesture_config: None,
+            internal: true,
+          }),
+        ),
+      );
+
+      static_components.insert(
+        external_display_id.clone(),
+        (
+          CloverComponentMeta {
+            name: "Debug External Display".to_string(),
+            critical: true,
+            location: "none".to_string(),
+            base_gesture_parameters: HashMap::new(),
+            internal: false,
+          },
+          CloverComponent::PhysicalDisplayComponent(PhysicalDisplayComponent {
+            resolution: VideoResolution {
+              width: NonZero::new(500).unwrap(),
+              height: NonZero::new(200).unwrap(),
+            },
+            size: DisplaySize {
+              height: Some(2.0),
+              width: None,
+            },
+            connection: displays::models::ConnectionType::Direct(DirectConnection {
+              display_id: "@primary".to_string(),
+              windowed: true,
+            }),
+            virtual_display: None,
+            gesture_config: None,
+            internal: false,
+          }),
+        ),
+      );
+    }
+
+    Self {
+      static_components,
+      static_modules,
+      uart_ports: Default::default(),
+      restart_gestures: Default::default(),
+      gesture_states: Default::default(),
+      gestures_bg_by_default: Default::default(),
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

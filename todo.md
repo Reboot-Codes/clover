@@ -2,6 +2,7 @@
 
 - [ ] CloverHub
   - [ ] Server
+    - [ ] Move to MQTT/RabbitMQ
     - [ ] Renderer
       - [ ] SystemUI
         - [ ] Custom Audio Plugin (using ModMan proxies).

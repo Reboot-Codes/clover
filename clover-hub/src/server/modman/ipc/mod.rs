@@ -7,19 +7,21 @@ use log::{
   error,
   warn,
 };
-use nexus::server::models::IPCMessageWithId;
-use serde::{
-  Deserialize,
-  Serialize,
+use nexus::{
+  server::models::IPCMessageWithId,
+  user::NexusUser,
 };
-use strum::VariantNames;
 use tokio::sync::broadcast::Sender;
 use url::Url;
 
 use crate::{
-  server::modman::models::{
-    GestureCommand,
-    ModManStore,
+  server::{
+    modman::models::{
+      CloverComponent,
+      GestureCommand,
+      ModManStore,
+    },
+    renderer::system_ui::AnyDisplayComponent,
   },
   utils::deserialize_base64,
 };
@@ -32,6 +34,7 @@ use std::{
 pub enum Events {
   Status,
   Gesture,
+  InitDisplays,
   None,
 }
 
@@ -42,6 +45,7 @@ impl FromStr for Events {
     match input {
       "/gesture" => Ok(Events::Gesture),
       "/status" => Ok(Events::Status),
+      "/init-displays" => Ok(Events::InitDisplays),
       "" => Ok(Events::None),
       "/" => Ok(Events::None),
       _ => Err(anyhow!("String \"{}\" not part of enum!", input)),
@@ -49,7 +53,11 @@ impl FromStr for Events {
   }
 }
 
-pub async fn handle_ipc_msg(store: ModManStore, ipc_rx: Sender<IPCMessageWithId>) {
+pub async fn handle_ipc_msg(
+  store: ModManStore,
+  ipc_rx: Sender<IPCMessageWithId>,
+  user: Arc<NexusUser>,
+) {
   let store_arc = Arc::new(store.clone());
 
   while let Ok(msg) = ipc_rx.subscribe().recv().await {
@@ -105,6 +113,56 @@ pub async fn handle_ipc_msg(store: ModManStore, ipc_rx: Sender<IPCMessageWithId>
                 None => {
                   // TODO reply!
                   warn!("Gesture ID not included! Use state event instead.");
+                }
+              }
+            }
+            Events::InitDisplays => {
+              for (_module_id, module_config) in store.modules.lock().await.iter() {
+                if module_config.initialized {
+                  for (component_id, _is_critical) in &module_config.components {
+                    match store.components.lock().await.get(component_id) {
+                      Some(component_entry) => {
+                        let component_config = component_entry.1.clone();
+
+                        match component_config {
+                          CloverComponent::PhysicalDisplayComponent(physical_display_config) => {
+                            match user.send(
+                              &"nexus://com.reboot-codes.clover.renderer/register-display"
+                                .to_string(),
+                              &serde_json_lenient::to_string(&AnyDisplayComponent::Physical(
+                                physical_display_config,
+                              ))
+                              .unwrap(),
+                              &None,
+                            ) {
+                              Err(e) => {
+                                error!("Error when attempting to send registered display registration to peers: {}", e);
+                              }
+                              _ => {}
+                            }
+                          }
+                          CloverComponent::VirtualDisplayComponent(virtual_display_config) => {
+                            match user.send(
+                              &"nexus://com.reboot-codes.clover.renderer/register-display"
+                                .to_string(),
+                              &serde_json_lenient::to_string(&AnyDisplayComponent::Virtual(
+                                virtual_display_config,
+                              ))
+                              .unwrap(),
+                              &None,
+                            ) {
+                              Err(e) => {
+                                error!("Error when attempting to send registered display registration to peers: {}", e);
+                              }
+                              _ => {}
+                            }
+                          }
+                          _ => {}
+                        }
+                      }
+                      None => todo!(),
+                    }
+                  }
                 }
               }
             }

@@ -1,16 +1,18 @@
 pub mod plugins;
 pub mod systems;
 
+use std::sync::{
+  Arc,
+  Mutex,
+};
+
 use crate::server::modman::components::video::displays::models::{
   PhysicalDisplayComponent,
   VirtualDisplayComponent,
 };
 use crate::utils::RecvSync;
 use bevy::{
-  app::{
-    App,
-    Startup,
-  },
+  app::App,
   diagnostic::{
     FrameTimeDiagnosticsPlugin,
     LogDiagnosticsPlugin,
@@ -19,12 +21,13 @@ use bevy::{
   prelude::*,
 };
 use queues::*;
-use systems::{
-  displays::display_registrar,
-  setup::setup,
+use serde::{
+  Deserialize,
+  Serialize,
 };
+use systems::displays::display_registrar;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnyDisplayComponent {
   Physical(PhysicalDisplayComponent),
   Virtual(VirtualDisplayComponent),
@@ -33,7 +36,7 @@ pub enum AnyDisplayComponent {
 #[derive(Resource)]
 pub struct SystemUIIPC {
   pub exit_channel: RecvSync<bevy::prelude::AppExit>,
-  pub display_registration_queue: Queue<AnyDisplayComponent>,
+  pub display_registration_queue: Arc<Mutex<Queue<(String, AnyDisplayComponent)>>>,
 }
 
 pub fn shutdown_system(
@@ -53,7 +56,7 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
 
   app
     .insert_resource(custom_bevy_ipc)
-    .add_systems(Startup, setup)
+    // .add_systems(Startup, setup)
     .add_systems(Update, display_registrar)
     .add_systems(Update, shutdown_system);
 
@@ -79,6 +82,8 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
           update_scroll_position,
         };
 
+        use crate::server::renderer::system_ui::systems::simulated_controls::sim_setup;
+
         let mut modded_winit: WinitPlugin<WakeUp> = Default::default();
         modded_winit.run_on_any_thread = true;
 
@@ -87,8 +92,8 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
             DefaultPlugins
               .set(WindowPlugin {
                 primary_window: Some(Window {
-                  title: "Clover Simulated Controls".into(),
-                  resolution: (440.0, 75.0).into(),
+                  title: "Clover".into(),
+                  resolution: (100.0, 100.0).into(),
                   present_mode: PresentMode::AutoVsync,
                   // Tells Wasm to resize the window according to the available canvas
                   fit_canvas_to_parent: true,
@@ -109,6 +114,7 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
             LogDiagnosticsPlugin::default(),
             FrameTimeDiagnosticsPlugin,
           ))
+          .add_systems(Startup, sim_setup)
           .add_systems(Update, (make_visible, update_scroll_position));
       }
     }

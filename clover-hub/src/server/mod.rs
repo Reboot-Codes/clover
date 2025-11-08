@@ -47,12 +47,12 @@ pub async fn server_main(
   let warehouse_store = WarehouseStore::new(None);
 
   // TODO: Let each process run independantly of eachother using nexus
-
   let warehouse_setup_store = Arc::new(warehouse_store.clone());
   match setup_warehouse(data_dir.clone(), warehouse_setup_store).await {
     Ok(_) => {
       match connect_db(warehouse_store.clone()).await {
         Ok(_) => {
+          debug!("Initalizing Stores...");
           let renderer_store = RendererStore::new(Some(warehouse_store.config.clone()));
           let modman_store = ModManStore::new(Some(warehouse_store.config.clone()));
           let inference_engine_store =
@@ -66,7 +66,9 @@ pub async fn server_main(
             .await
             .primary_api_key
             .clone();
+          debug!("Stores initalized!");
 
+          debug!("Creating master Nexus user...");
           // Add users to nexus
           let (mut nexus_store, master_user_config) =
             NexusStore::new(&"Owner".to_string(), &primary_api_key.clone()).await;
@@ -75,7 +77,9 @@ pub async fn server_main(
             "Master User api key: {}",
             master_user_config.api_keys[0].clone()
           );
+          debug!("Created master Nexus user!");
 
+          debug!("Creating Warehouse Nexus user...");
           let warehouse_user_config = Arc::new(
             nexus_store
               .add_user(
@@ -86,6 +90,14 @@ pub async fn server_main(
               .await
               .unwrap(),
           );
+          debug!("Creating Warehouse NexusUser object...");
+          let (warehouse_user, from_warehouse, to_warehouse) = nexus_store
+            .connect_user(&warehouse_user_config.api_keys[0].clone())
+            .await
+            .unwrap();
+          debug!("Created Warehouse Nexus user!");
+
+          debug!("Creating Renderer Nexus user...");
           let renderer_user_config = Arc::new(
             nexus_store
               .add_user(
@@ -96,6 +108,14 @@ pub async fn server_main(
               .await
               .unwrap(),
           );
+          debug!("Creating Renderer NexusUser object...");
+          let (renderer_user, from_renderer, to_renderer) = nexus_store
+            .connect_user(&renderer_user_config.api_keys[0].clone())
+            .await
+            .unwrap();
+          debug!("Created Renderer Nexus user!");
+
+          debug!("Creating Modman Nexus user...");
           let modman_user_config = Arc::new(
             nexus_store
               .add_user(
@@ -106,6 +126,14 @@ pub async fn server_main(
               .await
               .unwrap(),
           );
+          debug!("Creating ModMan NexusUser object...");
+          let (modman_user, from_modman, to_modman) = nexus_store
+            .connect_user(&modman_user_config.api_keys[0].clone())
+            .await
+            .unwrap();
+          debug!("Created Modman Nexus user!");
+
+          debug!("Creating Inference Engine Nexus user...");
           let inference_engine_user_config = Arc::new(
             nexus_store
               .add_user(
@@ -116,6 +144,14 @@ pub async fn server_main(
               .await
               .unwrap(),
           );
+          debug!("Creating InferenceEngine NexusUser object...");
+          let (inference_engine_user, from_inference_engine, to_inference_engine) = nexus_store
+            .connect_user(&inference_engine_user_config.api_keys[0].clone())
+            .await
+            .unwrap();
+          debug!("Created Inference Engine Nexus user!");
+
+          debug!("Creating AppDaemon Nexus user...");
           let appd_user_config = Arc::new(
             nexus_store
               .add_user(
@@ -126,30 +162,15 @@ pub async fn server_main(
               .await
               .unwrap(),
           );
-
-          // Create NexusUser objects
-          let (warehouse_user, from_warehouse, to_warehouse) = nexus_store
-            .connect_user(&warehouse_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          let (renderer_user, from_renderer, to_renderer) = nexus_store
-            .connect_user(&renderer_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          let (modman_user, from_modman, to_modman) = nexus_store
-            .connect_user(&modman_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          let (inference_engine_user, from_inference_engine, to_inference_engine) = nexus_store
-            .connect_user(&inference_engine_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
+          debug!("Creating AppDaemon NexusUser object...");
           let (appd_user, from_appd, to_appd) = nexus_store
             .connect_user(&appd_user_config.api_keys[0].clone())
             .await
             .unwrap();
+          debug!("Created AppDaemon Nexus user!");
 
           // Start Nexus
+          debug!("Starting Nexus...");
           let nexus_port = Arc::new(port);
           let nexus_store_clone = Arc::new(nexus_store.clone());
           let nexus_tokens = (CancellationToken::new(), CancellationToken::new());
@@ -182,6 +203,7 @@ pub async fn server_main(
           });
 
           // Start Warehouse
+          debug!("Starting Warehouse...");
           let warehouse_store_clone = Arc::new(warehouse_store.clone());
           let warehouse_tokens = (CancellationToken::new(), CancellationToken::new());
           let warehouse_tokens_clone = warehouse_tokens.clone();
@@ -194,21 +216,24 @@ pub async fn server_main(
             .await;
           });
 
-          // Start Renderer
-          let renderer_tokens = (CancellationToken::new(), CancellationToken::new());
-          let renderer_tokens_clone = renderer_tokens.clone();
-          let renderer_handle = tokio::task::spawn(async move {
-            renderer_main(renderer_store, renderer_user, renderer_tokens_clone).await;
-          });
-
           // Start ModMan
+          debug!("Starting Modman...");
           let modman_tokens = (CancellationToken::new(), CancellationToken::new());
           let modman_tokens_clone = modman_tokens.clone();
           let modman_handle = tokio::task::spawn(async move {
             modman_main(modman_store, modman_user, modman_tokens_clone).await;
           });
 
+          // Start Renderer
+          debug!("Starting Renderer...");
+          let renderer_tokens = (CancellationToken::new(), CancellationToken::new());
+          let renderer_tokens_clone = renderer_tokens.clone();
+          let renderer_handle = tokio::task::spawn(async move {
+            renderer_main(renderer_store, renderer_user, renderer_tokens_clone).await;
+          });
+
           // Start InferenceEngine
+          debug!("Starting Inference Engine...");
           let inference_engine_tokens = (CancellationToken::new(), CancellationToken::new());
           let inference_engine_tokens_clone = inference_engine_tokens.clone();
           let inference_engine_handle = tokio::task::spawn(async move {
@@ -221,6 +246,7 @@ pub async fn server_main(
           });
 
           // Start AppDaemon
+          debug!("Starting AppDaemon...");
           let appd_tokens = (CancellationToken::new(), CancellationToken::new());
           let appd_tokens_clone = appd_tokens.clone();
           let appd_handle = tokio::task::spawn(async move {
@@ -238,14 +264,14 @@ pub async fn server_main(
                     inference_engine_tokens.0.cancel();
                     tokio::select! {
                       _ = inference_engine_tokens.1.cancelled() => {
-                        info!("Shutting down ModMan...");
-                        modman_tokens.0.cancel();
+                        info!("Shutting down Renderer...");
+                        renderer_tokens.0.cancel();
                         tokio::select! {
-                          _ = modman_tokens.1.cancelled() => {
-                            info!("Shutting down Renderer...");
-                            renderer_tokens.0.cancel();
+                          _ = renderer_tokens.1.cancelled() => {
+                            info!("Shutting down ModMan...");
+                            modman_tokens.0.cancel();
                             tokio::select! {
-                              _ = renderer_tokens.1.cancelled() => {
+                              _ = modman_tokens.1.cancelled() => {
                                 info!("Shutting down Warehouse...");
                                 warehouse_tokens.0.cancel();
                                 tokio::select! {

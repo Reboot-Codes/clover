@@ -13,13 +13,13 @@ use serde::{
 };
 use strum::VariantNames;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioOutputComponent {
   pub connection: ConnectionType,
   pub gesture_config: Option<GestureConfig>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioInputComponent {
   pub connection: ConnectionType,
 }

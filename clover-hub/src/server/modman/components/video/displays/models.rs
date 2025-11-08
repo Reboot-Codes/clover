@@ -19,17 +19,18 @@ use strum::VariantNames;
 
 pub trait DisplayComponent {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicalDisplayComponent {
   /// Required to initialize rendering pipeline for this display.
   pub resolution: VideoResolution,
   /// Required to calculate PPI (and optionally pixel aspect ratio).
   pub size: DisplaySize,
   pub connection: ConnectionType,
-  /// If configured, the Entity ID of the VDisplay this physical display is a part of, like for a video wall.
-  pub virtual_display: Option<u64>,
+  /// The id of the VDisplay this physical display is a part of, like for a video wall.
+  pub virtual_display: Option<String>,
   /// If configured, how the display should react to gesture events. Will be overriden if this display is part of a virtual display.
   pub gesture_config: Option<GestureConfig>,
+  pub internal: bool,
 }
 
 impl DisplayComponent for PhysicalDisplayComponent {}
@@ -41,6 +42,7 @@ pub struct VirtualDisplayComponent {
   pub resolution: VideoResolution,
   /// If configured, how the display should react to gesture events.
   pub gesture_config: Option<GestureConfig>,
+  pub internal: bool,
 }
 
 impl DisplayComponent for VirtualDisplayComponent {}
@@ -51,11 +53,11 @@ pub struct DisplayPosition {
   pub y: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// All measurements in CM. Only one is required for square pixels. Otherwise, use both values for rectangular pixels (e.g. 1:2 pixel aspect ratio vs 1:1).
 pub struct DisplaySize {
-  pub height: Option<Real<f64>>,
-  pub width: Option<Real<f64>>,
+  pub height: Option<f64>,
+  pub width: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, VariantNames)]

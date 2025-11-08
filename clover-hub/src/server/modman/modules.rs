@@ -66,7 +66,12 @@ pub async fn init_component(
         }
       }
     }
-    None => todo!(),
+    None => {
+      failiure = Some(anyhow::anyhow!(
+        "Unable to find component {} in store!",
+        component_id.clone()
+      ));
+    }
   }
 
   match failiure {
@@ -146,6 +151,8 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
             } else {
               error!("Module: {}, failed to initialize!", id.clone());
             }
+          } else {
+            initialized_module = true;
           }
         }
       }

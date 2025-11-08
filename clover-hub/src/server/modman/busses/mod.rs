@@ -2,7 +2,10 @@ pub mod models;
 pub mod proxies;
 
 use super::models::ModManStore;
-use log::info;
+use log::{
+  error,
+  info,
+};
 use models::Bus;
 use nexus::server::websockets::WsIn;
 use nexus::{
@@ -24,7 +27,12 @@ pub async fn start_busses(
   let proxy_user = user.clone();
   handles.push(tokio::task::spawn(async move {
     while let Ok(raw_msg) = rx.recv().await {
-      proxy_user.send(&raw_msg.kind, &raw_msg.message, &raw_msg.replying_to);
+      match proxy_user.send(&raw_msg.kind, &raw_msg.message, &raw_msg.replying_to) {
+        Err(e) => {
+          error!("Error when proxying message: {}", e);
+        }
+        _ => {}
+      }
     }
   }));
 

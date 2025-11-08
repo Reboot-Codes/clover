@@ -23,7 +23,7 @@
             pkg-config
             (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
               extensions = [ "rust-src" ];
-              targets = [ "arm-unknown-linux-gnueabihf" "x86_64-pc-windows-gnu" ];
+              targets = [ "arm-unknown-linux-gnueabihf" "aarch64-unknown-linux-gnu" "x86_64-pc-windows-gnu" ];
             }))
             alsa-lib
             udev

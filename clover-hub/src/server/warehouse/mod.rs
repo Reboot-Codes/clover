@@ -84,7 +84,7 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
           Ok(mut file) => {
             match file
               .write_all(
-                serde_json_lenient::to_string::<Config>(&Default::default())
+                serde_json_lenient::to_string_pretty::<Config>(&Default::default())
                   .unwrap()
                   .as_bytes(),
               )
@@ -250,11 +250,19 @@ pub async fn warehouse_main(
         }
       }
 
-      let _ = init_user.send(
+      match init_user.send(
         &"nexus://com.reboot-codes.clover.warehouse/status".to_string(),
         &"finished-init".to_string(),
         &None,
-      );
+      ) {
+        Err(e) => {
+          error!(
+            "Error when letting peers know about completed init state: {}",
+            e
+          );
+        }
+        _ => {}
+      }
     })
     .await;
 
@@ -285,7 +293,7 @@ pub async fn warehouse_main(
 
           match config_file
             .write_all(
-              serde_json_lenient::to_string::<Config>(&config.clone() as &Config)
+              serde_json_lenient::to_string_pretty::<Config>(&config.clone() as &Config)
                 .unwrap()
                 .as_bytes(),
             )

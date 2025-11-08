@@ -10,14 +10,14 @@ impl CloverComponentTrait for PhysicalDisplayComponent {
     &mut self,
     store: Arc<crate::server::modman::models::ModManStore>,
   ) -> Result<(), anyhow::Error> {
-    todo!()
+    Ok(())
   }
 
   async fn deinit(
     &mut self,
     store: Arc<crate::server::modman::models::ModManStore>,
   ) -> Result<(), anyhow::Error> {
-    todo!()
+    Ok(())
   }
 }
 
@@ -26,13 +26,13 @@ impl CloverComponentTrait for VirtualDisplayComponent {
     &mut self,
     store: Arc<crate::server::modman::models::ModManStore>,
   ) -> Result<(), anyhow::Error> {
-    todo!()
+    Ok(())
   }
 
   async fn deinit(
     &mut self,
     store: Arc<crate::server::modman::models::ModManStore>,
   ) -> Result<(), anyhow::Error> {
-    todo!()
+    Ok(())
   }
 }

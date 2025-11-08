@@ -6,10 +6,8 @@ use crate::server::{
   modman::components::video::displays::models::VirtualDisplayComponent,
   renderer::system_ui::systems::view_management::Composition,
 };
-use bevy::math::f32;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
-use bevy::window::WindowResolution;
 #[cfg(feature = "compositor")]
 use bevy::window::{
   Monitor,
@@ -19,17 +17,42 @@ use bevy::window::{
 use log::warn;
 use queues::*;
 
+#[derive(Component)]
+#[cfg(feature = "compositor")]
+pub struct DisplayWindow {
+  pub id: String,
+}
+
+#[derive(Component)]
+pub struct DisplayCamera {
+  pub id: String,
+}
+
+#[derive(Component)]
+pub struct DisplayComposition {
+  pub id: String,
+}
+
+#[derive(Component)]
+pub struct VirtualDisplayID {
+  pub id: String,
+}
+
 pub fn display_registrar(
   mut commands: Commands,
-  mut ipc: ResMut<SystemUIIPC>,
+  ipc: Res<SystemUIIPC>,
   #[cfg(feature = "compositor")] monitor_entities_query: Query<(Entity, &Monitor)>,
-  vdisplay_query: Query<(Entity, &mut VirtualDisplayComponent)>,
+  vdisplay_query: Query<(Entity, &mut VirtualDisplayComponent, &VirtualDisplayID)>,
 ) {
-  let display_queue = &mut ipc.display_registration_queue;
+  let ipc_display_reg_queue_clone = ipc.display_registration_queue.clone();
+  let mut display_queue = ipc_display_reg_queue_clone.lock().unwrap();
 
   match display_queue.remove() {
-    Ok(any_display) => {
-      debug!("Found display to register: {:?}", any_display.clone());
+    Ok(display_config) => {
+      let display_id = display_config.0;
+      let any_display = display_config.1;
+
+      debug!("Found display to register: {}", display_id.clone());
 
       match any_display {
         AnyDisplayComponent::Physical(physical_display_component) => {
@@ -72,30 +95,49 @@ pub fn display_registrar(
 
               match physical_display_component.virtual_display {
                 Some(vdisplay_id) => {
-                  match vdisplay_query.get(Entity::from_bits(vdisplay_id)) {
-                    Ok(vdisplay) => {
-                      // TODO: Create a camera for this display.
-
-                      commands.get_entity(vdisplay.0).unwrap().insert(Window {
-                        title: "Clover SystemUI".into(),
+                  for (
+                    queried_vdisplay_entity, 
+                    _queried_vdisplay_component, 
+                    queried_vdisplay_id
+                  ) in &vdisplay_query {
+                    if vdisplay_id == queried_vdisplay_id.id {
+                      use bevy::window::WindowTheme;
+                  
+                      let window = commands.get_entity(queried_vdisplay_entity).unwrap().insert((Window {
+                        title: format!("Clover SystemUI: Virtual Display: {}", display_id.clone()),
                         mode: windowed,
+                        window_theme: Some(WindowTheme::Dark),
                         position,
                         ..Default::default()
-                      });
+                      }, DisplayWindow { id: vdisplay_id.to_string() })).id();
+                  
+                      commands.spawn((
+                        Camera3d::default(),
+                        Camera {
+                          target: RenderTarget::Window(WindowRef::Entity(window)),
+                          ..default()
+                        },
+                        Transform::from_xyz(6.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+                        DisplayCamera { id: vdisplay_id.to_string() }
+                      ));
+                      
+                      break;
                     }
-                    Err(e) => {}
                   }
                 }
                 None => {
-                  // TODO: Spawn a composition. Create a camera for this display.
+                  // TODO: Spawn a composition for this display.
+
+                  use bevy::window::WindowTheme;
 
                   let window = commands
-                    .spawn(Window {
-                      title: format!("Clover SystemUI {}", direct_connection.display_id.clone()),
+                    .spawn((Window {
+                      title: format!("Clover SystemUI: Display: {}", display_id.clone()),
                       mode: windowed,
+                      window_theme: Some(WindowTheme::Dark),
                       position,
                       ..Default::default()
-                    })
+                    }, DisplayWindow { id: display_id.clone() }))
                     .id();
 
                   commands.spawn((
@@ -105,11 +147,10 @@ pub fn display_registrar(
                       ..default()
                     },
                     Transform::from_xyz(6.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+                    DisplayCamera { id: display_id.clone() }
                   ));
                 }
               }
-
-              // TODO: Show new window!
             }
             crate::server::modman::components::video::displays::models::ConnectionType::ModManProxy(
               proxied_connection,
@@ -120,32 +161,12 @@ pub fn display_registrar(
           }
         }
         AnyDisplayComponent::Virtual(virtual_display_component) => {
-          debug!("Spawing VDisplay: {:?}", virtual_display_component.clone());
-          // TODO: Spawn a composition. Create a camera for this display.
+          debug!("Spawing VDisplay: {}", display_id.clone());
+          // TODO: Spawn a composition for this display.
 
-          let window = commands
-            .spawn(Window {
-              title: "Clover SystemUI: Virtual Display".to_owned(),
-              resolution: WindowResolution::new(
-                virtual_display_component.resolution.width.get() as f32,
-                virtual_display_component.resolution.height.get() as f32,
-              ),
-              ..Default::default()
-            })
-            .id();
+          commands.spawn((virtual_display_component, VirtualDisplayID { id: display_id.clone() }));
 
-          commands.spawn((
-            Camera3d::default(),
-            Camera {
-              target: RenderTarget::Window(WindowRef::Entity(window)),
-              ..default()
-            },
-            Transform::from_xyz(6.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-          ));
-
-          // TODO: Show new window!
-
-          debug!("Done spawning VDisplay!");
+          debug!("Done spawning VDisplay: {}!", display_id.clone());
         }
       }
     }

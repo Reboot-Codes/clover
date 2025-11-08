@@ -5,6 +5,7 @@ pub mod system_ui;
 use self::system_ui::system_ui_main;
 use crate::utils::RecvSync;
 use ipc::handle_ipc_msg;
+use log::error;
 use log::{
   debug,
   info,
@@ -16,6 +17,7 @@ use nexus::{
 };
 use queues::*;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use system_ui::SystemUIIPC;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
@@ -32,6 +34,7 @@ pub async fn gen_user() -> UserConfig {
       ],
       allowed_events_from: vec![
         "^nexus://com.reboot-codes.clover.renderer(\\.(.*))*(\\/.*)*$".to_string(),
+        "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$".to_string(),
       ],
       echo: false,
       proxy: false,
@@ -62,21 +65,17 @@ pub async fn renderer_main(
 ) {
   info!("Starting Renderer...");
 
+  let display_registration_queue = Arc::new(StdMutex::new(queue![]));
+
   let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
-  let mut system_ui_ipc = SystemUIIPC {
+  let system_ui_ipc = SystemUIIPC {
     exit_channel: RecvSync(bevy_cancel_rx),
-    display_registration_queue: queue![],
+    display_registration_queue: display_registration_queue.clone(),
   };
 
-  for (_display_id, display) in store.config.lock().await.renderer.virtual_displays.clone() {
-    system_ui_ipc
-      .display_registration_queue
-      .add(system_ui::AnyDisplayComponent::Virtual(display))
-      .unwrap();
-  }
-
   // TODO: Add this as a CLI/Config option!
-  std::thread::spawn(|| system_ui_main(system_ui_ipc, Some(false)));
+  let custom_bevy_ipc = system_ui_ipc;
+  std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
 
   // let display_handles = Arc::new(HashMap::new());
 
@@ -84,14 +83,38 @@ pub async fn renderer_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      let _ = init_user.send(
+      match init_user.send(
         &"nexus://com.reboot-codes.clover.renderer/status".to_string(),
         &"finished-init".to_string(),
         &None,
-      );
+      ) {
+        Err(e) => {
+          error!(
+            "Error when letting peers know about completed init state: {}",
+            e
+          );
+        }
+        _ => {}
+      }
+
+      info!("Requesting displays to setup in SystemUI from ModMan...");
+      match init_user.send(
+        &"nexus://com.reboot-codes.clover.modman/init-displays".to_string(),
+        &"first-time".to_string(),
+        &None,
+      ) {
+        Err(e) => {
+          error!(
+            "Error when requesting display configurations from peers: {}",
+            e
+          );
+        }
+        _ => {}
+      }
     })
     .await;
 
+  let ipc_display_registration_queue = display_registration_queue.clone();
   let ipc_recv_token = cancellation_tokens.0.clone();
   let (ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_handle = tokio::task::spawn(async move {
@@ -99,7 +122,7 @@ pub async fn renderer_main(
         _ = ipc_recv_token.cancelled() => {
           debug!("ipc_recv exited");
         },
-        _ = handle_ipc_msg(ipc_rx) => {}
+        _ = handle_ipc_msg(ipc_rx, ipc_display_registration_queue) => {}
     }
   });
 

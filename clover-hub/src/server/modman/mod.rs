@@ -9,6 +9,7 @@ use busses::start_busses;
 use ipc::handle_ipc_msg;
 use log::{
   debug,
+  error,
   info,
   warn,
 };
@@ -68,9 +69,46 @@ pub async fn modman_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      let modules = init_store.modules.lock().await;
+      let config = init_store.config.lock().await;
+      let static_modules = &config.modman.static_modules;
+      let static_components = &config.modman.static_components;
+      let mut modules = init_store.modules.lock().await;
       let mut modules_initalized: usize = 0;
 
+      debug!("Checking for statically defined modules to init...");
+      if static_modules.len() > 0 {
+        debug!(
+          "Adding {} statically defined module(s) to init queue...",
+          static_modules.len()
+        );
+        for (module_id, module) in static_modules {
+          modules.insert(module_id.clone(), module.clone());
+        }
+      } else {
+        debug!("No statically defined modules to put into store, skipping!");
+      }
+
+      debug!("Checking for statically defined components to init...");
+      if static_components.len() > 0 {
+        debug!(
+          "Adding {} statically defined components(s) to init queue...",
+          static_components.len()
+        );
+        let mut components = init_store.components.lock().await;
+
+        for (component_id, component) in static_components {
+          components.insert(
+            component_id.clone(),
+            Arc::new((component.0.clone(), component.1.clone())),
+          );
+        }
+      } else {
+        debug!("No statically defined components to put into store, skipping!");
+      }
+
+      drop(config);
+
+      info!("Initalizing modules...");
       if modules.len() > 0 {
         // Initialize modules that were registered already via configuration and persistence.
         for (id, module) in modules.iter() {
@@ -82,7 +120,7 @@ pub async fn modman_main(
           }
         }
       } else {
-        info!("No pre-configured modules to initialize.");
+        info!("No static modules to initialize.");
       }
 
       if modules_initalized != modules.len() {
@@ -91,20 +129,36 @@ pub async fn modman_main(
           modules_initalized,
           modules.len()
         );
-        init_user.send(
+        match init_user.send(
           &"nexus://com.reboot-codes.clover.appd/status".to_string(),
           &"incomplete-init".to_string(),
           &None,
-        );
+        ) {
+          Err(e) => {
+            error!(
+              "Error when letting peers know about incomplete init state: {}",
+              e
+            );
+          }
+          _ => {}
+        }
       } else {
         if modules_initalized != 0 {
           info!("Initalized all {} module(s)", modules_initalized);
         }
-        init_user.send(
+        match init_user.send(
           &"nexus://com.reboot-codes.clover.modman/status".to_string(),
           &"finished-init".to_string(),
           &None,
-        );
+        ) {
+          Err(e) => {
+            error!(
+              "Error when letting peers know about complete init state: {}",
+              e
+            );
+          }
+          _ => {}
+        }
       }
     })
     .await;
@@ -112,12 +166,13 @@ pub async fn modman_main(
   let ipc_recv_token = cancellation_tokens.0.clone();
   let (ipc_rx, ipc_handle) = user.subscribe();
   let ipc_recv_store = store.clone();
+  let ipc_user = Arc::new(user.clone());
   let ipc_recv_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = ipc_recv_token.cancelled() => {
         debug!("ipc_recv exited");
       },
-      _ = handle_ipc_msg(ipc_recv_store, ipc_rx) => {}
+      _ = handle_ipc_msg(ipc_recv_store, ipc_rx, ipc_user) => {}
     }
   });
 

@@ -3,6 +3,7 @@ pub mod ipc;
 use ipc::handle_ipc_msg;
 use log::{
   debug,
+  error,
   info,
 };
 use nexus::{
@@ -60,11 +61,19 @@ pub async fn inference_engine_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      init_user.send(
+      match init_user.send(
         &"nexus://com.reboot-codes.clover.inference-engine/status".to_string(),
         &"finished-init".to_string(),
         &None,
-      );
+      ) {
+        Err(e) => {
+          error!(
+            "Error when letting peers know about complete init status: {}",
+            e
+          );
+        }
+        _ => {}
+      }
     })
     .await;
 

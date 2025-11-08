@@ -8,12 +8,12 @@ use serde::{
 };
 use strum::VariantNames;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InputSensorComponent {
   pub connection: ConnectionType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputSensorComponent {
   pub gesture_config: Option<GestureConfig>,
   pub connection: ConnectionType,

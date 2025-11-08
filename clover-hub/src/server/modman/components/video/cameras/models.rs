@@ -25,7 +25,7 @@ pub enum ConnectionType {
   Stream(StreamingConnection),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraComponent {
   pub connection: ConnectionType,
   pub max_resolution: VideoResolution,

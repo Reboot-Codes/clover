@@ -98,20 +98,36 @@ pub async fn appd_main(
               apps_initialized,
               init_apps.len()
             );
-            init_user.send(
+            match init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"incomplete-init".to_string(),
               &None,
-            );
+            ) {
+              Err(e) => {
+                error!(
+                  "Error when letting peers know about incomplete init state: {}",
+                  e
+                );
+              }
+              _ => {}
+            }
           } else {
             if apps_initialized != 0 {
               info!("Initialized all {} apps!", apps_initialized);
             }
-            init_user.send(
+            match init_user.send(
               &"nexus://com.reboot-codes.clover.appd/status".to_string(),
               &"finished-init".to_string(),
               &None,
-            );
+            ) {
+              Err(e) => {
+                error!(
+                  "Error when letting peers know about complete init state: {}",
+                  e
+                );
+              }
+              _ => {}
+            }
           }
         })
         .await;
