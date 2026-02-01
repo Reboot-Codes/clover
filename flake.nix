@@ -1,72 +1,151 @@
 {
-  description = "CLOVER's Flake";
-
   inputs = {
-    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    flake-utils.url  = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    crane.url = "github:ipetkov/crane";
+    fenix.url = "github:nix-community/fenix";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      nixpkgs,
+      flake-utils,
+      ...
+    }@inputs:
+    let
+      fenix = inputs.fenix.packages;
+    in
+    # Iterate over Arm, x86 for macOS and Linux
+    (flake-utils.lib.eachDefaultSystem (
+      system:
       let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-          config.allowUnfree = true;
+        pkgs = nixpkgs.legacyPackages.${system};
+        crane = inputs.crane.mkLib pkgs;
+        # Toolchain
+        toolchain = fenix.${system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = "sha256-mDF70Zk2wfWYsYRIdAUMn5ixGahle3VFtGjjyz8oiHU=";
         };
+        craneLib = crane.overrideToolchain toolchain;
+
+        # Deps for all software packages
+        buildInputs = with pkgs; [
+          openssl.dev
+          pkg-config
+          wayland
+        ];
+
+        src = pkgs.lib.cleanSourceWith {
+          src = craneLib.path ./.;
+          filter = path: type: (pkgs.lib.hasInfix "/assets" path) || (craneLib.filterCargoSources path type);
+        };
+        commonArgs = {
+          doCheck = false;
+          inherit src buildInputs;
+          nativeBuildInputs = libraries;
+        };
+
+        libraries = with pkgs; [
+          openssl
+          pkg-config
+          vulkan-loader
+          libxkbcommon
+          wayland
+          xorg.libX11
+          xorg.libxcb
+          alsa-lib
+          udev
+          vulkan-loader
+          xorg.libX11
+          xorg.libXrandr
+          xorg.libXcursor
+          xorg.libXi
+          at-spi2-atk
+          atkmm
+          cairo
+          gdk-pixbuf
+          glib
+          gtk3
+          harfbuzz
+          librsvg
+          libsoup_3
+          pango
+          webkitgtk_4_1
+          fontconfig
+          libz
+        ];
+        # Compile all artifacts
+        appDeps = craneLib.buildDepsOnly commonArgs;
+
+        appListings = [
+          {
+            name = "clover-hub";
+            path = ./clover-hub/Cargo.toml;
+          }
+          {
+            name = "ratchet";
+            path = ./toolbox/ratchet/Cargo.toml;
+          }
+        ];
+
+        # Compile
+        pkg =
+          listing:
+          craneLib.buildPackage (
+            commonArgs
+            // {
+              cargoExtraArgs = "-p ${listing.name}";
+              cargoArtifacts = appDeps;
+              pname = listing.name;
+              version = (builtins.fromTOML (builtins.readFile listing.path)).package.version;
+            }
+          );
+        app =
+          listing:
+          flake-utils.lib.mkApp {
+            drv = pkg listing;
+          };
       in
       {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            openssl
-            pkg-config
-            (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-              extensions = [ "rust-src" ];
-              targets = [ "arm-unknown-linux-gnueabihf" "aarch64-unknown-linux-gnu" "x86_64-pc-windows-gnu" ];
-            }))
-            alsa-lib
-            udev
-            vulkan-loader
-            xorg.libX11
-            xorg.libXrandr
-            xorg.libXcursor
-            xorg.libXi
-            kdePackages.qtbase
+        # nix build
+        packages = {
+          default = pkg (builtins.elemAt appListings 0);
+        }
+        // builtins.listToAttrs (
+          map (listing: {
+            name = listing.name;
+            value = pkg listing;
+          }) appListings
+        );
+
+        # nix run
+        apps = {
+          default = app (builtins.elemAt appListings 0);
+        }
+        // builtins.listToAttrs (
+          map (listing: {
+            name = listing.name;
+            value = app listing;
+          }) appListings
+        );
+
+        # nix develop
+        devShells.default = craneLib.devShell {
+          inherit buildInputs;
+
+          packages = [
+            toolchain
+          ]
+          ++ (with pkgs; [
             nodejs_22
             yarn-berry
-            trunk-io
             rust-analyzer
-            at-spi2-atk
-            atkmm
-            cairo
-            gdk-pixbuf
-            glib
-            gtk3
-            harfbuzz
-            librsvg
-            libsoup_3
-            pango
-            webkitgtk_4_1
-            openssl
-            wayland
-            waylandpp
-            fontconfig
-          ];
+            tokio-console
+          ])
+          ++ libraries;
 
-          shellHook = ''
-              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${
-                pkgs.lib.makeLibraryPath [
-                  pkgs.udev
-                  pkgs.alsa-lib
-                  pkgs.vulkan-loader
-                  pkgs.libxkbcommon
-                  pkgs.wayland
-                ]
-              }"
-              RUST_SRC_PATH = "${pkgs.rust-bin.nightly.latest.default}/lib/rustlib/src/rust/library";
-              '';
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath libraries}";
         };
       }
-    );
+    ));
 }

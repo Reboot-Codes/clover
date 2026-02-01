@@ -64,6 +64,19 @@ pub async fn modman_main(
     }
   });
 
+  let ipc_recv_token = cancellation_tokens.0.clone();
+  let (ipc_rx, ipc_handle) = user.subscribe();
+  let ipc_recv_store = store.clone();
+  let ipc_user = Arc::new(user.clone());
+  let ipc_recv_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = ipc_recv_token.cancelled() => {
+        debug!("ipc_recv exited");
+      },
+      _ = handle_ipc_msg(ipc_recv_store, ipc_rx, ipc_user) => {}
+    }
+  });
+
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user.clone());
   cancellation_tokens
@@ -162,19 +175,6 @@ pub async fn modman_main(
       }
     })
     .await;
-
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_store = store.clone();
-  let ipc_user = Arc::new(user.clone());
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_recv_store, ipc_rx, ipc_user) => {}
-    }
-  });
 
   let mod_clean_token = cancellation_tokens.0.clone();
   tokio::select! {

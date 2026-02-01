@@ -234,6 +234,17 @@ pub async fn warehouse_main(
   ))
   .await;
 
+  let (mut ipc_rx, nexus_recv_handle) = user.subscribe();
+  let ipc_recv_token = cancellation_tokens.0.clone();
+  let ipc_recv_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = ipc_recv_token.cancelled() => {
+        debug!("ipc_recv exited");
+      },
+      _ = handle_ipc_msg(ipc_rx) => {}
+    }
+  });
+
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user.clone());
   let init_tokens = cancellation_tokens.clone();
@@ -265,17 +276,6 @@ pub async fn warehouse_main(
       }
     })
     .await;
-
-  let (mut ipc_rx, nexus_recv_handle) = user.subscribe();
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_rx) => {}
-    }
-  });
 
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {

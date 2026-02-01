@@ -10,7 +10,10 @@ use crate::server::modman::{
     PortStatus,
   },
 };
-use log::debug;
+use log::{
+  debug,
+  warn,
+};
 use nexus::server::{
   models::IPCMessageWithId,
   websockets::WsIn,
@@ -37,6 +40,12 @@ impl Bus for UARTBus {
     from_bus: tokio::sync::broadcast::Sender<WsIn>,
     to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
   ) -> Result<Vec<tokio::task::JoinHandle<()>>, anyhow::Error> {
+    let warn_config = self.store.config.lock().await;
+    if !(warn_config.modman.uart_ports.len() > 0) {
+      warn!("No UART ports configured to proxy messages to! You may see message delivery errors from `nexus::user` due to a closed channel (the UARTBus proxy); they can be safely ignored.");
+    }
+    drop(warn_config);
+
     match serialport::available_ports() {
       Ok(port_info) => {
         let mut handles = vec![];

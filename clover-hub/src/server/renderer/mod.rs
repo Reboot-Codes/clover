@@ -75,9 +75,21 @@ pub async fn renderer_main(
 
   // TODO: Add this as a CLI/Config option!
   let custom_bevy_ipc = system_ui_ipc;
-  std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
+  let bevy_thread = std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
 
   // let display_handles = Arc::new(HashMap::new());
+
+  let ipc_display_registration_queue = display_registration_queue.clone();
+  let ipc_recv_token = cancellation_tokens.0.clone();
+  let (ipc_rx, ipc_handle) = user.subscribe();
+  let ipc_recv_handle = tokio::task::spawn(async move {
+    tokio::select! {
+        _ = ipc_recv_token.cancelled() => {
+          debug!("ipc_recv exited");
+        },
+        _ = handle_ipc_msg(ipc_rx, ipc_display_registration_queue) => {}
+    }
+  });
 
   let init_user = Arc::new(user.clone());
   cancellation_tokens
@@ -114,18 +126,6 @@ pub async fn renderer_main(
     })
     .await;
 
-  let ipc_display_registration_queue = display_registration_queue.clone();
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-        _ = ipc_recv_token.cancelled() => {
-          debug!("ipc_recv exited");
-        },
-        _ = handle_ipc_msg(ipc_rx, ipc_display_registration_queue) => {}
-    }
-  });
-
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
@@ -135,6 +135,16 @@ pub async fn renderer_main(
       info!("Cleaning up displays...");
 
       let _ = bevy_cancel_tx.send(bevy::prelude::AppExit::Success);
+
+      info!("Waiting for Bevy to shut down...");
+      match bevy_thread.join() {
+        Ok(_) => {
+          info!("Bevy thread exited cleanly");
+        }
+        Err(e) => {
+          error!("Bevy thread panicked during shutdown: {:?}", e);
+        }
+      }
 
       // TODO: Clean up registered displays when server is shutting down.
 

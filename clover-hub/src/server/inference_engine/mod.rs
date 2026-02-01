@@ -57,6 +57,17 @@ pub async fn inference_engine_main(
 ) {
   info!("Starting Inference Engine...");
 
+  let ipc_recv_token = cancellation_tokens.0.clone();
+  let (ipc_rx, ipc_handle) = user.subscribe();
+  let ipc_recv_handle = tokio::task::spawn(async move {
+    tokio::select! {
+      _ = ipc_recv_token.cancelled() => {
+        debug!("ipc_recv exited");
+      },
+      _ = handle_ipc_msg(ipc_rx) => {}
+    }
+  });
+
   let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
@@ -76,17 +87,6 @@ pub async fn inference_engine_main(
       }
     })
     .await;
-
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_rx) => {}
-    }
-  });
 
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {

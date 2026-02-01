@@ -344,6 +344,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
   env_logger::Builder::new()
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();
+  // Debugging console for tokio
+  // console_subscriber::init();
 
   let big_boy_token = CancellationToken::new();
 

@@ -169,6 +169,9 @@ pub async fn server_main(
             .unwrap();
           debug!("Created AppDaemon Nexus user!");
 
+          // Create oneshot channel for ready signal
+          let (nexus_ready_tx, nexus_ready_rx) = tokio::sync::oneshot::channel();
+
           // Start Nexus
           debug!("Starting Nexus...");
           let nexus_port = Arc::new(port);
@@ -198,9 +201,22 @@ pub async fn server_main(
                 (appd_user_config.clone(), 0, from_appd),
               ],
               nexus_tokens_clone,
+              Some(nexus_ready_tx),
             )
             .await;
           });
+
+          // WAIT for nexus to be ready before starting services
+          match nexus_ready_rx.await {
+            Ok(_) => {
+              info!("Nexus is ready! Starting services...");
+            }
+            Err(_) => {
+              error!("Nexus failed to signal ready state!");
+              server_token.cancel();
+              return;
+            }
+          }
 
           // Start Warehouse
           debug!("Starting Warehouse...");
