@@ -1,4 +1,6 @@
 use crate::server::appd::models::BuildConfig;
+#[cfg(feature = "core")]
+use clover_hub_macros::ManifestCompile;
 use os_path::OsPath;
 use serde::{
   Deserialize,
@@ -224,7 +226,7 @@ pub struct Manifest {
   pub directory: Optional<DirectorySpec>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct DirectorySpec {
   #[serde(default)]
   pub modules: OptionalStrTHashMap<ModuleSpec>,
@@ -235,13 +237,13 @@ pub struct DirectorySpec {
   pub gesture_packs: OptionalStrTHashMap<GesturePackSpec>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct ModuleSpec {
   #[serde(default)]
   pub name: OptionalString,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct ApplicationSpec {
   pub name: RequiredString,
   pub version: RequiredString,
@@ -251,7 +253,7 @@ pub struct ApplicationSpec {
   pub containers: OptionalStrTHashMap<ContainerSpec>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct ContainerSpec {
   #[serde(default)]
   pub interface: OptionalBoolean,
@@ -260,7 +262,7 @@ pub struct ContainerSpec {
 }
 
 #[cfg(feature = "core")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct GesturePackSpec {
   #[serde(default)]
   pub name: OptionalString,
@@ -269,14 +271,14 @@ pub struct GesturePackSpec {
 }
 
 #[cfg(feature = "core")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 #[serde(untagged)]
 pub enum GestureSpec {
   StaticGestureSpec(StaticGestureSpec),
 }
 
 #[cfg(feature = "core")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct StaticGestureSpec {
   pub static_url: RequiredString,
 }

@@ -7,7 +7,7 @@ members = [
   "toolbox/ratchet",
   "core/libs/tesseract",
   "core/libs/carbon-fiber"
-]
+, "clover-hub-macros"]
 
 # [profile.dev]
 # opt-level = 1

@@ -1,3 +1,7 @@
+use crate::server::warehouse::repos::models::ManifestCompilationFrom;
+use crate::server::warehouse::repos::models::RawBuildConfig;
+use crate::server::warehouse::repos::models::RawRepoCreds;
+use crate::server::warehouse::repos::models::ResolutionCtx;
 use crate::server::warehouse::{
   config::models::Config,
   repos::models::{
@@ -7,10 +11,13 @@ use crate::server::warehouse::{
   },
 };
 use bollard::container;
+use clover_hub_macros::ManifestCompile;
+use os_path::OsPath;
 use serde::{
   Deserialize,
   Serialize,
 };
+use simple_error::SimpleError;
 use std::{
   collections::HashMap,
   sync::Arc,
@@ -57,7 +64,7 @@ pub struct ContainerConfig {
   pub build: Option<BuildConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct BuildConfig {
   /// Url to either container repo, or source git repo
   pub url: RequiredString,
@@ -65,7 +72,7 @@ pub struct BuildConfig {
   pub creds: Optional<RepoCreds>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct RepoCreds {
   /// Optional username if the login scheme requires it.
   pub username: OptionalString,
