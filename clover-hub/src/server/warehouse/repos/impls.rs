@@ -4,14 +4,7 @@ use super::{
   resolve_entry_value,
   resolve_list_entry,
 };
-use crate::server::{
-  appd::models::{
-    BuildConfig,
-    RepoCreds,
-  },
-  warehouse::repos::builtin_rfqdn,
-};
-use clover_hub_macros::ManifestCompile;
+use crate::server::warehouse::repos::builtin_rfqdn;
 use log::debug;
 use os_path::OsPath;
 use serde::Deserialize;

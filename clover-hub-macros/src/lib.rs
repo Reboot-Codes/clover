@@ -43,52 +43,51 @@ fn generate_struct_impl(
     let field_type = &f.ty;
 
     quote! {
-        debug!(concat!("Resolving ", stringify!(#spec_name), ".", #field_name_str));
-        let #field_name = match <#field_type as ManifestCompilationFrom<_>>::compile(
-            spec.#field_name.clone(),
-            resolution_ctx.clone(),
-            repo_dir_path.clone(),
-        )
-        .await
-        {
-            Ok(val) => {
-                debug!(concat!("Resolved ", stringify!(#spec_name), ".", #field_name_str));
-                val
-            }
-            Err(e) => {
-                err = Some(e);
-                Default::default()
-            }
-        };
+      debug!(concat!("Resolving ", stringify!(#spec_name), ".", #field_name_str));
+
+      let #field_name = match <#field_type as ManifestCompilationFrom<_>>::compile(
+        spec.#field_name.clone(),
+        resolution_ctx.clone(),
+        repo_dir_path.clone(),
+      ).await {
+        Ok(val) => {
+          debug!(concat!("Resolved ", stringify!(#spec_name), ".", #field_name_str));
+          val
+        }
+        Err(e) => {
+          err = Some(e);
+          Default::default()
+        }
+      };
     }
   });
 
   let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
 
   quote! {
-      impl ManifestCompilationFrom<#spec_name> for #name {
-          async fn compile(
-              spec: #spec_name,
-              resolution_ctx: ResolutionCtx,
-              repo_dir_path: OsPath,
-          ) -> Result<Self, SimpleError>
-          where
-              Self: Sized,
-              #spec_name: for<'a> Deserialize<'a>,
-          {
-              use log::debug;
-              let mut err = None;
+    impl ManifestCompilationFrom<#spec_name> for #name {
+      async fn compile(
+        spec: #spec_name,
+        resolution_ctx: ResolutionCtx,
+        repo_dir_path: OsPath,
+      ) -> Result<Self, SimpleError>
+      where
+        Self: Sized,
+        #spec_name: for<'a> Deserialize<'a>,
+      {
+        use log::debug;
+        let mut err = None;
 
-              #(#field_compilations)*
+        #(#field_compilations)*
 
-              match err {
-                  Some(e) => Err(e),
-                  None => Ok(Self {
-                      #(#field_names),*
-                  }),
-              }
-          }
+        match err {
+          Some(e) => Err(e),
+          None => Ok(Self {
+            #(#field_names),*
+          }),
+        }
       }
+    }
   }
 }
 
@@ -118,51 +117,49 @@ fn generate_enum_impl(
     let debug_msg = format!("raw-{}", convert_to_kebab_case(&name.to_string()));
 
     quote! {
-        #spec_name::#raw_variant_name(raw_spec) => {
-            match <#inner_type as ManifestCompilationFrom<_>>::compile(
-                raw_spec,
-                resolution_ctx.clone(),
-                repo_dir_path.clone(),
-            )
-            .await
-            {
-                Ok(val) => {
-                    debug!(concat!("Resolved ", #debug_msg));
-                    Self::#compiled_variant_name(val)
-                }
-                Err(e) => {
-                    err = Some(e);
-                    Self::#compiled_variant_name(Default::default())
-                }
-            }
+      #spec_name::#raw_variant_name(raw_spec) => {
+        match <#inner_type as ManifestCompilationFrom<_>>::compile(
+            raw_spec,
+            resolution_ctx.clone(),
+            repo_dir_path.clone(),
+        ).await {
+          Ok(val) => {
+            debug!(concat!("Resolved ", #debug_msg));
+            Self::#compiled_variant_name(val)
+          }
+          Err(e) => {
+            err = Some(e);
+            Self::#compiled_variant_name(Default::default())
+          }
         }
+      }
     }
   });
 
   quote! {
-      impl ManifestCompilationFrom<#spec_name> for #name {
-          async fn compile(
-              spec: #spec_name,
-              resolution_ctx: ResolutionCtx,
-              repo_dir_path: OsPath,
-          ) -> Result<Self, SimpleError>
-          where
-              Self: Sized,
-              #spec_name: for<'a> Deserialize<'a>,
-          {
-              use log::debug;
-              let mut err = None;
+    impl ManifestCompilationFrom<#spec_name> for #name {
+        async fn compile(
+          spec: #spec_name,
+          resolution_ctx: ResolutionCtx,
+          repo_dir_path: OsPath,
+        ) -> Result<Self, SimpleError>
+        where
+          Self: Sized,
+          #spec_name: for<'a> Deserialize<'a>,
+        {
+          use log::debug;
+          let mut err = None;
 
-              let ret = match spec {
-                  #(#variant_matches)*
-              };
+          let ret = match spec {
+            #(#variant_matches)*
+          };
 
-              match err {
-                  Some(e) => Err(e),
-                  None => Ok(ret),
-              }
+          match err {
+            Some(e) => Err(e),
+            None => Ok(ret),
           }
       }
+    }
   }
 }
 

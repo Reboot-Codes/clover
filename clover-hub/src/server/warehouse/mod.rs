@@ -31,7 +31,6 @@ use tokio::io::{
   AsyncWriteExt,
 };
 use tokio_util::sync::CancellationToken;
-use url::Url;
 
 // TODO: Move to snafu crate.
 #[derive(Debug, Clone)]
