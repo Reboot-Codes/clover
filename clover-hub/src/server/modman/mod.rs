@@ -1,3 +1,11 @@
+//! # ModMan
+//!
+//! Short for Module Manager.
+//!
+//! Manages [communication](busses) with [Modules](modules) and their [Components](components), as well as managing message generation for [Gestures](gestures).
+//! Primary execution starts at [`modman_main`]
+//!
+
 pub mod busses;
 pub mod components;
 pub mod gestures;

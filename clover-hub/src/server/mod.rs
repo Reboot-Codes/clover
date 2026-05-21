@@ -1,3 +1,18 @@
+//! # CloverHub Server
+//!
+//! Contains the modular, core logic to run a Clover instance. Process control is found here in [`server_main`].
+//!
+//! Primary server components in startup order are:
+//!
+//! - **[`warehouse`]:** Manages external repositories, and handles configuration parsing from them and the base configuration.
+//! - **[`modman`]:** Manages communication with non-networked [Modules](modman::models::Module) and their [Components](modman::models::CloverComponentMeta).
+//! - **[`renderer`]:** Uses graphical acceleration to render and display graphics on any connected [display components](modman::components::video::displays::models::PhysicalDisplayComponent).
+//! - **[`inference_engine`]:** Manages Machine Learning models and their respective accelerators.
+//! - **[`appd`]:** The Application Daemon (a.k.a. AppDaemon, AppD), handles external Podman applications and utility scripts in coordination with [`warehouse`].
+//!
+//! Generally, threads spawned here have a similar structure with IPC recv/send sub-threads, and Startup/Shutdown functions. Following this pattern ensures maintainability and ease of use.
+//!
+
 pub mod appd;
 pub mod inference_engine;
 pub mod modman;

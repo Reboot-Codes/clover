@@ -2186,7 +2186,6 @@ dependencies = [
  "socketcan 3.5.0",
  "spidev",
  "strum 0.27.1",
- "taurus",
  "thiserror 1.0.69",
  "tokio",
  "tokio-serial",
@@ -2739,51 +2738,6 @@ name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
-
-[[package]]
-name = "cxx"
-version = "1.0.158"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a71ea7f29c73f7ffa64c50b83c9fe4d3a6d4be89a86b009eb80d5a6d3429d741"
-dependencies = [
- "cc",
- "cxxbridge-cmd",
- "cxxbridge-flags",
- "cxxbridge-macro",
- "foldhash 0.1.5",
- "link-cplusplus",
-]
-
-[[package]]
-name = "cxxbridge-cmd"
-version = "1.0.158"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f44296c8693e9ea226a48f6a122727f77aa9e9e338380cb021accaeeb7ee279"
-dependencies = [
- "clap",
- "codespan-reporting 0.12.0",
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
-name = "cxxbridge-flags"
-version = "1.0.158"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42f69c181c176981ae44ba9876e2ea41ce8e574c296b38d06925ce9214fb8e4"
-
-[[package]]
-name = "cxxbridge-macro"
-version = "1.0.158"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8faff5d4467e0709448187df29ccbf3b0982cc426ee444a193f87b11afb565a8"
-dependencies = [
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 2.0.114",
-]
 
 [[package]]
 name = "d3d12"
@@ -5283,15 +5237,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4a5ff6bcca6c4867b1c4fd4ef63e4db7436ef363e0ad7531d1558856bae64f4"
 
 [[package]]
-name = "link-cplusplus"
-version = "1.0.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a6f6da007f968f9def0d65a05b187e2960183de70c160204ecfccf0ee330212"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6589,11 +6534,6 @@ checksum = "22ec719bbf3b2a81c109a4e20b1f129b5566b7dce654bc3872f6a05abf82b2c4"
 dependencies = [
  "ttf-parser 0.25.1",
 ]
-
-[[package]]
-name = "oximath"
-version = "0.1.0"
-source = "git+https://github.com/Reboot-Codes/oxifluxion#c2befd1db5f4d4632769b9bfa1aad4eb698139a7"
 
 [[package]]
 name = "palette"
@@ -8675,15 +8615,6 @@ name = "target-lexicon"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
-
-[[package]]
-name = "taurus"
-version = "0.1.0"
-source = "git+https://codeberg.org/Reboot-Codes/taurus#a733016b79f53f2f76cc4e1b61f86d871e9302b3"
-dependencies = [
- "cxx",
- "oximath",
-]
 
 [[package]]
 name = "tempfile"

@@ -1,3 +1,42 @@
+//! # Clover's Modular Repository Manifests
+//!
+//! Manifests can import components and use directives to help keep things organized and reduce the ammount of boilerplate required to write the repository's manifest in an effort to make creating clover compatible projects as easy as possible.
+//!
+//! ## How Value Compilation Works
+//!
+//! Manifest values are defined with a Raw version which is then resolved and de-'directive'd by it's compiled variant (drops `Raw` at the begining of the struct/enum, this is important for the [`ManifestCompile`] macro to work).
+//!
+//! For example (add after `// ---------- ***RAW*** Manfiest Entry Types Start Here ----------`):
+//!
+//! ```rust
+//! #[derive(Debug, Clone, Serialize, Deserialize)]
+//! pub struct RawContainerSpec {
+//!   #[serde(default)]
+//!   pub interface: OptionalSingleManifestSpecEntry<bool>,
+//!   #[serde(default)]
+//!   pub build: OptionalSingleManifestSpecEntry<RawBuildConfig>,
+//! }
+//! ```
+//!
+//! will become (add after `// ---------- ***COMPILED*** Manfiest Entry Types Start Here ----------`):
+//!
+//! ```rust
+//! #[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
+//! pub struct ContainerSpec {
+//!   #[serde(default)]
+//!   pub interface: OptionalBoolean,
+//!   #[serde(default)]
+//!   pub build: Optional<BuildConfig>,
+//! }
+//! ```
+//!
+//! when the manifest is [compiled](super::impls), e.g.:
+//!
+//! ```rust
+//! ContainerSpec.compile(raw_container_spec, ...);
+//! ```
+//!
+
 use crate::server::appd::models::BuildConfig;
 #[cfg(feature = "core")]
 use clover_hub_macros::ManifestCompile;
@@ -9,6 +48,7 @@ use serde::{
 use simple_error::SimpleError;
 use std::collections::HashMap;
 
+/// Import Resolution result enum.
 // TODO: Define defaults via `Default` trait impl for enums that returns its none variant.
 pub enum Resolution {
   /// Raw file content from a resolved `@import`. Should be deserialized prior to use!
@@ -20,6 +60,8 @@ pub enum Resolution {
   /// If there were other directives, they've been replaced with the correct value if provided in the ResolutionCtx.
   NoImport(String),
 }
+
+/// Used when resolving imports, contains the path of the current file calling for the resolution, the repository's RFQDN, and the most relevant Clover distro's RFQDN.
 #[derive(Debug, Clone)]
 pub struct ResolutionCtx {
   /// Used for the `@base` directive, if configured in the repo manifest, the base RFQDN for this repo.
@@ -133,6 +175,8 @@ pub enum Optional<T> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RequiredString(pub String);
 
+// ---------- ***RAW*** Manifiest Entry Types Start Here ----------
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ManifestSpec {
   pub name: Option<String>,
@@ -215,6 +259,8 @@ pub struct RawStaticGestureSpec {
   pub static_url: String,
 }
 
+// ---------- ***COMPILED*** Manifest Entry Types Start Here ----------
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
   #[serde(default)]
@@ -283,7 +329,10 @@ pub struct StaticGestureSpec {
   pub static_url: RequiredString,
 }
 
+/// Used in conjunction with the [clover_hub_macros] crate provide a function to compile possibly disjointed manifest files into a single object in-memory.
+// TODO: Specify trait bounds (resolve async_fn_in_trait).
 pub trait ManifestCompilationFrom<T> {
+  /// Perform the compilation on the RAW manifest value type to get the COMPILED manifest value with its dependencies and directives resolved. Put the *parsed* (use [Deserialize]), *`Raw`* value specification in the `spec` parameter.
   async fn compile(
     spec: T,
     resolution_ctx: ResolutionCtx,

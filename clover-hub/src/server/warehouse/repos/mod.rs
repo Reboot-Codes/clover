@@ -1,3 +1,12 @@
+//! # Clover Repository Management
+//!
+//! Clover relies upon external git repositories to load [Applications](crate::server::appd), communicate with [Modules](crate::server::modman::modules), and use [Gesture Packs](crate::server::modman::gestures).
+//!
+//! The @data/repos path holds an RFQDN tree of all git repositories that Clover has registered. On [startup](super::setup_warehouse), Clover will prune repos that are not registered in the store.
+//!
+//! Each repo contains a [Manifest](models) (pro tip: the magic manifest entry resolution/directives/etc are found here) which describes everything that clover might care about that's in that repository.
+//!
+
 pub mod impls;
 pub mod models;
 
@@ -52,6 +61,26 @@ impl From<git2::Error> for Error {
   }
 }
 
+/// Get the source Reverse Fully Qualifed Domain Name for this distrobution of Clover.
+///
+/// <div class="warning">
+///
+///   To comply with the AGPL and to avoid confusion about support, please change these strings to point to a domain you personally control the HTTP contents of!
+///
+///   Example
+///   ```rust
+///   pub fn builtin_rfqdn(is_core: bool) -> String {
+///     if is_core {
+///       String::from("pages.codeberg.username.clover.core")
+///     } else {
+///       String::from("pages.codeberg.username.clover")
+///     }
+///   }
+///   ```
+///
+/// </div>
+///
+// TODO: Make these a constant so all built-in strings get updated at once!
 pub fn builtin_rfqdn(is_core: bool) -> String {
   if is_core {
     String::from("com.reboot-codes.clover.CORE")
@@ -60,6 +89,7 @@ pub fn builtin_rfqdn(is_core: bool) -> String {
   }
 }
 
+/// Replace `@here`, `@base`, and `@builtin` manifest value directives.
 pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
   debug!(
     "replace_simple_directives (provided): {} + {:#?}",
@@ -294,6 +324,9 @@ where
   }
 }
 
+/// Source of filesystem structures like `/opt/clover/repos/com/reboot-codes/clover/@repo`.
+///
+/// Using `@repo` for the actual repository keeps everything unique and organized and allows for nested repo bases (e.g. an unstable repo for testing out the latest apps). For this reason `@repo` is a banned directory name in Clover-compatible remote repositories.
 pub async fn update_repo_dir_structure(
   repo_dir_path: OsPath,
   store: Arc<WarehouseStore>,
@@ -329,7 +362,8 @@ pub async fn update_repo_dir_structure(
   }
 }
 
-/// Used to resolve repo manifest entry **values** that may have directives (`@import`, `@base`, `@here`) in them.
+/// Used to resolve repo manifest entry **values** that may have directives (`@import`, `@base`, `@here`, `@builtin`) in them.
+/// Hands off to [replace_simple_directives] if it isn't an import.
 pub async fn resolve_entry_value(
   value: String,
   resolution_ctx: ResolutionCtx,
@@ -485,6 +519,8 @@ pub async fn resolve_entry_value(
   }
 }
 
+/// Downloads repository updates from their origin remote using git.
+/// Git implicitly supports both HTTP(S) and SSH, so users have options when getting updates.
 pub async fn download_repo_updates(
   store: Arc<WarehouseStore>,
   repo_dir_path: OsPath,

@@ -1,2 +1,9 @@
+//! # Sensors, LEDs, etc
+//!
+//! A sensor component is a bidirectional data component that encompasses everything from temperature, light, and capacitance measurements, to accent LEDs. Sensor components are used for anything that doesn't have a specialized component.
+//!
+//! For example, you'd use a sensor component for a bend sensor, however, you'd use a [movement component](super::movement) for a brushless motor with an encoder. For more complex LED matrices, you'll want to define a [display component](super::video::displays) instead to take advantage of the hardware accelerated, centralized, and programmatically efficient renderer; however, the development libraries have smooth timing functions for things like LED strips when a sensor component is accessed as something like an LED/set of LEDs, or a servo, etc.
+//!
+
 pub mod impls;
 pub mod models;

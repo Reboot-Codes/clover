@@ -1,3 +1,8 @@
+//! # Clover ModMan Data Structures
+//!
+//! [Modules](Module) are comprised of [Components](CloverComponent) and their [Metadata](CloverComponentMeta).
+//!
+
 use crate::server::{
   modman::components::{
     audio::models::{
@@ -32,7 +37,7 @@ use super::components::models::CloverComponentTrait;
 
 // TODO: Define defaults via `Default` trait impl.
 
-/// Modules contain [Components](CloverComponent).
+/// Modules are comprised of [Components](CloverComponent) and their [Metadata](CloverComponentMeta).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
   pub module_type: String,

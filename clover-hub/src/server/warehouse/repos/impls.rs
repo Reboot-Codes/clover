@@ -906,7 +906,7 @@ impl ManifestCompilationFrom<OptionalSingleManifestSpecEntry<bool>> for Optional
   }
 }
 
-//* ----------------------------
+// ---------- Begin Actual Value Compilation Implementations ----------
 
 impl Manifest {
   pub async fn compile(

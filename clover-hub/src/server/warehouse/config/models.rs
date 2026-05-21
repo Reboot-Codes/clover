@@ -13,18 +13,23 @@ use std::{
 use crate::server::modman::models::ModManConfig;
 use crate::server::renderer::models::RendererConfig;
 
+/// Clover Base Configuration, generally pulled from `/opt/clover/config.jsonc`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+  /// Uses Podman by default.
   pub docker_daemon: String,
   pub repos: HashMap<String, RepoSpec>,
   #[serde(default)]
   pub data_dir: OsPath,
+  // TODO: REMOVE. Use Zenoh storage
   #[serde(skip)]
   pub db: Option<Arc<DatabaseConnection>>,
   pub primary_api_key: String,
   /// Default gesture pack to use
   pub default_gesture_pack: String,
+  /// Hardware Configuration for Modman.
   pub modman: ModManConfig,
+  /// Hardware Configuration for Renderer.
   pub renderer: RendererConfig,
 }
 

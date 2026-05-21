@@ -1,3 +1,12 @@
+//! # Renderer
+//!
+//! Uses graphical acceleration to render and display graphics on any connected [display components](super::modman::components::video::displays). Primary thread execution starts with [`renderer_main`].
+//!
+//! The renderer service is *only* responsible for creating, managing, destroying, and writing to an arbitrary number of OpenGL/Vulkan contexts who's frames are captured and sent to displays registered with modman when permitted by the user.
+//!
+//! The internal bevy-based engine is found within the [System UI](system_ui) package.
+//!
+
 pub mod ipc;
 pub mod models;
 pub mod system_ui;

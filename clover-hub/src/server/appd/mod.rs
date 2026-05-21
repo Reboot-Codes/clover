@@ -1,3 +1,8 @@
+//! # AppDaemon
+//!
+//! The Application Daemon (a.k.a. AppD), handles external Podman applications and utility scripts in coordination with [`super::warehouse`]. Primary thread execution starts with [`appd_main`].
+//!
+
 pub mod docker;
 pub mod ipc;
 pub mod models;

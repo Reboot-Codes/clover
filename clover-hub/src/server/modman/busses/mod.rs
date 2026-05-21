@@ -1,3 +1,8 @@
+//! # ModMan Proxies
+//!
+//! A.k.a. `busses`, Proxies allow Modules to access Zenoh securely without needing a network bridge. [Each bus](proxies) is compiled into ModMan, and enabled via features.
+//!
+
 pub mod models;
 pub mod proxies;
 

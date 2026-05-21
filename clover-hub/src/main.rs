@@ -1,11 +1,23 @@
+//! # CloverHub
+//! The Rust-based nerve centre for all communication between modules, their components, you, and configuration tools. It is built to be secure and performant, while allowing for flexible implementation for everything from spicing up your cosplay, to surgical body mods.
+//!
+//! ## CLI
+//! Found here in [`cli`], will spin up the required tokio threads.
+//!
+//! ## [Server](server)
+//! Contains the modular, core logic to run a clover instance. You probably want this.
+//!
+//! ## [TUI](tui)
+//! Terminal User Interface to manage a clover instance over UART/SSH.
+//!
+
 #![feature(stmt_expr_attributes)]
-#![feature(let_chains)]
 #![feature(ascii_char)]
 #![feature(trivial_bounds)]
 
-mod server;
-mod tui;
-mod utils;
+pub mod server;
+pub mod tui;
+pub mod utils;
 
 use clap::{
   Arg,
@@ -31,10 +43,10 @@ use crate::tui::tui_main;
 
 pub struct Empty {}
 
-const DEFAULT_PORT_STR: &str = "6699";
-const DEFAULT_PORT: u16 = 6699;
+pub const DEFAULT_PORT_STR: &str = "6699";
+pub const DEFAULT_PORT: u16 = 6699;
 
-fn cli() -> Command {
+pub fn cli() -> Command {
   Command::new("clover")
     .about("Central command and control for the Clover system.")
     .subcommand_required(true)
@@ -73,7 +85,7 @@ fn cli() -> Command {
     )
 }
 
-fn port_arg() -> Arg {
+pub fn port_arg() -> Arg {
   Arg::new("port")
     .short('p')
     .long("port")
@@ -85,11 +97,11 @@ fn port_arg() -> Arg {
     ))
 }
 
-fn aio_args() -> Vec<Arg> {
+pub fn aio_args() -> Vec<Arg> {
   vec![port_arg()]
 }
 
-fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
+pub fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
   match arg {
     Ok(val) => val,
     Err(e) => {
@@ -102,7 +114,7 @@ fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
   }
 }
 
-fn get_signal_handle(
+pub fn get_signal_handle(
   big_boy_token: CancellationToken,
   cancellation_token: CancellationToken,
   server_token: Option<CancellationToken>,
@@ -144,7 +156,7 @@ fn get_signal_handle(
 // taken from https://stackoverflow.com/questions/77585473/rust-tokio-how-to-handle-more-signals-than-just-sigint-i-e-sigquit#77591939
 /// Waits for a signal that requests a graceful shutdown, like SIGTERM or SIGINT.
 #[cfg(unix)]
-async fn wait_for_signal_impl(server_token: Option<CancellationToken>) {
+pub async fn wait_for_signal_impl(server_token: Option<CancellationToken>) {
   use log::debug;
   use tokio::signal::unix::{
     signal,
@@ -179,7 +191,7 @@ async fn wait_for_signal_impl(server_token: Option<CancellationToken>) {
 
 /// Waits for a signal that requests a graceful shutdown, Ctrl-C (SIGINT).
 #[cfg(windows)]
-async fn wait_for_signal_impl() {
+pub async fn wait_for_signal_impl() {
   use tokio::signal::windows;
 
   // Infos here:
@@ -197,7 +209,8 @@ async fn wait_for_signal_impl() {
   };
 }
 
-async fn run(big_boy_token: CancellationToken) {
+/// Run the primary CloverHub process.
+pub async fn run(big_boy_token: CancellationToken) {
   let matches = Box::leak(Box::new(cli().get_matches()));
   let subcommand = matches.subcommand();
 
@@ -339,8 +352,8 @@ async fn run(big_boy_token: CancellationToken) {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-  // TODO:: Create a logger that will send logs to a FIFO buffer to send over WS via EvtBuzz
+pub async fn main() -> Result<(), Box<dyn Error>> {
+  // TODO: Create a logger that will send logs to a FIFO buffer to send to CarbonSteel clients
   env_logger::Builder::new()
     .parse_filters(&env::var("CLOVER_LOG").unwrap_or("info".to_string()))
     .init();

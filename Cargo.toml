@@ -3,14 +3,42 @@ resolver = "2"
 
 members = [
   "clover-hub",
+  "clover-hub-macros",
   "toolbox/carbon-steel",
   "toolbox/ratchet",
   "core/libs/tesseract",
-  "core/libs/carbon-fiber"
-, "clover-hub-macros"]
+  "core/libs/carbon-fiber",
+]
 
 # [profile.dev]
 # opt-level = 1
-# 
+#
 # [profile.dev.package."*"]
 # opt-level = 3
+
+[workspace.dependencies]
+clover-hub = { path = "./clover-hub" }
+clover-hub-macros = { path = "./clover-hub-macros" }
+
+carbon-steel = { path = "./toolbox/carbon-steel" }
+ratchet = { path = "./toolbox/ratchet" }
+
+tesseract = { path = "./core/libs/tesseract" }
+carbon-fiber = { path = "./core/libs/carbon-fiber" }
+
+tokio = {
+  version = "1.42.0",
+  features = [
+    "signal",
+    "macros",
+    "sync",
+    "rt-multi-thread",
+  ]
+}
+tokio-util = "0.7.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json_lenient = "0.2.4"
+sea-orm = { version = "1.1.1", features = [
+  "runtime-tokio-rustls",
+  "sqlx-sqlite",
+] }

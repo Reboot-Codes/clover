@@ -1,3 +1,8 @@
+//! # Supported ModMan Proxy Busses
+//!
+//! All busses here are officially supported, and are designed to work with the CarbonFiber reference API to provide standardized communication according to the [Module's configuration](crate::server::modman::modules)
+//!
+
 pub mod app;
 #[cfg(feature = "bt_classic")]
 pub mod bt_classic;

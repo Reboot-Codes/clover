@@ -1,3 +1,12 @@
+//! # Warehouse
+//!
+//! Manages external repositories, and handles configuration parsing from them and the [base configuration](config).
+//!
+//! Before starting its sibling components, CHServer will first call [`setup_warehouse`] to get the Clover warehouse/primary storage directory (by default: `/opt/clover`) ready for use.
+//!
+//! Later, after an inital connection to Zenoh is initalized, Warehouse will then monitor for [events](ipc) using its primary service defined in [`warehouse_main`].
+//!
+
 pub mod config;
 pub mod db;
 pub mod ipc;
@@ -32,6 +41,8 @@ use tokio::io::{
 };
 use tokio_util::sync::CancellationToken;
 
+/// The primary startup Error enum.
+/// Warehouse will return this enum in [`setup_warehouse`].
 // TODO: Move to snafu crate.
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -46,6 +57,11 @@ pub enum Error {
   FailedToUpdateRepoDirectoryStructure { error: SimpleError },
 }
 
+/// Warehouse's data directory preparation function.
+///
+/// 1. Ensures that the data directory exists,
+/// 2. Loads the core [configuration file](config) (paired management devices, permanently attached hardware, core Modules to initalize, etc),
+/// 3. and preps [Repository storage](repos).
 pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Result<(), Error> {
   let mut err = None;
   let mut data_dir_path = OsPath::new().join(data_dir.clone());
@@ -220,6 +236,7 @@ pub async fn gen_user() -> UserConfig {
   }
 }
 
+/// Main service function for Warehouse. Maintains an ongoing connection to Zenoh, and will manage filesystem operations as needed.
 pub async fn warehouse_main(
   store: Arc<WarehouseStore>,
   user: NexusUser,
@@ -227,6 +244,7 @@ pub async fn warehouse_main(
 ) {
   info!("Starting Warehouse...");
 
+  // TODO: Move to Zenoh's persistent storage
   let db_raw = Database::connect(format!(
     "sqlite://{}?mode=rwc",
     store.config.lock().await.data_dir.join("/db.sqlite")
