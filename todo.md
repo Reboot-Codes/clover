@@ -2,28 +2,47 @@
 
 - [ ] CloverHub
   - [ ] Server
-    - [ ] Move to MQTT/RabbitMQ
+    - [ ] Centralize common crates and types
+    - [ ] Move to Tracing
+      - [ ] add `tracing`, `tracing-subscriber`, `tracing-log`
+      - [ ] Pass logs to Zenoh
+    - [ ] Move to Snafu
+    - [ ] Move to Zenoh
+      - [ ] Map out all events
+      - [ ] Move to zenoh path convention
+      - [ ] Refactor `service_main` functions
+      - [ ] Move to Zenoh for in-memory store (RocksDB?)
+      - [ ] Implement dynamic host IDs
+      - [ ] Refactor IPC threads
+    - [ ] Move to flat loop over shutdown callback pyramid
+    - [ ] Create system theme paradigm (theme colors)
     - [ ] Renderer
       - [ ] SystemUI
+        - [ ] Double check on registering displays properly
+        - [ ] Build UI framework
         - [ ] Custom Audio Plugin (using ModMan proxies).
         - [ ] i18n
     - [ ] Modman
       - [ ] Finish proxy bindings (WIP)
       - [ ] Finish module init and de-init methods
       - [ ] Finish gesture event schema
+      - [ ] Build gesture message generator.
       - [ ] i18n
     - [ ] Warehouse
-      - [x] Setup serialization and de-serialization for general store dbs.
       - [ ] Finish models
+      - [ ] Allow offline resiliance (no internet does not mean update failiure, just failed to check updates)
+    - [ ] Inference Engine
+      - [ ] Setup ONNX (`ort`)
+      - [ ] Setup Candle
 - [ ] Core
   - [ ] Libraries
     - [ ] Tesseract
       - [ ] Rust
-      - [ ] Python
       - [ ] TypeScript
-      - [ ] Go
+        - [ ] use OpenTelemetry to have `tracing`-esque logging to pass to Zenoh.
     - [ ] Toolbox
       - [ ] CarbonSteel
+        - [ ] Enable FFI via `flutter_rust_bridge`.
         - [ ] Modules
         - [ ] Expression Packs
         - [ ] Repo Manifests
@@ -33,6 +52,8 @@
         - [ ] Zed
           - [ ] i18n
       - [ ] Ratchet
+        - [ ] Transition to Flutter
+          - [ ] use `flutter_scene`, and specifically enable impeller on desktop builds.
         - [ ] Inital Setup Flow
           - [ ] i18n
         - [ ] Repos
@@ -50,16 +71,6 @@
             - [ ] i18n
           - [ ] Creation
             - [ ] i18n
-      - [ ] Spanner
-        - [ ] Create mobile app template
-        - [ ] React native base
-        - [ ] Android native modules
-        - [ ] Darwin native modules
-        - [ ] Setup CarbonSteel in RN:
-          - https://medium.com/@marekkotewicz/building-a-mobile-app-in-rust-and-react-native-part-1-project-setup-b8dbcf3f539f
-          - https://medium.com/@marekkotewicz/building-a-mobile-app-in-rust-and-react-native-part-2-hello-world-60970a7d194a
-          - https://github.com/debris/rust-react-native-boilerplate
-        - [ ] i18n
     - [ ] CarbonFiber
       - [ ] Rust (`no_std`)
         - [ ] i18n
@@ -73,9 +84,17 @@
       - [ ] Settings
       - [ ] FLIPr
 - [ ] Docs
+  - [ ] Transition to Astro
+    - [ ] Copy in, and modify the generated rustdoc
   - [ ] i18n
-  - [ ] Remove references to Arbiter and Modman (move the latter to nexus docs)
   - [ ] CloverHub
     - [ ] Module proxy config
   - [ ] User setup
     - [ ] Inital config tutorial (WIP, actually)
+  - [ ] Developer Tutorials
+    - [ ] Repo setup
+      - [ ] Manifest setup (clover manifest helper in Deno/TS?)
+      - [ ] Setting up `.well-known/clover.manifest.lnk`
+    - [ ] Gesture Pack Creation
+    - [ ] App Creation
+    - [ ] Module Creation
