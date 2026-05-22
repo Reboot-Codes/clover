@@ -27,11 +27,6 @@ use inference_engine::{
   inference_engine_main,
   InferenceEngineStore,
 };
-use log::{
-  debug,
-  error,
-  info,
-};
 use modman::{
   models::ModManStore,
   modman_main,
@@ -44,6 +39,13 @@ use renderer::{
 };
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  info_span,
+  Instrument,
+};
 use warehouse::{
   db::connect_db,
   models::WarehouseStore,
@@ -65,21 +67,26 @@ pub fn spawn_cleanup_task(
   global_cancellation_token: CancellationToken,
   services: Vec<InitializedService>,
 ) -> tokio::task::JoinHandle<()> {
-  tokio::task::spawn(async move {
-    global_cancellation_token.cancelled().await;
+  let shutdown_span = info_span!("server_shutdown");
 
-    let services_iter = services.into_iter();
+  tokio::task::spawn(
+    async move {
+      global_cancellation_token.cancelled().await;
 
-    for service in services_iter.rev() {
-      info!("Shutting down {}...", service.name);
-      service.shutdown_trigger.cancel();
+      let services_iter = services.into_iter();
 
-      service.shutdown_ack.cancelled().await;
-      info!("{} Shutdown Complete", service.name);
+      for service in services_iter.rev() {
+        info!("Shutting down {}...", service.name);
+        service.shutdown_trigger.cancel();
+
+        service.shutdown_ack.cancelled().await;
+        info!("{} Shutdown Complete", service.name);
+      }
+
+      info!("Graceful shutdown successful!");
     }
-
-    info!("Graceful shutdown successful!");
-  })
+    .instrument(shutdown_span),
+  )
 }
 
 pub async fn server_main(
