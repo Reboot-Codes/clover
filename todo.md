@@ -4,7 +4,8 @@
   - [ ] Server
     - [ ] Centralize common crates and types
     - [ ] Move to Tracing
-      - [ ] add `tracing`, `tracing-subscriber`, `tracing-log`
+      - [x] add `tracing`, `tracing-subscriber`, `tracing-log`
+      - [ ] Add file parsing for log rules
       - [ ] Pass logs to Zenoh
     - [ ] Move to Snafu
     - [ ] Move to Zenoh

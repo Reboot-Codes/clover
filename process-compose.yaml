@@ -1,0 +1,17 @@
+version: "0.5"
+
+processes:
+  zenohd-router:
+    command: >
+      zenohd -l tcp/0.0.0.0:6699 --adminspace-permissions rw
+    availability:
+      restart: "always"
+  clover-hub:
+    command: >
+      RUST_BACKTRACE=1 CLOVER_LOG="clover=debug,clover-hub-macros=debug,wgpu_hal=error" CLOVER_SIMULATED_CONTROLS="true" CLOVER_MASTER_PRINT="true" cargo run --bin="clover-hub" run server
+    availability:
+      restart: "on_failure"
+    # Wait until the local Zenoh TCP socket is actively listening before booting the hub
+    depends_on:
+      zenohd-router:
+        condition: process_started

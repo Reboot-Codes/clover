@@ -42,3 +42,6 @@ sea-orm = { version = "1.1.1", features = [
   "runtime-tokio-rustls",
   "sqlx-sqlite",
 ] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+tracing-log = "0.2.0"

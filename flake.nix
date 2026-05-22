@@ -130,22 +130,45 @@
         );
 
         # nix develop
-        devShells.default = craneLib.devShell {
-          inherit buildInputs;
+        devShells.default =
+          let
+            cloverEnv = pkgs.writeShellScriptBin "clover-up" ''
+              CURRENT_REPO_ROOT=${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null
 
-          packages = [
-            toolchain
-          ]
-          ++ (with pkgs; [
-            nodejs_22
-            yarn-berry
-            rust-analyzer
-            tokio-console
-          ])
-          ++ libraries;
+              # Fallback to the current working directory if not inside a git repo
+              if [ -z "$CURRENT_REPO_ROOT" ]; then
+                CURRENT_REPO_ROOT=$(pwd)
+              fi
 
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath libraries}";
-        };
+              # Verify the file actually exists before trying to pass it to process-compose
+              PROCESS_COMPOSE_FILE="$CURRENT_REPO_ROOT/process-compose.yaml"
+              if [ ! -f "$PROCESS_COMPOSE_FILE" ]; then
+                echo "Fatal: Could not find process-compose.yaml at root target: $CURRENT_REPO_ROOT"
+                exit 1
+              fi
+
+              exec ${pkgs.process-compose}/bin/process-compose up --no-server -f $PROCESS_COMPOSE_FILE
+            '';
+          in
+          craneLib.devShell {
+            inherit buildInputs;
+
+            packages = [
+              toolchain
+            ]
+            ++ (with pkgs; [
+              nodejs_22
+              yarn-berry
+              rust-analyzer
+              tokio-console
+              zenoh
+              process-compose
+              cloverEnv
+            ])
+            ++ libraries;
+
+            LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath libraries}";
+          };
       }
     ));
 }
