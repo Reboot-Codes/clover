@@ -15,7 +15,6 @@
       - [ ] Move to Zenoh for in-memory store (RocksDB?)
       - [ ] Implement dynamic host IDs
       - [ ] Refactor IPC threads
-    - [ ] Move to flat loop over shutdown callback pyramid
     - [ ] Create system theme paradigm (theme colors)
     - [ ] Renderer
       - [ ] SystemUI

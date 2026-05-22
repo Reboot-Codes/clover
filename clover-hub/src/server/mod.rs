@@ -51,6 +51,37 @@ use warehouse::{
   warehouse_main,
 };
 
+/// Tracks services that are run by the main clover-hub process.
+pub struct InitializedService {
+  /// Pretty name for the service
+  pub name: &'static str,
+  /// Triggers this specific service's shutdown loop
+  pub shutdown_trigger: CancellationToken,
+  /// Acknowledges when this service has completely stopped running
+  pub shutdown_ack: CancellationToken,
+}
+
+pub fn spawn_cleanup_task(
+  global_cancellation_token: CancellationToken,
+  services: Vec<InitializedService>,
+) -> tokio::task::JoinHandle<()> {
+  tokio::task::spawn(async move {
+    global_cancellation_token.cancelled().await;
+
+    let services_iter = services.into_iter();
+
+    for service in services_iter.rev() {
+      info!("Shutting down {}...", service.name);
+      service.shutdown_trigger.cancel();
+
+      service.shutdown_ack.cancelled().await;
+      info!("{} Shutdown Complete", service.name);
+    }
+
+    info!("Graceful shutdown successful!");
+  })
+}
+
 pub async fn server_main(
   data_dir: &String,
   port: u16,
@@ -187,6 +218,8 @@ pub async fn server_main(
           // Create oneshot channel for ready signal
           let (nexus_ready_tx, nexus_ready_rx) = tokio::sync::oneshot::channel();
 
+          let mut services = Vec::new();
+
           // Start Nexus
           debug!("Starting Nexus...");
           let nexus_port = Arc::new(port);
@@ -220,6 +253,11 @@ pub async fn server_main(
             )
             .await;
           });
+          services.push(InitializedService {
+            name: "Nexus",
+            shutdown_trigger: nexus_tokens.0,
+            shutdown_ack: nexus_tokens.1,
+          });
 
           // WAIT for nexus to be ready before starting services
           match nexus_ready_rx.await {
@@ -246,6 +284,11 @@ pub async fn server_main(
             )
             .await;
           });
+          services.push(InitializedService {
+            name: "Warehouse",
+            shutdown_trigger: warehouse_tokens.0,
+            shutdown_ack: warehouse_tokens.1,
+          });
 
           // Start ModMan
           debug!("Starting Modman...");
@@ -254,6 +297,11 @@ pub async fn server_main(
           let modman_handle = tokio::task::spawn(async move {
             modman_main(modman_store, modman_user, modman_tokens_clone).await;
           });
+          services.push(InitializedService {
+            name: "ModMan",
+            shutdown_trigger: modman_tokens.0,
+            shutdown_ack: modman_tokens.1,
+          });
 
           // Start Renderer
           debug!("Starting Renderer...");
@@ -261,6 +309,11 @@ pub async fn server_main(
           let renderer_tokens_clone = renderer_tokens.clone();
           let renderer_handle = tokio::task::spawn(async move {
             renderer_main(renderer_store, renderer_user, renderer_tokens_clone).await;
+          });
+          services.push(InitializedService {
+            name: "Renderer",
+            shutdown_trigger: renderer_tokens.0,
+            shutdown_ack: renderer_tokens.1,
           });
 
           // Start InferenceEngine
@@ -275,6 +328,11 @@ pub async fn server_main(
             )
             .await;
           });
+          services.push(InitializedService {
+            name: "Inference Engine",
+            shutdown_trigger: inference_engine_tokens.0,
+            shutdown_ack: inference_engine_tokens.1,
+          });
 
           // Start AppDaemon
           debug!("Starting AppDaemon...");
@@ -283,50 +341,13 @@ pub async fn server_main(
           let appd_handle = tokio::task::spawn(async move {
             appd_main(appd_store, appd_user, appd_tokens_clone).await;
           });
-
-          let cleanup_handle = tokio::task::spawn(async move {
-            tokio::select! {
-              _ = cancellation_token.cancelled() => {
-                info!("Shutting down AppD...");
-                appd_tokens.0.cancel();
-                tokio::select! {
-                  _ = appd_tokens.1.cancelled() => {
-                    info!("Shutting down Inference Engine...");
-                    inference_engine_tokens.0.cancel();
-                    tokio::select! {
-                      _ = inference_engine_tokens.1.cancelled() => {
-                        info!("Shutting down Renderer...");
-                        renderer_tokens.0.cancel();
-                        tokio::select! {
-                          _ = renderer_tokens.1.cancelled() => {
-                            info!("Shutting down ModMan...");
-                            modman_tokens.0.cancel();
-                            tokio::select! {
-                              _ = modman_tokens.1.cancelled() => {
-                                info!("Shutting down Warehouse...");
-                                warehouse_tokens.0.cancel();
-                                tokio::select! {
-                                  _ = warehouse_tokens.1.cancelled() => {
-                                    info!("Shutting down Nexus...");
-                                    nexus_tokens.0.cancel();
-                                    tokio::select! {
-                                      _ = nexus_tokens.1.cancelled() => {
-                                        info!("Graceful shutdown successful!");
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+          services.push(InitializedService {
+            name: "AppDaemon",
+            shutdown_trigger: appd_tokens.0,
+            shutdown_ack: appd_tokens.1,
           });
+
+          let cleanup_handle = spawn_cleanup_task(cancellation_token, services);
 
           tokio::select! {_ = futures::future::join_all(vec![
             cleanup_handle,
