@@ -46,9 +46,10 @@ clap = { version = "4.5.4", features = ["derive"] }
 # Debugging Tools
 log = "^0.4.26"
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter","registry", "std", "fmt"] }
 tracing-log = { workspace = true }
-console-subscriber = "0.5.0"
+opentelemetry_sdk = { workspace = true, features = ["logs"] }
+opentelemetry-appender-tracing = { workspace = true }
 
 # Utils that we had to write
 clover-hub-macros = { path = "../clover-hub-macros" }
