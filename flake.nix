@@ -51,15 +51,14 @@
           vulkan-loader
           libxkbcommon
           wayland
-          xorg.libX11
-          xorg.libxcb
+          libX11
+          libxcb
           alsa-lib
           udev
           vulkan-loader
-          xorg.libX11
-          xorg.libXrandr
-          xorg.libXcursor
-          xorg.libXi
+          libXrandr
+          libXcursor
+          libXi
           at-spi2-atk
           atkmm
           cairo
@@ -73,6 +72,8 @@
           webkitgtk_4_1
           fontconfig
           libz
+          mesa
+          libglvnd
         ];
         # Compile all artifacts
         appDeps = craneLib.buildDepsOnly commonArgs;
@@ -81,10 +82,6 @@
           {
             name = "clover-hub";
             path = ./clover-hub/Cargo.toml;
-          }
-          {
-            name = "ratchet";
-            path = ./toolbox/ratchet/Cargo.toml;
           }
         ];
 
@@ -147,6 +144,9 @@
                 exit 1
               fi
 
+              # Ensure that libraries are actually passed to the development setup.
+              LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}"
+
               exec ${pkgs.process-compose}/bin/process-compose up --no-server -f $PROCESS_COMPOSE_FILE
             '';
           in
@@ -164,10 +164,9 @@
               zenoh
               process-compose
               cloverEnv
+              flutter
             ])
             ++ libraries;
-
-            LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath libraries}";
           };
       }
     ));
