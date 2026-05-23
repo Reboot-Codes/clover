@@ -31,6 +31,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
   // let exporter = opentelemetry_stdout::LogExporter::default();
   let provider: SdkLoggerProvider = SdkLoggerProvider::builder()
     .with_resource(Resource::builder().with_service_name("clover-hub").build())
+    // TODO: Send logs to Zenoh log endpoint.
     //  .with_simple_exporter(exporter)
     .build();
 
@@ -45,16 +46,12 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
   // - Allow `info` level and above by default.
   // - Completely restrict logs from `hyper`, `tonic`, `h2`, and `reqwest`.
   //
-  // Note: This filtering will also drop logs from these components even when
-  // they are used outside of the OTLP Exporter.
   let otel_filter = EnvFilter::new("info")
     .add_directive("hyper=off".parse().unwrap())
     .add_directive("tonic=off".parse().unwrap())
     .add_directive("h2=off".parse().unwrap())
     .add_directive("reqwest=off".parse().unwrap());
   let otel_layer = layer::OpenTelemetryTracingBridge::new(&provider).with_filter(otel_filter);
-
-  // TODO: Send logs to Zenoh log endpoint.
 
   let env_filter = EnvFilter::try_from_env("CLOVER_LOG")
     .unwrap_or_else(|_| EnvFilter::new("info").add_directive("clover_hub=debug".parse().unwrap()));

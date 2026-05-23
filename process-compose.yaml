@@ -3,7 +3,7 @@ version: "0.5"
 processes:
   zenohd-router:
     command: >
-      zenohd -l tcp/0.0.0.0:6699 --adminspace-permissions rw
+      zenohd -l tcp/0.0.0.0:6699 --adminspace-permissions rw --cfg=':{metadata:{name:"com.reboot-codes.clover.server"},adminspace:{enabled:true,permissions:{read:true,write:true}}'
     availability:
       restart: "always"
   clover-hub:

@@ -67,6 +67,7 @@ anyhow = "1.0.97"
 
 # HTTP/WS
 nexus = { path = "../../nexus" }
+zenoh = { workspace = true }
 url = "2.5.0"
 image = { version = "0.25.5", features = ["serde"] }
 
