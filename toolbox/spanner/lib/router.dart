@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:spanner/features/welcome/screens/landing.dart';
 
+import 'package:spanner/features/settings/components/shell.dart';
 import 'package:spanner/features/settings/screens/categories.dart';
 
 import 'features/configurator/components/shell.dart';
@@ -77,9 +78,16 @@ final router = GoRouter(
       ],
     ),
     // TODO: Move to ShellRoute for desktop/tablet optimization
-    GoRoute(
-      path: "/settings",
-      builder: (context, state) => const SettingsCategories(),
+    ShellRoute(
+      builder: (context, state, child) {
+        return SettingsShell(child: child);
+      },
+      routes: [
+        GoRoute(
+          path: "/settings",
+          builder: (context, state) => const SettingsCategories(),
+        ),
+      ],
     ),
     GoRoute(path: "/", builder: (context, state) => const LandingPage()),
   ],

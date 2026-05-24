@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spanner/components/window_controls.dart';
 
 class NavDestinationConfig {
   final String id; // Unique identifier for reordering/keys
@@ -86,11 +87,13 @@ class ConfiguratorShell extends StatelessWidget {
                 padding: EdgeInsetsGeometry.only(right: 6.0),
                 child: IconButton(
                   icon: Icon(Icons.settings_outlined),
+                  tooltip: "Settings",
                   onPressed: () {
                     context.push("/settings");
                   },
                 ),
               ),
+              WindowControls(),
             ],
           ),
           bottomNavigationBar: isSmall

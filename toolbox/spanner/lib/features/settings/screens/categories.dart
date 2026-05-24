@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 class SettingCategory {
   final String id;
@@ -29,45 +28,34 @@ class SettingsCategories extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            context.pop();
-          },
-        ),
-        title: Text("Settings"),
-      ),
-      body: Container(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Search',
-                icon: Icon(Icons.search),
+    return Container(
+      padding: EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          TextField(
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              labelText: 'Search',
+              icon: Icon(Icons.search),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.only(top: 8.0),
+              child: ListView.builder(
+                itemCount: settingsCategories.length,
+                itemBuilder: (context, index) {
+                  final category = settingsCategories[index];
+                  return ListTile(
+                    leading: category.icon,
+                    title: Text(category.name),
+                    subtitle: Text(category.description),
+                  );
+                },
               ),
             ),
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.only(top: 8.0),
-                child: ListView.builder(
-                  itemCount: settingsCategories.length,
-                  itemBuilder: (context, index) {
-                    final category = settingsCategories[index];
-                    return ListTile(
-                      leading: category.icon,
-                      title: Text(category.name),
-                      subtitle: Text(category.description),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

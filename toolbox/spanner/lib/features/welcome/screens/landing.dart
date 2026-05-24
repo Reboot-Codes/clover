@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spanner/components/window_controls.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -7,7 +8,7 @@ class LandingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Spanner")),
+      appBar: AppBar(title: Text("Spanner"), actions: [WindowControls()]),
       body: Column(
         children: [
           Text("Welcome to Spanner!"),

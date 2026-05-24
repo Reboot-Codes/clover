@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:spanner/components/window_controls.dart';
 
 class WizardShell extends StatelessWidget {
   final Widget child;
@@ -9,7 +10,7 @@ class WizardShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       // TODO: Add progress bar.
-      appBar: AppBar(title: Text("Setup Wizard")),
+      appBar: AppBar(title: Text("Setup Wizard"), actions: [WindowControls()]),
       body: child,
     );
   }
