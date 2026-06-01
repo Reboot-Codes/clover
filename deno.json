@@ -1,0 +1,6 @@
+{
+  "allowScripts": [
+    "npm:esbuild@0.27.7",
+    "npm:sharp@0.34.5"
+  ]
+}

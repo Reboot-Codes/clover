@@ -1,6 +1,6 @@
 ---
-import TopBar from '../components/nav/topbar.astro'
-import '../styles/global.css'
+import NavBar from '../components/nav/NavBar.astro'
+import globalStyles from '../styles/global.css?url'
 ---
 
 
@@ -12,11 +12,11 @@ import '../styles/global.css'
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
+		<link rel="stylesheet" href={globalStyles} />
 		<title>Astro Basics</title>
 	</head>
-	<body class="bg-black text-white relative min-h-screen">
-	  <div class="engineering-grid-fade"></div>
-		<TopBar />
+	<body class="bg-black text-white min-h-[300vh] flex flex-col">
+		<NavBar />
 		<slot />
 	</body>
 </html>

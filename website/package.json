@@ -1,5 +1,5 @@
 {
-  "name": "clover-website",
+  "name": "@clover/website",
   "type": "module",
   "version": "0.0.1",
   "engines": {
@@ -16,5 +16,8 @@
     "@tailwindcss/vite": "^4.3.0",
     "astro": "^6.3.7",
     "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "sass-embedded": "^1.100.0"
   }
 }

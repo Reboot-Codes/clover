@@ -1,10 +1,10 @@
 ---
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import BigHero from '../components/nav/BigHero.astro';
 ---
 
 <Layout>
-  Hello world.
+  <BigHero class="flex flex-row items-center">
+    Hello World!
+  </BigHero>
 </Layout>
