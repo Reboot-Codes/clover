@@ -129,7 +129,7 @@
         # nix develop
         devShells.default =
           let
-            cloverEnv = pkgs.writeShellScriptBin "clover-up" ''
+            cloverCompose = pkgs.writeShellScriptBin "clover-up" ''
               CURRENT_REPO_ROOT=${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null
 
               # Fallback to the current working directory if not inside a git repo
@@ -149,6 +149,26 @@
 
               exec ${pkgs.process-compose}/bin/process-compose up --no-server -f $PROCESS_COMPOSE_FILE
             '';
+
+            cloverHubCMD = pkgs.writeShellScriptBin "clover-hub" ''
+              # Ensure that libraries are actually passed to the development setup.
+              LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}"
+              RUST_BACKTRACE=1
+              CLOVER_LOG="clover=debug,clover-hub-macros=debug,wgpu_hal=error"
+              CLOVER_SIMULATED_CONTROLS="true"
+              CLOVER_MASTER_PRINT="true"
+
+              exec cargo run --bin="clover-hub" -- $@
+            '';
+
+            cloverHubZenoh = pkgs.writeShellScriptBin "clover-zenoh" ''
+              RUST_LOG=info,zenohd=debug
+
+              exec zenohd -l tcp/0.0.0.0:6699 --adminspace-permissions rw \
+                --cfg='adminspace/enabled:true' \
+                --cfg='adminspace/permissions/read:true' \
+                --cfg='adminspace/permissions/write:true'
+            '';
           in
           craneLib.devShell {
             inherit buildInputs;
@@ -163,7 +183,9 @@
               tokio-console
               zenoh
               process-compose
-              cloverEnv
+              cloverCompose
+              cloverHubCMD
+              cloverHubZenoh
               flutter
             ])
             ++ libraries;

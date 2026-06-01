@@ -15,11 +15,6 @@ pub mod repos;
 
 use config::models::Config;
 use ipc::handle_ipc_msg;
-use log::{
-  debug,
-  error,
-  info,
-};
 use models::WarehouseStore;
 use nexus::user::NexusUser;
 use nexus::{
@@ -40,6 +35,12 @@ use tokio::io::{
   AsyncWriteExt,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  instrument,
+};
 
 /// The primary startup Error enum.
 /// Warehouse will return this enum in [`setup_warehouse`].
@@ -62,6 +63,7 @@ pub enum Error {
 /// 1. Ensures that the data directory exists,
 /// 2. Loads the core [configuration file](config) (paired management devices, permanently attached hardware, core Modules to initalize, etc),
 /// 3. and preps [Repository storage](repos).
+#[instrument]
 pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Result<(), Error> {
   let mut err = None;
   let mut data_dir_path = OsPath::new().join(data_dir.clone());
@@ -237,6 +239,7 @@ pub async fn gen_user() -> UserConfig {
 }
 
 /// Main service function for Warehouse. Maintains an ongoing connection to Zenoh, and will manage filesystem operations as needed.
+#[instrument(skip(store, user, cancellation_tokens))]
 pub async fn warehouse_main(
   store: Arc<WarehouseStore>,
   user: NexusUser,

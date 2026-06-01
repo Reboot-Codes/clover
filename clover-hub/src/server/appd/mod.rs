@@ -14,12 +14,6 @@ use bollard::{
 };
 use docker::remove_app;
 use ipc::handle_ipc_msg;
-use log::{
-  debug,
-  error,
-  info,
-  warn,
-};
 use models::AppDStore;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
@@ -28,6 +22,13 @@ use nexus::{
 };
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  instrument,
+  warn,
+};
 
 // TODO: Create application manifest schema/models
 
@@ -48,6 +49,7 @@ pub async fn gen_user() -> UserConfig {
   }
 }
 
+#[instrument(skip(store, user, cancellation_tokens))]
 pub async fn appd_main(
   store: AppDStore,
   user: NexusUser,

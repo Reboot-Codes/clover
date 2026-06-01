@@ -3,6 +3,7 @@
 - [ ] CloverHub
   - [ ] Server
     - [ ] Centralize common crates and types
+    - [ ] Fix TUI segfault bug
     - [ ] Move to Tracing
       - [x] add `tracing`, `tracing-subscriber`, `tracing-log`
       - [ ] Add file parsing for log rules
@@ -15,6 +16,7 @@
       - [ ] Move to Zenoh for in-memory store (RocksDB?)
       - [ ] Implement dynamic host IDs
       - [ ] Refactor IPC threads
+      - [ ] Add debug screen to TUI
     - [ ] Create system theme paradigm (theme colors)
     - [ ] Renderer
       - [ ] SystemUI

@@ -7,12 +7,6 @@
 
 pub mod ipc;
 
-use ipc::handle_ipc_msg;
-use log::{
-  debug,
-  error,
-  info,
-};
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
   server::models::UserConfig,
@@ -21,6 +15,13 @@ use nexus::{
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  instrument,
+  span,
+};
 
 use super::warehouse::config::models::Config;
 
@@ -57,6 +58,7 @@ impl InferenceEngineStore {
   }
 }
 
+#[instrument(skip(inference_engine_store, user, cancellation_tokens))]
 pub async fn inference_engine_main(
   inference_engine_store: InferenceEngineStore,
   user: NexusUser,
@@ -64,41 +66,64 @@ pub async fn inference_engine_main(
 ) {
   info!("Starting Inference Engine...");
 
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_rx) => {}
+  let mut zenoh_config = zenoh::Config::default();
+
+  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+
+  debug!("Connecting to Zenoh...");
+  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
+  debug!("Connected to Zenoh!");
+
+  let ipc_token = cancellation_tokens.0.clone();
+  let ipc_session = session.clone();
+  let ipc_handle = tokio::task::spawn(async move {
+    let subscriber = ipc_session
+      .declare_subscriber("com/reboot-codes/clover/server/inference_engine/**")
+      .await
+      .unwrap();
+
+    while !ipc_token.is_cancelled() {
+      match subscriber.recv_async().await {
+        Ok(sample) => {
+          // Refer to z_bytes.rs to see how to deserialize different types of message
+          let payload = sample
+            .payload()
+            .try_to_string()
+            .unwrap_or_else(|e| e.to_string().into());
+
+          debug!(
+            ">> [Subscriber] Received {} ('{}': '{}')",
+            sample.kind(),
+            sample.key_expr().as_str(),
+            payload
+          );
+          if let Some(att) = sample.attachment() {
+            let att = att.try_to_string().unwrap_or_else(|e| e.to_string().into());
+            debug!(" ({att})");
+          }
+        }
+        Err(msg) => {
+          error!("{}", msg);
+        }
+      }
     }
   });
-
-  let init_user = Arc::new(user.clone());
+  let init_session = session.clone();
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      match init_user.send(
-        &"nexus://com.reboot-codes.clover.inference-engine/status".to_string(),
-        &"finished-init".to_string(),
-        &None,
-      ) {
-        Err(e) => {
-          error!(
-            "Error when letting peers know about complete init status: {}",
-            e
-          );
-        }
-        _ => {}
-      }
+      let init_publisher = init_session
+        .declare_publisher("com/reboot-codes/clover/server/inference_engine/status")
+        .await
+        .unwrap();
+
+      init_publisher.put("ready");
     })
     .await;
 
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
-      ipc_recv_handle.abort();
       ipc_handle.abort();
 
       info!("Cleaning up networks...");

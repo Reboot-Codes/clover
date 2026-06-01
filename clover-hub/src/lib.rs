@@ -2,6 +2,7 @@
 #![feature(ascii_char)]
 #![feature(trivial_bounds)]
 
+pub mod logging;
 pub mod server;
 pub mod tui;
 pub mod utils;
@@ -22,6 +23,7 @@ use std::time::Duration;
 use tokio::time;
 use tokio_util::sync::CancellationToken;
 
+use crate::logging::setup_logging;
 use crate::server::server_main;
 use crate::tui::tui_main;
 
@@ -42,18 +44,7 @@ pub fn cli() -> Command {
         .flatten_help(true)
         .args(aio_args())
         .subcommand(Command::new("aio").args(aio_args()))
-        .subcommand(
-          Command::new("server")
-            .arg(
-              Arg::new("data_dir")
-                .short('d')
-                .long("data-dir")
-                .required(false)
-                .default_value("/opt/clover")
-                .help("The data directory to use other than `/opt/clover`"),
-            )
-            .arg(port_arg()),
-        )
+        .subcommand(Command::new("server").arg(data_dir_arg()).arg(port_arg()))
         .subcommand(
           Command::new("tui")
             .arg(
@@ -81,8 +72,17 @@ pub fn port_arg() -> Arg {
     ))
 }
 
+pub fn data_dir_arg() -> Arg {
+  Arg::new("data_dir")
+    .short('d')
+    .long("data-dir")
+    .required(false)
+    .default_value("/opt/clover")
+    .help("The data directory to use other than `/opt/clover`")
+}
+
 pub fn aio_args() -> Vec<Arg> {
-  vec![port_arg()]
+  vec![data_dir_arg(), port_arg()]
 }
 
 pub fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
@@ -198,11 +198,14 @@ pub async fn run(big_boy_token: CancellationToken) {
   let matches = Box::leak(Box::new(cli().get_matches()));
   let subcommand = matches.subcommand();
 
+  let aio_shutdown_token = big_boy_token.clone();
   match subcommand {
     Some(("run", sub_matches)) => {
       let run_command = sub_matches.subcommand().unwrap_or(("aio", sub_matches));
       match run_command {
         ("aio", sub_matches) => {
+          let logging_provider = setup_logging(false);
+
           info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
           let from_server_token = CancellationToken::new();
@@ -232,12 +235,11 @@ pub async fn run(big_boy_token: CancellationToken) {
           });
 
           let tui_port = Arc::new(port);
-          let tui_token = cancellation_token.clone();
           let tui_handle = tokio::task::spawn(async move {
             let _ = tui_main(
               *tui_port.to_owned(),
               Ok::<String, ()>("localhost".to_string()).ok(),
-              tui_token,
+              aio_shutdown_token,
             )
             .await;
           });
@@ -250,10 +252,13 @@ pub async fn run(big_boy_token: CancellationToken) {
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle, server_handle]) => {
             info!("Exiting...");
+            let _ = logging_provider.shutdown();
             exit(0);
           }}
         }
         ("server", sub_matches) => {
+          let logging_provider = setup_logging(true);
+
           info!("Starting CloverHub!");
           let from_server_token = CancellationToken::new();
           let server_cancellation_token_clone = from_server_token.clone();
@@ -282,10 +287,13 @@ pub async fn run(big_boy_token: CancellationToken) {
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, server_handle]) => {
             info!("Exiting...");
+            let _ = logging_provider.shutdown();
             exit(0);
           }}
         }
         ("tui", sub_matches) => {
+          let logging_provider = setup_logging(false);
+
           info!("Starting CloverHub!");
           let cancellation_token = CancellationToken::new();
           let host = sub_matches
@@ -300,12 +308,11 @@ pub async fn run(big_boy_token: CancellationToken) {
 
           info!("Running Terminal UI...");
           let tui_host = Arc::new(host);
-          let tui_token = cancellation_token.clone();
           let tui_handle = tokio::task::spawn(async move {
             tui_main(
               port,
               Ok::<String, ()>((*tui_host.to_owned()).to_string()).ok(),
-              tui_token,
+              aio_shutdown_token,
             )
             .await
             .err();
@@ -315,6 +322,7 @@ pub async fn run(big_boy_token: CancellationToken) {
 
           tokio::select! {_ = futures::future::join_all(vec![signal_handle, tui_handle]) => {
             info!("Exiting...");
+            let _ = logging_provider.shutdown();
             exit(0);
           }}
         }
@@ -329,7 +337,7 @@ pub async fn run(big_boy_token: CancellationToken) {
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
-      info!("Calling out to {ext:?} with {args:?}");
+      println!("Calling out to {ext:?} with {args:?}");
     }
     _ => unreachable!(), // If all subcommands are defined above, anything else is unreachable!()
   }

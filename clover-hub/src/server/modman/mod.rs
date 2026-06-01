@@ -15,12 +15,6 @@ pub mod modules;
 
 use busses::start_busses;
 use ipc::handle_ipc_msg;
-use log::{
-  debug,
-  error,
-  info,
-  warn,
-};
 use models::ModManStore;
 use modules::{
   deinit_module,
@@ -33,6 +27,13 @@ use nexus::{
 };
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  instrument,
+  warn,
+};
 
 /// The minimum required permissions and configuration for ModMan to use Nexus.
 pub async fn gen_user() -> UserConfig {
@@ -53,6 +54,7 @@ pub async fn gen_user() -> UserConfig {
 }
 
 /// Begin the ModMan threads and sub-processes to ensure module/compoent communications.
+#[instrument(skip(store, user, cancellation_tokens))]
 pub async fn modman_main(
   store: ModManStore,
   user: NexusUser,

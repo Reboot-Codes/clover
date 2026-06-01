@@ -14,11 +14,6 @@ pub mod system_ui;
 use self::system_ui::system_ui_main;
 use crate::utils::RecvSync;
 use ipc::handle_ipc_msg;
-use log::error;
-use log::{
-  debug,
-  info,
-};
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
   server::models::UserConfig,
@@ -30,6 +25,12 @@ use std::sync::Mutex as StdMutex;
 use system_ui::SystemUIIPC;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  info,
+  instrument,
+};
 
 use super::warehouse::config::models::Config;
 
@@ -67,6 +68,7 @@ impl RendererStore {
   }
 }
 
+#[instrument(skip(store, user, cancellation_tokens))]
 pub async fn renderer_main(
   store: RendererStore,
   user: NexusUser,

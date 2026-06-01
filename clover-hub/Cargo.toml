@@ -36,11 +36,8 @@ uart = ["dep:serialport", "dep:tokio-serial"]
 
 [dependencies]
 # CLI
-crossterm = { version = "0.28.1", features = ["serde"] }
-tui = { version = "0.19", default-features = false, features = [
-  'crossterm',
-  'serde',
-] }
+ratatui = "0.30.0"
+tui-logger = { version = "0.18.2", features = ["tracing-support"] }
 clap = { version = "4.5.4", features = ["derive"] }
 
 # Debugging Tools
