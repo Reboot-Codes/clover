@@ -10,15 +10,20 @@ use log::{
 use os_path::OsPath;
 use serde::Deserialize;
 use simple_error::SimpleError;
-use std::hash::{
-  DefaultHasher,
-  Hash,
-  Hasher,
+use std::{
+  hash::{
+    DefaultHasher,
+    Hash,
+    Hasher,
+  },
+  sync::Arc,
 };
 use tokio::{
   fs,
   io::AsyncReadExt,
 };
+use tokio_util::sync::CancellationToken;
+use tracing::instrument;
 
 pub struct RecvSync<T>(pub std::sync::mpsc::Receiver<T>);
 
@@ -106,5 +111,23 @@ where
       Some(e) => Err(e.into()),
       None => Err(anyhow!("Damn... no error but couldn't return an object?")),
     },
+  }
+}
+
+/// One time publisher to a topic over a Zenoh session. For any longer term publishing, setup a publisher manually!
+#[instrument(skip(session))]
+pub async fn one_off_message(session: Arc<zenoh::Session>, topic: &String, message: &String) {
+  let publisher = session.declare_publisher(topic.clone()).await.unwrap();
+
+  match publisher.put(message.clone()).await {
+    Ok(_) => {
+      debug!("Sucessfully sent message to topic: {}", &topic);
+    }
+    Err(_) => {
+      error!(
+        "Failed to send message to zenoh topic: {}, this may be a sign of a misconfiguration!!",
+        &topic
+      );
+    }
   }
 }

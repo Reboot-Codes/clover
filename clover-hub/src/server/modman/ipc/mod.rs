@@ -12,6 +12,8 @@ use nexus::{
   user::NexusUser,
 };
 use tokio::sync::broadcast::Sender;
+use tokio_util::sync::CancellationToken;
+use tracing::instrument;
 use url::Url;
 
 use crate::{
@@ -53,6 +55,41 @@ impl FromStr for Events {
   }
 }
 
+#[instrument(skip(ipc_token, ipc_session))]
+pub async fn handle_ipc(ipc_token: CancellationToken, ipc_session: Arc<zenoh::Session>) {
+  let subscriber = ipc_session
+    .declare_subscriber("com/reboot-codes/clover/server/inference_engine/**")
+    .await
+    .unwrap();
+
+  while !ipc_token.is_cancelled() {
+    match subscriber.recv_async().await {
+      Ok(sample) => {
+        // Refer to z_bytes.rs to see how to deserialize different types of message
+        let payload = sample
+          .payload()
+          .try_to_string()
+          .unwrap_or_else(|e| e.to_string().into());
+
+        debug!(
+          ">> [Subscriber] Received {} ('{}': '{}')",
+          sample.kind(),
+          sample.key_expr().as_str(),
+          payload
+        );
+        if let Some(att) = sample.attachment() {
+          let att = att.try_to_string().unwrap_or_else(|e| e.to_string().into());
+          debug!(" ({att})");
+        }
+      }
+      Err(msg) => {
+        error!("{}", msg);
+      }
+    }
+  }
+}
+
+/// LEGACY!
 pub async fn handle_ipc_msg(
   store: ModManStore,
   ipc_rx: Sender<IPCMessageWithId>,

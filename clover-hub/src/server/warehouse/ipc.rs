@@ -1,48 +1,41 @@
-use anyhow::anyhow;
-use log::debug;
-use nexus::server::models::IPCMessageWithId;
-use std::str::FromStr;
-use tokio::sync::broadcast::Sender;
-use url::Url;
+use std::sync::Arc;
 
-#[derive(Debug, PartialEq)]
-pub enum Events {
-  None,
-}
+use tokio_util::sync::CancellationToken;
+use tracing::{
+  debug,
+  error,
+  instrument,
+};
 
-impl FromStr for Events {
-  type Err = anyhow::Error;
+#[instrument(skip(ipc_token, ipc_session))]
+pub async fn handle_ipc(ipc_token: CancellationToken, ipc_session: Arc<zenoh::Session>) {
+  let subscriber = ipc_session
+    .declare_subscriber("com/reboot-codes/clover/server/inference_engine/**")
+    .await
+    .unwrap();
 
-  fn from_str(input: &str) -> Result<Events, Self::Err> {
-    match input {
-      "" => Ok(Events::None),
-      "/" => Ok(Events::None),
-      _ => Err(anyhow!("String \"{}\" not part of enum!", input)),
-    }
-  }
-}
+  while !ipc_token.is_cancelled() {
+    match subscriber.recv_async().await {
+      Ok(sample) => {
+        // Refer to z_bytes.rs to see how to deserialize different types of message
+        let payload = sample
+          .payload()
+          .try_to_string()
+          .unwrap_or_else(|e| e.to_string().into());
 
-pub async fn handle_ipc_msg(ipc_rx: Sender<IPCMessageWithId>) {
-  while let Ok(msg) = ipc_rx.subscribe().recv().await {
-    let kind = Url::parse(&msg.kind.clone()).unwrap();
-
-    // Verify that we care about this event.
-    if kind.host().unwrap() == url::Host::Domain("com.reboot-codes.clover.warehouse") {
-      debug!("Processing: {}", msg.kind.clone());
-
-      match Events::from_str(kind.path()) {
-        Ok(event_type) => {
-          match event_type {
-            _ => {
-              // TODO
-              debug!("TODO");
-            }
-          }
+        debug!(
+          ">> [Subscriber] Received {} ('{}': '{}')",
+          sample.kind(),
+          sample.key_expr().as_str(),
+          payload
+        );
+        if let Some(att) = sample.attachment() {
+          let att = att.try_to_string().unwrap_or_else(|e| e.to_string().into());
+          debug!(" ({att})");
         }
-        Err(e) => {
-          // TODO
-          debug!("TODO");
-        }
+      }
+      Err(msg) => {
+        error!("{}", msg);
       }
     }
   }

@@ -14,7 +14,6 @@ pub mod models;
 pub mod repos;
 
 use config::models::Config;
-use ipc::handle_ipc_msg;
 use models::WarehouseStore;
 use nexus::user::NexusUser;
 use nexus::{
@@ -41,6 +40,9 @@ use tracing::{
   info,
   instrument,
 };
+
+use crate::server::warehouse::ipc::handle_ipc;
+use crate::utils::one_off_message;
 
 /// The primary startup Error enum.
 /// Warehouse will return this enum in [`setup_warehouse`].
@@ -247,23 +249,24 @@ pub async fn warehouse_main(
 ) {
   info!("Starting Warehouse...");
 
+  let mut zenoh_config = zenoh::Config::default();
+
+  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+
+  debug!("Connecting to Zenoh...");
+  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
+  debug!("Connected to Zenoh!");
+
+  let ipc_token = cancellation_tokens.0.clone();
+  let ipc_session = session.clone();
+  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+
   // TODO: Move to Zenoh's persistent storage
   let db_raw = Database::connect(format!(
     "sqlite://{}?mode=rwc",
     store.config.lock().await.data_dir.join("/db.sqlite")
   ))
   .await;
-
-  let (mut ipc_rx, nexus_recv_handle) = user.subscribe();
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_rx) => {}
-    }
-  });
 
   let init_store = Arc::new(store.clone());
   let init_user = Arc::new(user.clone());
@@ -281,27 +284,19 @@ pub async fn warehouse_main(
         }
       }
 
-      match init_user.send(
-        &"nexus://com.reboot-codes.clover.warehouse/status".to_string(),
-        &"finished-init".to_string(),
-        &None,
-      ) {
-        Err(e) => {
-          error!(
-            "Error when letting peers know about completed init state: {}",
-            e
-          );
-        }
-        _ => {}
-      }
+      one_off_message(
+        session.clone(),
+        &"com/reboot-codes/clover/server/warehouse/status".to_string(),
+        &"ready".to_string(),
+      )
+      .await;
     })
     .await;
 
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
-      ipc_recv_handle.abort();
-      nexus_recv_handle.abort();
+      ipc_handle.abort();
 
       info!("Buttoning up storage...");
       // TODO: Lock db and clean up when done.

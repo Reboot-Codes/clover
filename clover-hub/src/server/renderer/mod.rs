@@ -12,8 +12,9 @@ pub mod models;
 pub mod system_ui;
 
 use self::system_ui::system_ui_main;
+use crate::server::renderer::ipc::handle_ipc;
+use crate::utils::one_off_message;
 use crate::utils::RecvSync;
-use ipc::handle_ipc_msg;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
   server::models::UserConfig,
@@ -76,6 +77,18 @@ pub async fn renderer_main(
 ) {
   info!("Starting Renderer...");
 
+  let mut zenoh_config = zenoh::Config::default();
+
+  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+
+  debug!("Connecting to Zenoh...");
+  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
+  debug!("Connected to Zenoh!");
+
+  let ipc_token = cancellation_tokens.0.clone();
+  let ipc_session = session.clone();
+  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+
   let display_registration_queue = Arc::new(StdMutex::new(queue![]));
 
   let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
@@ -90,36 +103,11 @@ pub async fn renderer_main(
 
   // let display_handles = Arc::new(HashMap::new());
 
-  let ipc_display_registration_queue = display_registration_queue.clone();
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-        _ = ipc_recv_token.cancelled() => {
-          debug!("ipc_recv exited");
-        },
-        _ = handle_ipc_msg(ipc_rx, ipc_display_registration_queue) => {}
-    }
-  });
-
+  let init_session = session.clone();
   let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      match init_user.send(
-        &"nexus://com.reboot-codes.clover.renderer/status".to_string(),
-        &"finished-init".to_string(),
-        &None,
-      ) {
-        Err(e) => {
-          error!(
-            "Error when letting peers know about completed init state: {}",
-            e
-          );
-        }
-        _ => {}
-      }
-
       info!("Requesting displays to setup in SystemUI from ModMan...");
       match init_user.send(
         &"nexus://com.reboot-codes.clover.modman/init-displays".to_string(),
@@ -134,13 +122,19 @@ pub async fn renderer_main(
         }
         _ => {}
       }
+
+      one_off_message(
+        init_session.clone(),
+        &"com/reboot-codes/clover/server/renderer/status".to_string(),
+        &"ready".to_string(),
+      )
+      .await;
     })
     .await;
 
   let cleanup_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = cleanup_token.cancelled() => {
-      ipc_recv_handle.abort();
       ipc_handle.abort();
 
       info!("Cleaning up displays...");

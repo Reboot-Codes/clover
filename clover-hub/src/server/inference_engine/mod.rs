@@ -23,6 +23,11 @@ use tracing::{
   span,
 };
 
+use crate::{
+  server::inference_engine::ipc::handle_ipc,
+  utils::one_off_message,
+};
+
 use super::warehouse::config::models::Config;
 
 pub async fn gen_user() -> UserConfig {
@@ -76,48 +81,17 @@ pub async fn inference_engine_main(
 
   let ipc_token = cancellation_tokens.0.clone();
   let ipc_session = session.clone();
-  let ipc_handle = tokio::task::spawn(async move {
-    let subscriber = ipc_session
-      .declare_subscriber("com/reboot-codes/clover/server/inference_engine/**")
-      .await
-      .unwrap();
+  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
 
-    while !ipc_token.is_cancelled() {
-      match subscriber.recv_async().await {
-        Ok(sample) => {
-          // Refer to z_bytes.rs to see how to deserialize different types of message
-          let payload = sample
-            .payload()
-            .try_to_string()
-            .unwrap_or_else(|e| e.to_string().into());
-
-          debug!(
-            ">> [Subscriber] Received {} ('{}': '{}')",
-            sample.kind(),
-            sample.key_expr().as_str(),
-            payload
-          );
-          if let Some(att) = sample.attachment() {
-            let att = att.try_to_string().unwrap_or_else(|e| e.to_string().into());
-            debug!(" ({att})");
-          }
-        }
-        Err(msg) => {
-          error!("{}", msg);
-        }
-      }
-    }
-  });
-  let init_session = session.clone();
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      let init_publisher = init_session
-        .declare_publisher("com/reboot-codes/clover/server/inference_engine/status")
-        .await
-        .unwrap();
-
-      init_publisher.put("ready");
+      one_off_message(
+        session.clone(),
+        &"com/reboot-codes/clover/server/inference_engine/status".to_string(),
+        &"ready".to_string(),
+      )
+      .await;
     })
     .await;
 

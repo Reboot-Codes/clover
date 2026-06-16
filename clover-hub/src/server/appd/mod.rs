@@ -7,13 +7,17 @@ pub mod docker;
 pub mod ipc;
 pub mod models;
 
+use crate::{
+  server::appd::ipc::handle_ipc,
+  utils::one_off_message,
+};
+
 use self::docker::init_app;
 use bollard::{
   Docker,
   API_DEFAULT_VERSION,
 };
 use docker::remove_app;
-use ipc::handle_ipc_msg;
 use models::AppDStore;
 use nexus::{
   arbiter::models::ApiKeyWithoutUID,
@@ -64,19 +68,20 @@ pub async fn appd_main(
       info!("Connected to docker on {}!", docker_path.clone());
       let docker = Arc::new(docker_conn);
 
-      let ipc_recv_token = cancellation_tokens.0.clone();
-      let (ipc_rx, ipc_handle) = user.subscribe();
-      let ipc_recv_handle = tokio::task::spawn(async move {
-        tokio::select! {
-          _ = ipc_recv_token.cancelled() => {
-            debug!("ipc_recv exited");
-          },
-          _ = handle_ipc_msg(ipc_rx) => {}
-        }
-      });
+      let mut zenoh_config = zenoh::Config::default();
 
+      zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+
+      debug!("Connecting to Zenoh...");
+      let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
+      debug!("Connected to Zenoh!");
+
+      let ipc_token = cancellation_tokens.0.clone();
+      let ipc_session = session.clone();
+      let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+
+      let init_session = session.clone();
       let init_store = Arc::new(store.clone());
-      let init_user = Arc::new(user.clone());
       let init_docker = docker.clone();
       cancellation_tokens
         .0
@@ -116,36 +121,22 @@ pub async fn appd_main(
               apps_initialized,
               init_apps.len()
             );
-            match init_user.send(
-              &"nexus://com.reboot-codes.clover.appd/status".to_string(),
-              &"incomplete-init".to_string(),
-              &None,
-            ) {
-              Err(e) => {
-                error!(
-                  "Error when letting peers know about incomplete init state: {}",
-                  e
-                );
-              }
-              _ => {}
-            }
+            one_off_message(
+              init_session.clone(),
+              &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
+              &"ready:incomplete".to_string(),
+            )
+            .await;
           } else {
             if apps_initialized != 0 {
               info!("Initialized all {} apps!", apps_initialized);
             }
-            match init_user.send(
-              &"nexus://com.reboot-codes.clover.appd/status".to_string(),
-              &"finished-init".to_string(),
-              &None,
-            ) {
-              Err(e) => {
-                error!(
-                  "Error when letting peers know about complete init state: {}",
-                  e
-                );
-              }
-              _ => {}
-            }
+            one_off_message(
+              init_session.clone(),
+              &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
+              &"ready".to_string(),
+            )
+            .await;
           }
         })
         .await;
@@ -155,7 +146,6 @@ pub async fn appd_main(
       let cleanup_token = cancellation_tokens.0.clone();
       tokio::select! {
         _ = cleanup_token.cancelled() => {
-          ipc_recv_handle.abort();
           ipc_handle.abort();
 
           info!("Cleaning up applications...");

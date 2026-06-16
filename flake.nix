@@ -154,11 +154,10 @@
               # Ensure that libraries are actually passed to the development setup.
               LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}"
               RUST_BACKTRACE=1
-              CLOVER_LOG="clover=debug,clover-hub-macros=debug,wgpu_hal=error"
               CLOVER_SIMULATED_CONTROLS="true"
               CLOVER_MASTER_PRINT="true"
 
-              exec cargo run --bin="clover-hub" -- $@
+              exec cargo run --bin="clover-hub" -- "$@"
             '';
 
             cloverHubZenoh = pkgs.writeShellScriptBin "clover-zenoh" ''

@@ -35,6 +35,11 @@ use tracing::{
   warn,
 };
 
+use crate::{
+  server::modman::ipc::handle_ipc,
+  utils::one_off_message,
+};
+
 /// The minimum required permissions and configuration for ModMan to use Nexus.
 pub async fn gen_user() -> UserConfig {
   UserConfig {
@@ -62,6 +67,18 @@ pub async fn modman_main(
 ) {
   info!("Starting ModMan...");
 
+  let mut zenoh_config = zenoh::Config::default();
+
+  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+
+  debug!("Connecting to Zenoh...");
+  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
+  debug!("Connected to Zenoh!");
+
+  let ipc_token = cancellation_tokens.0.clone();
+  let ipc_session = session.clone();
+  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+
   let bus_store = Arc::new(store.clone());
   let bus_token = cancellation_tokens.0.clone();
   let bus_user = Arc::new(user.clone());
@@ -87,8 +104,8 @@ pub async fn modman_main(
     }
   });
 
+  let init_session = session.clone();
   let init_store = Arc::new(store.clone());
-  let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
@@ -152,36 +169,22 @@ pub async fn modman_main(
           modules_initalized,
           modules.len()
         );
-        match init_user.send(
-          &"nexus://com.reboot-codes.clover.appd/status".to_string(),
-          &"incomplete-init".to_string(),
-          &None,
-        ) {
-          Err(e) => {
-            error!(
-              "Error when letting peers know about incomplete init state: {}",
-              e
-            );
-          }
-          _ => {}
-        }
+        one_off_message(
+          init_session.clone(),
+          &"com/reboot-codes/clover/server/appdaemon".to_string(),
+          &"ready:incomplete".to_string(),
+        )
+        .await;
       } else {
         if modules_initalized != 0 {
           info!("Initalized all {} module(s)", modules_initalized);
         }
-        match init_user.send(
-          &"nexus://com.reboot-codes.clover.modman/status".to_string(),
-          &"finished-init".to_string(),
-          &None,
-        ) {
-          Err(e) => {
-            error!(
-              "Error when letting peers know about complete init state: {}",
-              e
-            );
-          }
-          _ => {}
-        }
+        one_off_message(
+          init_session.clone(),
+          &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
+          &"ready".to_string(),
+        )
+        .await;
       }
     })
     .await;
