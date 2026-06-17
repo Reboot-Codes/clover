@@ -24,7 +24,10 @@ use nexus::{
   server::models::UserConfig,
   user::NexusUser,
 };
-use std::sync::Arc;
+use std::{
+  collections::HashMap,
+  sync::Arc,
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{
   debug,
@@ -33,10 +36,14 @@ use tracing::{
   instrument,
   warn,
 };
+use zenoh_ext::{
+  AdvancedPublisherBuilderExt,
+  CacheConfig,
+};
 
-use crate::{
-  server::modman::ipc::handle_ipc,
-  utils::one_off_message,
+use crate::server::modman::{
+  ipc::handle_ipc,
+  models::Module,
 };
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/modman";
@@ -71,10 +78,22 @@ pub async fn modman_main(
   let mut zenoh_config = zenoh::Config::default();
 
   zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+  zenoh_config
+    .insert_json5(
+      "timestamping/enabled",
+      r#"{ router: true, peer: true, client: true }"#,
+    )
+    .unwrap();
 
   debug!("Connecting to Zenoh...");
   let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
   debug!("Connected to Zenoh!");
+
+  let status_publisher = session
+    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+    .cache(CacheConfig::default().max_samples(1))
+    .await
+    .unwrap();
 
   let ipc_token = cancellation_tokens.0.clone();
   let ipc_session = session.clone();
@@ -93,15 +112,23 @@ pub async fn modman_main(
     }
   });
 
-  let init_session = session.clone();
   let init_store = Arc::new(store.clone());
-  cancellation_tokens
+  let init_results = cancellation_tokens
     .0
     .run_until_cancelled(async move {
       let config = init_store.config.lock().await;
       let static_modules = &config.modman.static_modules;
       let static_components = &config.modman.static_components;
-      let mut modules = init_store.modules.lock().await;
+      let mut modules_to_init: HashMap<String, Module> = {
+        let mut hashmap = HashMap::new();
+        let modules = init_store.modules.lock().await;
+
+        for (module_id, module_config) in modules.iter() {
+          hashmap.insert(module_id.clone(), module_config.clone());
+        }
+
+        hashmap
+      };
       let mut modules_initalized: usize = 0;
 
       debug!("Checking for statically defined modules to init...");
@@ -111,7 +138,7 @@ pub async fn modman_main(
           static_modules.len()
         );
         for (module_id, module) in static_modules {
-          modules.insert(module_id.clone(), module.clone());
+          modules_to_init.insert(module_id.clone(), module.clone());
         }
       } else {
         debug!("No statically defined modules to put into store, skipping!");
@@ -135,12 +162,14 @@ pub async fn modman_main(
         debug!("No statically defined components to put into store, skipping!");
       }
 
+      let total_modules = modules_to_init.len();
+
       drop(config);
 
       info!("Initalizing modules...");
-      if modules.len() > 0 {
+      if total_modules > 0 {
         // Initialize modules that were registered already via configuration and persistence.
-        for (id, module) in modules.iter() {
+        for (id, module) in modules_to_init.iter() {
           let (initialized, _components_initialized) =
             init_module(&init_store, id.clone(), module.clone()).await;
 
@@ -152,65 +181,68 @@ pub async fn modman_main(
         info!("No static modules to initialize.");
       }
 
-      if modules_initalized != modules.len() {
-        warn!(
-          "Initalized {} out of {} module(s)!",
-          modules_initalized,
-          modules.len()
-        );
-        one_off_message(
-          init_session.clone(),
-          &format!("{MODULE_EVT_ID}/status"),
-          "ready:incomplete",
-        )
-        .await;
-      } else {
-        if modules_initalized != 0 {
-          info!("Initalized all {} module(s)", modules_initalized);
-        }
-        one_off_message(
-          init_session.clone(),
-          &format!("{MODULE_EVT_ID}/status"),
-          "ready",
-        )
-        .await;
-      }
+      (modules_initalized, total_modules)
     })
     .await;
+
+  if let Some((modules_initalized, total_modules)) = init_results {
+    if modules_initalized != total_modules {
+      warn!("Initalized {modules_initalized} out of {total_modules} module(s)!");
+      status_publisher
+        .put("ready:incomplete")
+        .await
+        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+    } else {
+      if modules_initalized != 0 {
+        info!("Initalized all {modules_initalized} module(s)");
+      }
+      status_publisher
+        .put("ready")
+        .await
+        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+    }
+
+    info!("ModMan Ready!");
+  }
 
   let mod_clean_token = cancellation_tokens.0.clone();
   tokio::select! {
     _ = mod_clean_token.cancelled() => {
       bus_handle.abort();
       ipc_handle.abort();
+      drop(status_publisher);
 
       info!("Cleaning up modules...");
 
       // TODO: Add override cancellation token to force stop!
 
-      tokio::select! {
-        modules = store.modules.lock() => {
-          debug!("done waiting for lock");
-          if modules.len() > 0 {
-            let mut modules_deinitalized: usize = 0;
+      let modules_snapshot: Vec<(String, Module)> = {
+        let modules = store.modules.lock().await;
+        debug!("done waiting for lock");
+        modules
+          .iter()
+          .filter(|(_, m)| m.initialized)
+          .map(|(id, m)| (id.clone(), m.clone()))
+          .collect()
+        // lock drops here
+      };
 
-            for (id, module) in modules.iter() {
-              if module.initialized {
-                let (de_initialized, _components_deinitialized) = deinit_module(&store, id.clone(), module.clone()).await;
+      let total = modules_snapshot.len();
+      let mut modules_deinitalized: usize = 0;
 
-                if de_initialized { modules_deinitalized += 1; }
-              }
-            }
-
-            if modules_deinitalized != modules.len() {
-              warn!("Deinitalized {} out of {} module(s)!", modules_deinitalized, modules.len());
-            } else {
-              info!("Deinitalized all {} module(s)", modules_deinitalized);
-            }
-          } else {
-            debug!("No modules to deinit.");
-          }
+      if total > 0 {
+        for (id, module) in modules_snapshot {
+          let (de_initialized, _) = deinit_module(&store, id, module).await;
+          if de_initialized { modules_deinitalized += 1; }
         }
+
+        if modules_deinitalized != total {
+          warn!("Deinitalized {} out of {} module(s)!", modules_deinitalized, total);
+        } else {
+          info!("Deinitalized all {} module(s)", modules_deinitalized);
+        }
+      } else {
+        debug!("No modules to deinit.");
       }
 
       std::mem::drop(store);

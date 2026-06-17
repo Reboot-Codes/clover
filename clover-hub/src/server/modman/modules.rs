@@ -374,10 +374,12 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
                 deinitialized_module_components,
                 module.components.len()
               );
-              initialized_module = true;
+              initialized_module = false;
             } else {
               error!("Module: {}, failed to deinitialize!", id.clone());
             }
+          } else {
+            initialized_module = false;
           }
         }
       }

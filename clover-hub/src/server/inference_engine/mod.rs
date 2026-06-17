@@ -22,32 +22,16 @@ use tracing::{
   instrument,
   span,
 };
-
-use crate::{
-  server::inference_engine::ipc::handle_ipc,
-  utils::one_off_message,
+use zenoh_ext::{
+  AdvancedPublisherBuilderExt,
+  CacheConfig,
 };
+
+use crate::server::inference_engine::ipc::handle_ipc;
 
 use super::warehouse::config::models::Config;
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/inference_engine";
-
-pub async fn gen_user() -> UserConfig {
-  UserConfig {
-    user_type: "com.reboot-codes.com.clover.inference-engine".to_string(),
-    pretty_name: "Clover: Inference Engine".to_string(),
-    api_keys: vec![ApiKeyWithoutUID {
-      allowed_events_to: vec![
-        "^nexus://com.reboot-codes.clover.inference-engine(\\.(.*))*(\\/.*)*$".to_string(),
-      ],
-      allowed_events_from: vec![
-        "^nexus://com.reboot-codes.clover.inference-engine(\\.(.*))*(\\/.*)*$".to_string(),
-      ],
-      echo: false,
-      proxy: false,
-    }],
-  }
-}
 
 #[derive(Debug, Clone)]
 pub struct InferenceEngineStore {
@@ -65,10 +49,9 @@ impl InferenceEngineStore {
   }
 }
 
-#[instrument(skip(inference_engine_store, user, cancellation_tokens))]
+#[instrument(skip(inference_engine_store, cancellation_tokens))]
 pub async fn inference_engine_main(
   inference_engine_store: InferenceEngineStore,
-  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting Inference Engine...");
@@ -76,10 +59,22 @@ pub async fn inference_engine_main(
   let mut zenoh_config = zenoh::Config::default();
 
   zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+  zenoh_config
+    .insert_json5(
+      "timestamping/enabled",
+      r#"{ router: true, peer: true, client: true }"#,
+    )
+    .unwrap();
 
   debug!("Connecting to Zenoh...");
   let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
   debug!("Connected to Zenoh!");
+
+  let status_publisher = session
+    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+    .cache(CacheConfig::default().max_samples(1))
+    .await
+    .unwrap();
 
   let ipc_token = cancellation_tokens.0.clone();
   let ipc_session = session.clone();
@@ -88,7 +83,12 @@ pub async fn inference_engine_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      one_off_message(session.clone(), &format!("{MODULE_EVT_ID}/status"), "ready").await;
+      status_publisher
+        .put("ready")
+        .await
+        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+
+      info!("InferenceEngine Ready!");
     })
     .await;
 

@@ -132,42 +132,6 @@ pub async fn server_main(
           );
           debug!("Created master Nexus user!");
 
-          debug!("Creating Warehouse Nexus user...");
-          let warehouse_user_config = Arc::new(
-            nexus_store
-              .add_user(
-                warehouse::gen_user().await,
-                Some(master_user_config.id.clone()),
-                None,
-              )
-              .await
-              .unwrap(),
-          );
-          debug!("Creating Warehouse NexusUser object...");
-          let (warehouse_user, from_warehouse, to_warehouse) = nexus_store
-            .connect_user(&warehouse_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          debug!("Created Warehouse Nexus user!");
-
-          debug!("Creating Renderer Nexus user...");
-          let renderer_user_config = Arc::new(
-            nexus_store
-              .add_user(
-                renderer::gen_user().await,
-                Some(master_user_config.id.clone()),
-                None,
-              )
-              .await
-              .unwrap(),
-          );
-          debug!("Creating Renderer NexusUser object...");
-          let (renderer_user, from_renderer, to_renderer) = nexus_store
-            .connect_user(&renderer_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          debug!("Created Renderer Nexus user!");
-
           debug!("Creating Modman Nexus user...");
           let modman_user_config = Arc::new(
             nexus_store
@@ -186,42 +150,6 @@ pub async fn server_main(
             .unwrap();
           debug!("Created Modman Nexus user!");
 
-          debug!("Creating Inference Engine Nexus user...");
-          let inference_engine_user_config = Arc::new(
-            nexus_store
-              .add_user(
-                inference_engine::gen_user().await,
-                Some(master_user_config.id.clone()),
-                None,
-              )
-              .await
-              .unwrap(),
-          );
-          debug!("Creating InferenceEngine NexusUser object...");
-          let (inference_engine_user, from_inference_engine, to_inference_engine) = nexus_store
-            .connect_user(&inference_engine_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          debug!("Created Inference Engine Nexus user!");
-
-          debug!("Creating AppDaemon Nexus user...");
-          let appd_user_config = Arc::new(
-            nexus_store
-              .add_user(
-                appd::gen_user().await,
-                Some(master_user_config.id.clone()),
-                None,
-              )
-              .await
-              .unwrap(),
-          );
-          debug!("Creating AppDaemon NexusUser object...");
-          let (appd_user, from_appd, to_appd) = nexus_store
-            .connect_user(&appd_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          debug!("Created AppDaemon Nexus user!");
-
           // Create oneshot channel for ready signal
           let (nexus_ready_tx, nexus_ready_rx) = tokio::sync::oneshot::channel();
 
@@ -237,24 +165,8 @@ pub async fn server_main(
             nexus_listener(
               *nexus_port.to_owned(),
               nexus_store_clone,
-              vec![
-                (warehouse_user_config.clone(), 0, to_warehouse),
-                (renderer_user_config.clone(), 0, to_renderer),
-                (modman_user_config.clone(), 0, to_modman),
-                (inference_engine_user_config.clone(), 0, to_inference_engine),
-                (appd_user_config.clone(), 0, to_appd),
-              ],
-              vec![
-                (warehouse_user_config.clone(), 0, from_warehouse),
-                (renderer_user_config.clone(), 0, from_renderer),
-                (modman_user_config.clone(), 0, from_modman),
-                (
-                  inference_engine_user_config.clone(),
-                  0,
-                  from_inference_engine,
-                ),
-                (appd_user_config.clone(), 0, from_appd),
-              ],
+              vec![(modman_user_config.clone(), 0, to_modman)],
+              vec![(modman_user_config.clone(), 0, from_modman)],
               nexus_tokens_clone,
               Some(nexus_ready_tx),
             )
@@ -284,12 +196,7 @@ pub async fn server_main(
           let warehouse_tokens = (CancellationToken::new(), CancellationToken::new());
           let warehouse_tokens_clone = warehouse_tokens.clone();
           let warehouse_handle = tokio::task::spawn(async move {
-            warehouse_main(
-              warehouse_store_clone.clone(),
-              warehouse_user,
-              warehouse_tokens_clone,
-            )
-            .await;
+            warehouse_main(warehouse_store_clone.clone(), warehouse_tokens_clone).await;
           });
           services.push(InitializedService {
             name: "Warehouse",
@@ -315,7 +222,7 @@ pub async fn server_main(
           let renderer_tokens = (CancellationToken::new(), CancellationToken::new());
           let renderer_tokens_clone = renderer_tokens.clone();
           let renderer_handle = tokio::task::spawn(async move {
-            renderer_main(renderer_store, renderer_user, renderer_tokens_clone).await;
+            renderer_main(renderer_store, renderer_tokens_clone).await;
           });
           services.push(InitializedService {
             name: "Renderer",
@@ -328,12 +235,7 @@ pub async fn server_main(
           let inference_engine_tokens = (CancellationToken::new(), CancellationToken::new());
           let inference_engine_tokens_clone = inference_engine_tokens.clone();
           let inference_engine_handle = tokio::task::spawn(async move {
-            inference_engine_main(
-              inference_engine_store,
-              inference_engine_user,
-              inference_engine_tokens_clone,
-            )
-            .await;
+            inference_engine_main(inference_engine_store, inference_engine_tokens_clone).await;
           });
           services.push(InitializedService {
             name: "Inference Engine",
@@ -346,7 +248,7 @@ pub async fn server_main(
           let appd_tokens = (CancellationToken::new(), CancellationToken::new());
           let appd_tokens_clone = appd_tokens.clone();
           let appd_handle = tokio::task::spawn(async move {
-            appd_main(appd_store, appd_user, appd_tokens_clone).await;
+            appd_main(appd_store, appd_tokens_clone).await;
           });
           services.push(InitializedService {
             name: "AppDaemon",

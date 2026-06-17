@@ -40,9 +40,12 @@ use tracing::{
   info,
   instrument,
 };
+use zenoh_ext::{
+  AdvancedPublisherBuilderExt,
+  CacheConfig,
+};
 
 use crate::server::warehouse::ipc::handle_ipc;
-use crate::utils::one_off_message;
 
 /// The primary startup Error enum.
 /// Warehouse will return this enum in [`setup_warehouse`].
@@ -243,10 +246,9 @@ pub async fn gen_user() -> UserConfig {
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/warehouse";
 
 /// Main service function for Warehouse. Maintains an ongoing connection to Zenoh, and will manage filesystem operations as needed.
-#[instrument(skip(store, user, cancellation_tokens))]
+#[instrument(skip(store, cancellation_tokens))]
 pub async fn warehouse_main(
   store: Arc<WarehouseStore>,
-  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting Warehouse...");
@@ -254,10 +256,22 @@ pub async fn warehouse_main(
   let mut zenoh_config = zenoh::Config::default();
 
   zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+  zenoh_config
+    .insert_json5(
+      "timestamping/enabled",
+      r#"{ router: true, peer: true, client: true }"#,
+    )
+    .unwrap();
 
   debug!("Connecting to Zenoh...");
   let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
   debug!("Connected to Zenoh!");
+
+  let status_publisher = session
+    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+    .cache(CacheConfig::default().max_samples(1))
+    .await
+    .unwrap();
 
   let ipc_token = cancellation_tokens.0.clone();
   let ipc_session = session.clone();
@@ -271,7 +285,6 @@ pub async fn warehouse_main(
   .await;
 
   let init_store = Arc::new(store.clone());
-  let init_user = Arc::new(user.clone());
   let init_tokens = cancellation_tokens.clone();
   cancellation_tokens
     .0
@@ -286,12 +299,12 @@ pub async fn warehouse_main(
         }
       }
 
-      one_off_message(
-        session.clone(),
-        "com/reboot-codes/clover/server/warehouse/status",
-        "ready",
-      )
-      .await;
+      status_publisher
+        .put("ready")
+        .await
+        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+
+      info!("Warehouse Ready!");
     })
     .await;
 

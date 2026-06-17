@@ -48,3 +48,4 @@ tracing-log = "0.2.0"
 opentelemetry_sdk = "0.32.0"
 opentelemetry-appender-tracing = "0.32.0"
 zenoh = "1.9.0"
+zenoh-ext = { version = "1.9.0", features = ["unstable"] }

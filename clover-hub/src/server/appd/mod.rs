@@ -7,10 +7,7 @@ pub mod docker;
 pub mod ipc;
 pub mod models;
 
-use crate::{
-  server::appd::ipc::handle_ipc,
-  utils::one_off_message,
-};
+use crate::server::appd::ipc::handle_ipc;
 
 use self::docker::init_app;
 use bollard::{
@@ -19,11 +16,6 @@ use bollard::{
 };
 use docker::remove_app;
 use models::AppDStore;
-use nexus::{
-  arbiter::models::ApiKeyWithoutUID,
-  server::models::UserConfig,
-  user::NexusUser,
-};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use tracing::{
@@ -33,32 +25,18 @@ use tracing::{
   instrument,
   warn,
 };
+use zenoh_ext::{
+  AdvancedPublisherBuilderExt,
+  CacheConfig,
+};
 
 // TODO: Create application manifest schema/models
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/appdaemon";
 
-pub async fn gen_user() -> UserConfig {
-  UserConfig {
-    user_type: "com.reboot-codes.com.clover.appd".to_string(),
-    pretty_name: "Clover: AppD".to_string(),
-    api_keys: vec![ApiKeyWithoutUID {
-      allowed_events_to: vec![
-        "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$".to_string()
-      ],
-      allowed_events_from: vec![
-        "^nexus://com.reboot-codes.clover.appd(\\.(.*))*(\\/.*)*$".to_string()
-      ],
-      echo: false,
-      proxy: false,
-    }],
-  }
-}
-
-#[instrument(skip(store, user, cancellation_tokens))]
+#[instrument(skip(store, cancellation_tokens))]
 pub async fn appd_main(
   store: AppDStore,
-  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting AppDaemon...");
@@ -73,10 +51,22 @@ pub async fn appd_main(
       let mut zenoh_config = zenoh::Config::default();
 
       zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
+      zenoh_config
+        .insert_json5(
+          "timestamping/enabled",
+          r#"{ router: true, peer: true, client: true }"#,
+        )
+        .unwrap();
 
       debug!("Connecting to Zenoh...");
       let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
       debug!("Connected to Zenoh!");
+
+      let status_publisher = session
+        .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+        .cache(CacheConfig::default().max_samples(1))
+        .await
+        .unwrap();
 
       let ipc_token = cancellation_tokens.0.clone();
       let ipc_session = session.clone();
@@ -123,23 +113,21 @@ pub async fn appd_main(
               apps_initialized,
               init_apps.len()
             );
-            one_off_message(
-              init_session.clone(),
-              &format!("{MODULE_EVT_ID}/status"),
-              "ready:incomplete",
-            )
-            .await;
+            status_publisher
+              .put("ready:incomplete")
+              .await
+              .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
           } else {
             if apps_initialized != 0 {
               info!("Initialized all {} apps!", apps_initialized);
             }
-            one_off_message(
-              init_session.clone(),
-              &format!("{MODULE_EVT_ID}/status"),
-              "ready",
-            )
-            .await;
+            status_publisher
+              .put("ready")
+              .await
+              .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
           }
+
+          info!("AppDaemon Ready!");
         })
         .await;
 

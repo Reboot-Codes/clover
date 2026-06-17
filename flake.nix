@@ -166,7 +166,8 @@
               exec zenohd -l tcp/0.0.0.0:6699 --adminspace-permissions rw \
                 --cfg='adminspace/enabled:true' \
                 --cfg='adminspace/permissions/read:true' \
-                --cfg='adminspace/permissions/write:true'
+                --cfg='adminspace/permissions/write:true' \
+                --cfg='timestamping/enabled/client:true'
             '';
           in
           craneLib.devShell {
