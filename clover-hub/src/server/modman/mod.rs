@@ -14,7 +14,6 @@ pub mod models;
 pub mod modules;
 
 use busses::start_busses;
-use ipc::handle_ipc_msg;
 use models::ModManStore;
 use modules::{
   deinit_module,
@@ -39,6 +38,8 @@ use crate::{
   server::modman::ipc::handle_ipc,
   utils::one_off_message,
 };
+
+pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/modman";
 
 /// The minimum required permissions and configuration for ModMan to use Nexus.
 pub async fn gen_user() -> UserConfig {
@@ -77,7 +78,8 @@ pub async fn modman_main(
 
   let ipc_token = cancellation_tokens.0.clone();
   let ipc_session = session.clone();
-  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+  let ipc_store = store.clone();
+  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_store, ipc_token, ipc_session));
 
   let bus_store = Arc::new(store.clone());
   let bus_token = cancellation_tokens.0.clone();
@@ -88,19 +90,6 @@ pub async fn modman_main(
         debug!("bus_handle exited");
       },
       _ = start_busses(bus_store, bus_user) => {}
-    }
-  });
-
-  let ipc_recv_token = cancellation_tokens.0.clone();
-  let (ipc_rx, ipc_handle) = user.subscribe();
-  let ipc_recv_store = store.clone();
-  let ipc_user = Arc::new(user.clone());
-  let ipc_recv_handle = tokio::task::spawn(async move {
-    tokio::select! {
-      _ = ipc_recv_token.cancelled() => {
-        debug!("ipc_recv exited");
-      },
-      _ = handle_ipc_msg(ipc_recv_store, ipc_rx, ipc_user) => {}
     }
   });
 
@@ -171,8 +160,8 @@ pub async fn modman_main(
         );
         one_off_message(
           init_session.clone(),
-          &"com/reboot-codes/clover/server/appdaemon".to_string(),
-          &"ready:incomplete".to_string(),
+          &format!("{MODULE_EVT_ID}/status"),
+          "ready:incomplete",
         )
         .await;
       } else {
@@ -181,8 +170,8 @@ pub async fn modman_main(
         }
         one_off_message(
           init_session.clone(),
-          &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
-          &"ready".to_string(),
+          &format!("{MODULE_EVT_ID}/status"),
+          "ready",
         )
         .await;
       }
@@ -193,7 +182,6 @@ pub async fn modman_main(
   tokio::select! {
     _ = mod_clean_token.cancelled() => {
       bus_handle.abort();
-      ipc_recv_handle.abort();
       ipc_handle.abort();
 
       info!("Cleaning up modules...");

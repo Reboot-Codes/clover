@@ -67,17 +67,21 @@ pub mod command_generator;
 
 use std::sync::Arc;
 
-use log::{
+use tokio_util::sync::CancellationToken;
+use tracing::{
   debug,
   error,
-};
-use tokio_util::sync::CancellationToken;
-
-use crate::server::modman::models::{
-  GestureState,
-  ModManStore,
+  info,
+  instrument,
 };
 
+use crate::server::modman::{
+  gestures::command_generator::gesture_command_generator,
+  models::ModManStore,
+};
+
+/// Thread to calculate
+#[instrument(skip(store, cancellation_token))]
 pub async fn gesture_command_generator_manager(
   store: Arc<ModManStore>,
   cancellation_token: CancellationToken,
@@ -96,19 +100,9 @@ pub async fn gesture_command_generator_manager(
         gesture_index_plus_one += 1;
 
         match store.gesture_states.lock().await.get(gesture_id) {
-          Some(gesture_state) => match gesture_state.current_state {
-            GestureState::Begin {
-              intensity,
-              speed,
-              background,
-            } => todo!(),
-            GestureState::Pause => todo!(),
-            _ => {
-              // Not covered by this function, see `super::ipc::gestures`!
-            }
-          },
+          Some(gesture_state) => gesture_command_generator(gesture_id, gesture_state).await,
           None => {
-            error!("Gesture: {}, is not in state map, removing from background gesture array! This state de-sync is not permissable and should be reported as a bug!", gesture_id.clone());
+            error!("Gesture: {}, is not in state map, removing from the gesture array! This state de-sync is not permissable and should be reported as a bug!", gesture_id.clone());
             gestures_to_remove.push((gesture_index_plus_one - 1, gesture_id.clone()));
             continue;
           }
@@ -124,4 +118,6 @@ pub async fn gesture_command_generator_manager(
       }
     }
   }
+
+  info!("Stopped generating gesture commands!");
 }

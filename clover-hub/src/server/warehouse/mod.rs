@@ -240,6 +240,8 @@ pub async fn gen_user() -> UserConfig {
   }
 }
 
+pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/warehouse";
+
 /// Main service function for Warehouse. Maintains an ongoing connection to Zenoh, and will manage filesystem operations as needed.
 #[instrument(skip(store, user, cancellation_tokens))]
 pub async fn warehouse_main(
@@ -286,8 +288,8 @@ pub async fn warehouse_main(
 
       one_off_message(
         session.clone(),
-        &"com/reboot-codes/clover/server/warehouse/status".to_string(),
-        &"ready".to_string(),
+        "com/reboot-codes/clover/server/warehouse/status",
+        "ready",
       )
       .await;
     })

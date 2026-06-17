@@ -30,6 +30,8 @@ use crate::{
 
 use super::warehouse::config::models::Config;
 
+pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/inference_engine";
+
 pub async fn gen_user() -> UserConfig {
   UserConfig {
     user_type: "com.reboot-codes.com.clover.inference-engine".to_string(),
@@ -86,12 +88,7 @@ pub async fn inference_engine_main(
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
-      one_off_message(
-        session.clone(),
-        &"com/reboot-codes/clover/server/inference_engine/status".to_string(),
-        &"ready".to_string(),
-      )
-      .await;
+      one_off_message(session.clone(), &format!("{MODULE_EVT_ID}/status"), "ready").await;
     })
     .await;
 

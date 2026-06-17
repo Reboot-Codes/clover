@@ -36,6 +36,8 @@ use tracing::{
 
 // TODO: Create application manifest schema/models
 
+pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/appdaemon";
+
 pub async fn gen_user() -> UserConfig {
   UserConfig {
     user_type: "com.reboot-codes.com.clover.appd".to_string(),
@@ -123,8 +125,8 @@ pub async fn appd_main(
             );
             one_off_message(
               init_session.clone(),
-              &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
-              &"ready:incomplete".to_string(),
+              &format!("{MODULE_EVT_ID}/status"),
+              "ready:incomplete",
             )
             .await;
           } else {
@@ -133,8 +135,8 @@ pub async fn appd_main(
             }
             one_off_message(
               init_session.clone(),
-              &"com/reboot-codes/clover/server/appdaemon/status".to_string(),
-              &"ready".to_string(),
+              &format!("{MODULE_EVT_ID}/status"),
+              "ready",
             )
             .await;
           }

@@ -12,7 +12,10 @@ pub mod models;
 pub mod system_ui;
 
 use self::system_ui::system_ui_main;
-use crate::server::renderer::ipc::handle_ipc;
+use crate::server::{
+  modman::MODULE_EVT_ID as MODMAN_EVT_ID,
+  renderer::ipc::handle_ipc,
+};
 use crate::utils::one_off_message;
 use crate::utils::RecvSync;
 use nexus::{
@@ -34,6 +37,8 @@ use tracing::{
 };
 
 use super::warehouse::config::models::Config;
+
+pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/renderer";
 
 pub async fn gen_user() -> UserConfig {
   UserConfig {
@@ -104,31 +109,65 @@ pub async fn renderer_main(
   // let display_handles = Arc::new(HashMap::new());
 
   let init_session = session.clone();
-  let init_user = Arc::new(user.clone());
   cancellation_tokens
     .0
     .run_until_cancelled(async move {
       info!("Requesting displays to setup in SystemUI from ModMan...");
-      match init_user.send(
-        &"nexus://com.reboot-codes.clover.modman/init-displays".to_string(),
-        &"first-time".to_string(),
-        &None,
-      ) {
-        Err(e) => {
-          error!(
-            "Error when requesting display configurations from peers: {}",
-            e
-          );
-        }
-        _ => {}
-      }
 
-      one_off_message(
-        init_session.clone(),
-        &"com/reboot-codes/clover/server/renderer/status".to_string(),
-        &"ready".to_string(),
-      )
-      .await;
+      match init_session
+        .get(format!("{MODMAN_EVT_ID}/displays/get"))
+        .await
+      {
+        Ok(reply_fifo) => match reply_fifo.recv_async().await {
+          Ok(reply) => match reply.result() {
+            Ok(sample) => {
+              let payload = sample
+                .payload()
+                .try_to_string()
+                .unwrap_or_else(|e| e.to_string().into());
+
+              debug!("Got displays: {:?}", payload);
+
+              one_off_message(
+                init_session.clone(),
+                &format!("{MODULE_EVT_ID}/status"),
+                "ready",
+              )
+              .await;
+            }
+            Err(e) => {
+              let payload = e
+                .payload()
+                .try_to_string()
+                .unwrap_or_else(|e| e.to_string().into());
+              error!(">> Received (ERROR: '{payload}')");
+
+              one_off_message(
+                init_session.clone(),
+                &format!("{MODULE_EVT_ID}/status"),
+                "ready:incomplete",
+              )
+              .await;
+            }
+          },
+          Err(_) => {
+            one_off_message(
+              init_session.clone(),
+              &format!("{MODULE_EVT_ID}/status"),
+              "ready:incomplete",
+            )
+            .await;
+          }
+        },
+        Err(e) => {
+          one_off_message(
+            init_session.clone(),
+            &format!("{MODULE_EVT_ID}/status"),
+            "ready:incomplete",
+          )
+          .await;
+        }
+      }
     })
     .await;
 

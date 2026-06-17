@@ -15,10 +15,17 @@
           "torso.core.back.spine.tail": {
             "@animation": {
               "type": "bounce",
-              "speed": 1000.0,
+              "curve": "linear",
+              "duration": 1000.0,
               "keyframes": [
-                { "x": -45.0, "y": "@inital" },
-                { "x": 45.0, "y": "@inital" }
+                {
+                  "x": -45.0,
+                  "y": "@inital"
+                },
+                {
+                  "x": 45.0,
+                  "y": "@inital"
+                }
               ]
             }
           }

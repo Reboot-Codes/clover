@@ -40,12 +40,17 @@ use super::components::models::CloverComponentTrait;
 /// Modules are comprised of [Components](CloverComponent) and their [Metadata](CloverComponentMeta).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
+  /// RFQDN of the module definition from the manifest database.
   pub module_type: String,
+  /// Manifest-defined name for this module (e.g. recognizable model number).
   pub module_name: String,
+  /// User defined pretty name with manifest-defined default.
   pub custom_name: Option<String>,
+  /// Has communication been established and self-test run?
   pub initialized: bool,
-  /// Component ID and if it's critical
+  /// Vec of Component IDs and if they're critical.
   pub components: Vec<(String, bool)>,
+  /// Either `com.reboot-codes.clover.hub` or the RFQDN of the app that manages this module.
   pub registered_by: String,
 }
 
@@ -66,12 +71,13 @@ pub struct CloverComponentMeta {
   /// Is this component required for the module to work? Default: yes.
   /// If any critical component fails to initalize, the module will fail to initalize entirely.
   pub critical: bool,
-  /// Where this component is on/in the user. RFQDN formatted, e.g. `com.reboot-codes.CORE.head.eyes.internal`
+  /// Where this component is on/in the user. RFQDN formatted, e.g. `com.reboot-codes.CORE.head.eyes.internal` for a HUD display
   pub location: String,
   /// Parameters used for gesture events to synthesize commands to send to this component if it supports RX from Nexus.
   /// This is also used to determine if a gesture is supported by this component.
   /// Ignored if the component does not support recv.
   pub base_gesture_parameters: HashMap<String, GestureParameters>,
+  /// If the component is internal, usually inferenced from the `location` parameter. Used by the permissions/privacy rules model.
   pub internal: bool,
 }
 
@@ -130,10 +136,17 @@ impl CloverComponentTrait for CloverComponent {
 /// ) + offset
 /// ```
 pub struct GestureParameters {
-  min: f64,
-  max: f64,
-  multiplier: f64,
-  offset: f64,
+  pub min: f64,
+  pub max: f64,
+  pub multiplier: f64,
+  pub offset: f64,
+}
+
+impl GestureParameters {
+  pub fn calculate_intensity(&self, intensity: f64) -> f64 {
+    return ((((intensity + 1.0) * (self.max - self.min)) + self.min) * self.multiplier)
+      + self.offset;
+  }
 }
 
 /// In memory data-store for components, modules, and any needed configuration.
@@ -199,16 +212,28 @@ pub enum GestureState {
   #[serde(rename = "begin")]
   #[strum(serialize = "begin")]
   Begin {
+    /// Multiplier over the value (y) axis of the gesture's smoothing curve.
     intensity: f64,
+    /// Multiplier over the time (x) axis of the gesture's smoothing curve.
     speed: f64,
+    /// Background gestures will be calculated before foreground gestures. Foreground gestures will always override background gestures.
+    ///
+    /// For example, you can have a background gesture that displays intermittent blinking, but you can start a temporary foreground gesture to show a different shape of the eyes to display an emotion.
     background: Option<bool>,
   },
+  /// Resume calculation of module commands.
+  ///
+  /// This state is not saved at all.
   #[serde(rename = "unpause")]
   #[strum(serialize = "unpause")]
   UnPause,
+  /// Temporarilly freeze the values that were already calculated for module commands as a result of this gesture.
+  ///
+  /// This state is not saved. Upon shutdown, if a foreground gesture is paused, the gesture will be removed from the stack upon shutdown; otherwise, background gestures will be saved in the `Begin` state to be automatically resumed upon startup.
   #[serde(rename = "pause")]
   #[strum(serialize = "end")]
   Pause,
+  /// Removes the gesture from module command calculations entierly.
   #[serde(rename = "end")]
   #[strum(serialize = "end")]
   End,
@@ -223,13 +248,7 @@ pub struct GestureCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GestureConfig {
-  Static(String),
-  Reactive(ReactiveGestureConfig),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReactiveGestureConfig {
+pub struct GestureConfig {
   /// The primary gesture pack to use for this component
   pub primary_gesture_pack: Option<String>,
   /// The default gesture for the component to use when idle.

@@ -1,3 +1,4 @@
+use super::MODULE_EVT_ID;
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -10,7 +11,7 @@ use tracing::{
 #[instrument(skip(ipc_token, ipc_session))]
 pub async fn handle_ipc(ipc_token: CancellationToken, ipc_session: Arc<zenoh::Session>) {
   let subscriber = ipc_session
-    .declare_subscriber("com/reboot-codes/clover/server/inference_engine/**")
+    .declare_subscriber(&format!("{MODULE_EVT_ID}/**"))
     .await
     .unwrap();
 

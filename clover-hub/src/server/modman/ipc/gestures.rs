@@ -6,12 +6,17 @@ use log::{
   info,
   warn,
 };
+use tokio_util::sync::CancellationToken;
+use tracing::instrument;
 
-use crate::server::modman::models::{
-  GestureCommand,
-  GestureState,
-  GestureStates,
-  ModManStore,
+use crate::server::modman::{
+  models::{
+    GestureCommand,
+    GestureState,
+    GestureStates,
+    ModManStore,
+  },
+  MODULE_EVT_ID,
 };
 
 pub async fn should_be_bg(store: Arc<ModManStore>, bg_from_state: Option<bool>) -> bool {
@@ -21,6 +26,26 @@ pub async fn should_be_bg(store: Arc<ModManStore>, bg_from_state: Option<bool>) 
   }
 }
 
+#[instrument(skip(store, cancellation_token, session))]
+pub async fn gesture_queryable(
+  store: ModManStore,
+  cancellation_token: CancellationToken,
+  session: Arc<zenoh::Session>,
+) {
+  let key_expr = format!("{MODULE_EVT_ID}/gestures/update");
+
+  let queryable = session.declare_queryable(&key_expr).await.unwrap();
+
+  debug!("Listening on {key_expr}!");
+  while !cancellation_token.is_cancelled() {
+    match queryable.recv_async().await {
+      Ok(query) => {}
+      Err(e) => {}
+    }
+  }
+}
+
+#[instrument(skip(store))]
 pub async fn handle_gesture_cmd(
   store: &mut Arc<ModManStore>,
   gesture_id: String,

@@ -47,13 +47,16 @@ use super::{
     Module,
   },
 };
-use log::{
+use std::sync::Arc;
+use tracing::{
+  debug,
   error,
   info,
+  instrument,
   warn,
 };
-use std::sync::Arc;
 
+#[instrument(skip(store))]
 pub async fn init_component(
   store: &ModManStore,
   module_id: String,
@@ -122,6 +125,7 @@ pub async fn init_component(
   }
 }
 
+#[instrument(skip(store))]
 pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut initialized_module_components = 0;
@@ -170,6 +174,8 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
         }
       }
 
+      debug!("Module: {id}, Done initializing components!");
+
       match critical_failiure {
         Some(failiure) => {
           let (component_id, e) = failiure;
@@ -194,6 +200,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
               error!("Module: {}, failed to initialize!", id.clone());
             }
           } else {
+            debug!("Finished initalizing module.");
             initialized_module = true;
           }
         }
@@ -201,32 +208,41 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
     }
   }
 
-  if initialized_module {
-    // Update the store with new state of the module.
-    if initialized_module {
-      store.modules.lock().await.insert(
-        id.clone(),
-        Module {
-          module_type: module.module_type.clone(),
-          module_name: module.module_name.clone(),
-          custom_name: module.custom_name.clone(),
-          initialized: true,
-          components: module.components.clone(),
-          registered_by: module.registered_by.clone(),
-        },
-      );
+  debug!("Module: {id}, Marked as initialized.");
 
-      info!(
-        "Module: {} ({}), Initialized!",
-        module.get_name(),
-        id.clone()
-      );
-    }
+  // Update the store with new state of the module.
+  if initialized_module {
+    debug!("Module: {id}, Waiting on in-memory store lock...");
+    store.modules.lock().await.insert(
+      id.clone(),
+      Module {
+        module_type: module.module_type.clone(),
+        module_name: module.module_name.clone(),
+        custom_name: module.custom_name.clone(),
+        initialized: true,
+        components: module.components.clone(),
+        registered_by: module.registered_by.clone(),
+      },
+    );
+    debug!("Module: {id}, In-memory store updated!");
+
+    info!(
+      "Module: {} ({}), Initialized!",
+      module.get_name(),
+      id.clone()
+    );
+  } else {
+    error!(
+      "Module: {} ({}), failed to initialize!",
+      module.get_name(),
+      id.clone()
+    );
   }
 
   (initialized_module, initialized_module_components)
 }
 
+#[instrument(skip(store))]
 pub async fn deinit_component(
   store: &ModManStore,
   module_id: String,
@@ -290,6 +306,7 @@ pub async fn deinit_component(
   }
 }
 
+#[instrument(skip(store))]
 pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut deinitialized_module_components = 0;

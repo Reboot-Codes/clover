@@ -116,17 +116,17 @@ where
 
 /// One time publisher to a topic over a Zenoh session. For any longer term publishing, setup a publisher manually!
 #[instrument(skip(session))]
-pub async fn one_off_message(session: Arc<zenoh::Session>, topic: &String, message: &String) {
-  let publisher = session.declare_publisher(topic.clone()).await.unwrap();
+pub async fn one_off_message(session: Arc<zenoh::Session>, topic: &str, message: &str) {
+  let publisher = session.declare_publisher(topic).await.unwrap();
 
-  match publisher.put(message.clone()).await {
+  match publisher.put(message).await {
     Ok(_) => {
-      debug!("Sucessfully sent message to topic: {}", &topic);
+      debug!("Sucessfully sent message to topic: {}", topic);
     }
     Err(_) => {
       error!(
         "Failed to send message to zenoh topic: {}, this may be a sign of a misconfiguration!!",
-        &topic
+        topic
       );
     }
   }
