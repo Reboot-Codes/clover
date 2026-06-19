@@ -7,38 +7,22 @@ pub mod models;
 pub mod proxies;
 
 use super::models::ModManStore;
-use log::{
-  error,
-  info,
-};
-use models::Bus;
-use nexus::server::websockets::WsIn;
-use nexus::{
-  server::MAX_SIZE,
-  user::NexusUser,
-};
-use proxies::uart::UARTBus;
+use log::info;
 use std::sync::Arc;
 
 pub async fn start_busses(
   store: Arc<ModManStore>,
-  user: Arc<NexusUser>,
+  session: Arc<zenoh::Session>,
 ) -> futures::future::JoinAll<tokio::task::JoinHandle<()>> {
   info!("Starting ModMan Proxy Busses...");
   let mut handles = vec![];
-  let (tx, mut rx) = tokio::sync::broadcast::channel::<WsIn>(MAX_SIZE);
 
   // TODO: ASAP: Move to creating a sub-user for each module!
-  let proxy_user = user.clone();
+  let proxy_session = session.clone();
   handles.push(tokio::task::spawn(async move {
-    while let Ok(raw_msg) = rx.recv().await {
-      match proxy_user.send(&raw_msg.kind, &raw_msg.message, &raw_msg.replying_to) {
-        Err(e) => {
-          error!("Error when proxying message: {}", e);
-        }
-        _ => {}
-      }
-    }
+    /*while let Ok(raw_msg) = rx.recv().await {
+      debug!("Got proxy message from bus: {:?raw_msg}");
+    }*/
   }));
 
   // TODO: Add config options for each bus!
@@ -78,11 +62,9 @@ pub async fn start_busses(
 
   #[cfg(feature = "uart")]
   {
-    let uart_channel = user.subscribe();
-    handles.push(uart_channel.1);
     handles.push(tokio::task::spawn(async move {
       info!("Starting UART Bus...");
-      match (UARTBus {
+      /*match (UARTBus {
         store: store.clone(),
       })
       .subscribe_to_bus(tx.clone(), uart_channel.0)
@@ -92,7 +74,7 @@ pub async fn start_busses(
           futures::future::join_all(handles).await;
         }
         Err(_) => todo!(),
-      }
+      }*/
     }));
   }
 

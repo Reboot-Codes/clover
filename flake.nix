@@ -40,6 +40,8 @@
           filter = path: type: (pkgs.lib.hasInfix "/assets" path) || (craneLib.filterCargoSources path type);
         };
         commonArgs = {
+          pname = "clover-workspace";
+          version = "0.0.0";
           doCheck = false;
           inherit src buildInputs;
           nativeBuildInputs = libraries;
@@ -94,7 +96,14 @@
               cargoExtraArgs = "-p ${listing.name}";
               cargoArtifacts = appDeps;
               pname = listing.name;
-              version = (builtins.fromTOML (builtins.readFile listing.path)).package.version;
+              version = (fromTOML (builtins.readFile listing.path)).package.version;
+
+              nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ pkgs.makeWrapper ];
+
+              postInstall = ''
+                wrapProgram $out/bin/${listing.name} \
+                  --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath libraries}"
+              '';
             }
           );
         app =

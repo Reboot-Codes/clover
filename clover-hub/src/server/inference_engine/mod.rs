@@ -6,12 +6,6 @@
 //!
 
 pub mod ipc;
-
-use nexus::{
-  arbiter::models::ApiKeyWithoutUID,
-  server::models::UserConfig,
-  user::NexusUser,
-};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;

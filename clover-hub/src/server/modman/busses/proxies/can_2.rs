@@ -3,10 +3,6 @@ use crate::server::modman::busses::models::{
   BusTypes,
 };
 use can;
-use nexus::server::{
-  models::IPCMessageWithId,
-  websockets::WsIn,
-};
 use socketcan;
 
 #[derive(Debug, Clone)]

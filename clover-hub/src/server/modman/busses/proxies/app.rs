@@ -2,18 +2,14 @@ use crate::server::modman::busses::models::{
   Bus,
   BusTypes,
 };
-use nexus::server::{
-  models::IPCMessageWithId,
-  websockets::WsIn,
-};
 
 pub struct AppBus {}
 
 impl Bus for AppBus {
   async fn subscribe_to_bus(
     &mut self,
-    from_bus: tokio::sync::broadcast::Sender<WsIn>,
-    to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
+    //from_bus: tokio::sync::broadcast::Sender<WsIn>,
+    //to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
   ) -> Result<Vec<tokio::task::JoinHandle<()>>, anyhow::Error> {
     todo!()
   }

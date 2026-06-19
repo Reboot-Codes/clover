@@ -3,10 +3,6 @@ use crate::server::modman::busses::models::{
   BusTypes,
 };
 use bluer;
-use nexus::server::{
-  models::IPCMessageWithId,
-  websockets::WsIn,
-};
 
 #[derive(Debug, Clone)]
 pub struct BluetoothLEBus {}

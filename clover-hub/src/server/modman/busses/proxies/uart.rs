@@ -14,10 +14,6 @@ use log::{
   debug,
   warn,
 };
-use nexus::server::{
-  models::IPCMessageWithId,
-  websockets::WsIn,
-};
 use serialport;
 use tokio::io::{
   split,

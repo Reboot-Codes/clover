@@ -19,11 +19,6 @@ use modules::{
   deinit_module,
   init_module,
 };
-use nexus::{
-  arbiter::models::ApiKeyWithoutUID,
-  server::models::UserConfig,
-  user::NexusUser,
-};
 use std::{
   collections::HashMap,
   sync::Arc,
@@ -48,29 +43,10 @@ use crate::server::modman::{
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/modman";
 
-/// The minimum required permissions and configuration for ModMan to use Nexus.
-pub async fn gen_user() -> UserConfig {
-  UserConfig {
-    user_type: "com.reboot-codes.com.clover.modman".to_string(),
-    pretty_name: "Clover: ModMan".to_string(),
-    api_keys: vec![ApiKeyWithoutUID {
-      allowed_events_to: vec![
-        "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$".to_string()
-      ],
-      allowed_events_from: vec![
-        "^nexus://com.reboot-codes.clover.modman(\\.(.*))*(\\/.*)*$".to_string()
-      ],
-      echo: false,
-      proxy: false,
-    }],
-  }
-}
-
 /// Begin the ModMan threads and sub-processes to ensure module/compoent communications.
-#[instrument(skip(store, user, cancellation_tokens))]
+#[instrument(skip(store, cancellation_tokens))]
 pub async fn modman_main(
   store: ModManStore,
-  user: NexusUser,
   cancellation_tokens: (CancellationToken, CancellationToken),
 ) {
   info!("Starting ModMan...");
@@ -102,13 +78,13 @@ pub async fn modman_main(
 
   let bus_store = Arc::new(store.clone());
   let bus_token = cancellation_tokens.0.clone();
-  let bus_user = Arc::new(user.clone());
+  let bus_session = session.clone();
   let bus_handle = tokio::task::spawn(async move {
     tokio::select! {
       _ = bus_token.cancelled() => {
         debug!("bus_handle exited");
       },
-      _ = start_busses(bus_store, bus_user) => {}
+      _ = start_busses(bus_store, bus_session) => {}
     }
   });
 

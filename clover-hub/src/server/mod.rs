@@ -31,8 +31,6 @@ use modman::{
   models::ModManStore,
   modman_main,
 };
-use nexus::server::listener::nexus_listener;
-use nexus::server::models::NexusStore;
 use renderer::{
   renderer_main,
   RendererStore,
@@ -121,74 +119,7 @@ pub async fn server_main(
             .clone();
           debug!("Stores initalized!");
 
-          debug!("Creating master Nexus user...");
-          // Add users to nexus
-          let (mut nexus_store, master_user_config) =
-            NexusStore::new(&"Owner".to_string(), &primary_api_key.clone()).await;
-
-          debug!(
-            "Master User api key: {}",
-            master_user_config.api_keys[0].clone()
-          );
-          debug!("Created master Nexus user!");
-
-          debug!("Creating Modman Nexus user...");
-          let modman_user_config = Arc::new(
-            nexus_store
-              .add_user(
-                modman::gen_user().await,
-                Some(master_user_config.id.clone()),
-                None,
-              )
-              .await
-              .unwrap(),
-          );
-          debug!("Creating ModMan NexusUser object...");
-          let (modman_user, from_modman, to_modman) = nexus_store
-            .connect_user(&modman_user_config.api_keys[0].clone())
-            .await
-            .unwrap();
-          debug!("Created Modman Nexus user!");
-
-          // Create oneshot channel for ready signal
-          let (nexus_ready_tx, nexus_ready_rx) = tokio::sync::oneshot::channel();
-
           let mut services = Vec::new();
-
-          // Start Nexus
-          debug!("Starting Nexus...");
-          let nexus_port = Arc::new(port);
-          let nexus_store_clone = Arc::new(nexus_store.clone());
-          let nexus_tokens = (CancellationToken::new(), CancellationToken::new());
-          let nexus_tokens_clone = nexus_tokens.clone();
-          let nexus_handle = tokio::task::spawn(async move {
-            nexus_listener(
-              *nexus_port.to_owned(),
-              nexus_store_clone,
-              vec![(modman_user_config.clone(), 0, to_modman)],
-              vec![(modman_user_config.clone(), 0, from_modman)],
-              nexus_tokens_clone,
-              Some(nexus_ready_tx),
-            )
-            .await;
-          });
-          services.push(InitializedService {
-            name: "Nexus",
-            shutdown_trigger: nexus_tokens.0,
-            shutdown_ack: nexus_tokens.1,
-          });
-
-          // WAIT for nexus to be ready before starting services
-          match nexus_ready_rx.await {
-            Ok(_) => {
-              info!("Nexus is ready! Starting services...");
-            }
-            Err(_) => {
-              error!("Nexus failed to signal ready state!");
-              server_token.cancel();
-              return;
-            }
-          }
 
           // Start Warehouse
           debug!("Starting Warehouse...");
@@ -209,7 +140,7 @@ pub async fn server_main(
           let modman_tokens = (CancellationToken::new(), CancellationToken::new());
           let modman_tokens_clone = modman_tokens.clone();
           let modman_handle = tokio::task::spawn(async move {
-            modman_main(modman_store, modman_user, modman_tokens_clone).await;
+            modman_main(modman_store, modman_tokens_clone).await;
           });
           services.push(InitializedService {
             name: "ModMan",
@@ -261,7 +192,6 @@ pub async fn server_main(
           tokio::select! {_ = futures::future::join_all(vec![
             cleanup_handle,
             warehouse_handle,
-            nexus_handle,
             renderer_handle,
             modman_handle,
             inference_engine_handle,

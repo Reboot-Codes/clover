@@ -15,11 +15,6 @@ pub mod repos;
 
 use config::models::Config;
 use models::WarehouseStore;
-use nexus::user::NexusUser;
-use nexus::{
-  arbiter::models::ApiKeyWithoutUID,
-  server::models::UserConfig,
-};
 use os_path::OsPath;
 use repos::{
   download_repo_updates,
@@ -223,23 +218,6 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
   match err {
     Some(e) => Err(e),
     None => Ok(()),
-  }
-}
-
-pub async fn gen_user() -> UserConfig {
-  UserConfig {
-    user_type: "com.reboot-codes.com.clover.warehouse".to_string(),
-    pretty_name: "Clover: Warehouse".to_string(),
-    api_keys: vec![ApiKeyWithoutUID {
-      allowed_events_to: vec![
-        "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$".to_string(),
-      ],
-      allowed_events_from: vec![
-        "^nexus://com.reboot-codes.clover.warehouse(\\.(.*))*(\\/.*)*$".to_string(),
-      ],
-      echo: false,
-      proxy: false,
-    }],
   }
 }
 

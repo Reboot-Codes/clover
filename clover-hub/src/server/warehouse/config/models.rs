@@ -1,4 +1,3 @@
-use nexus::utils;
 use os_path::OsPath;
 use sea_orm::DatabaseConnection;
 use serde::{
@@ -50,7 +49,7 @@ impl Default for Config {
       repos: HashMap::new(),
       data_dir: OsPath::new(),
       db: None,
-      primary_api_key: utils::gen_api_key(),
+      primary_api_key: "CHANGE_ME".to_string(),
       default_gesture_pack: "com.reboot-codes.clover.CORE.default".to_string(),
       modman: Default::default(),
       renderer: Default::default(),
