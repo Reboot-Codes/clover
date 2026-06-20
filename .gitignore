@@ -1,5 +1,5 @@
 target/
-result/
+result
 .direnv
 
 # Byte-compiled / optimized / DLL files
