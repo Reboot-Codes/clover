@@ -174,7 +174,9 @@ pub async fn renderer_main(
 
       let displays_payload = loop {
         match init_session
-          .get(format!("{MODMAN_EVT_ID}/displays/get"))
+          .get(format!(
+            "{MODMAN_EVT_ID}/components/by-type/video/displays/all"
+          ))
           .await
         {
           Ok(reply_fifo) => match reply_fifo.recv_async().await {

@@ -99,7 +99,7 @@ impl CloverComponentTrait for AudioInputComponent {
           }
         }
       }
-      super::models::ConnectionType::ModManProxy(proxied_connection) => todo!(),
+      super::models::ConnectionType::ModManProxy => todo!(),
       super::models::ConnectionType::Stream(streaming_connection) => todo!(),
     }
 
@@ -195,7 +195,7 @@ impl CloverComponentTrait for AudioOutputComponent {
         }
       }
       // TODO: ModMan Proxied Audio Output device (like a GROVE speaker).
-      super::models::ConnectionType::ModManProxy(proxied_connection) => todo!(),
+      super::models::ConnectionType::ModManProxy => todo!(),
       super::models::ConnectionType::Stream(streaming_connection) => todo!(),
     }
 

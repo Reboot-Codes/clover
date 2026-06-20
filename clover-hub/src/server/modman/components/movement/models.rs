@@ -1,9 +1,6 @@
-use crate::server::modman::{
-  components::models::ProxiedConnection,
-  models::{
-    GestureConfig,
-    GestureParameters,
-  },
+use crate::server::modman::models::{
+  GestureConfig,
+  GestureParameters,
 };
 use serde::{
   Deserialize,
@@ -15,7 +12,7 @@ use strum::VariantNames;
 pub enum ConnectionType {
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
-  ModManProxy(ProxiedConnection),
+  ModManProxy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

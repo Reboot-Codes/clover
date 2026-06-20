@@ -222,6 +222,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
         initialized: true,
         components: module.components.clone(),
         registered_by: module.registered_by.clone(),
+        connection: module.connection.clone(),
       },
     );
     debug!("Module: {id}, In-memory store updated!");
@@ -398,6 +399,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
           initialized: false,
           components: module.components.clone(),
           registered_by: module.registered_by.clone(),
+          connection: module.connection.clone(),
         },
       );
 

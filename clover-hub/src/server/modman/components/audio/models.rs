@@ -1,10 +1,7 @@
 use std::sync::Arc;
 
 use crate::server::modman::{
-  components::models::{
-    ProxiedConnection,
-    StreamingConnection,
-  },
+  components::models::StreamingConnection,
   models::GestureConfig,
 };
 use serde::{
@@ -31,7 +28,7 @@ pub enum ConnectionType {
   Direct(DirectConnection),
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
-  ModManProxy(ProxiedConnection),
+  ModManProxy,
   #[serde(rename = "stream")]
   #[strum(serialize = "stream")]
   Stream(StreamingConnection),

@@ -8,6 +8,7 @@
 
 pub mod busses;
 pub mod components;
+pub mod connections;
 pub mod gestures;
 pub mod ipc;
 pub mod models;

@@ -4,23 +4,26 @@
 //!
 
 use crate::server::{
-  modman::components::{
-    audio::models::{
-      AudioInputComponent,
-      AudioOutputComponent,
-    },
-    movement::models::MovementComponent,
-    sensors::models::{
-      InputSensorComponent,
-      OutputSensorComponent,
-    },
-    video::{
-      cameras::models::CameraComponent,
-      displays::models::{
-        PhysicalDisplayComponent,
-        VirtualDisplayComponent,
+  modman::{
+    components::{
+      audio::models::{
+        AudioInputComponent,
+        AudioOutputComponent,
+      },
+      movement::models::MovementComponent,
+      sensors::models::{
+        InputSensorComponent,
+        OutputSensorComponent,
+      },
+      video::{
+        cameras::models::CameraComponent,
+        displays::models::{
+          PhysicalDisplayComponent,
+          VirtualDisplayComponent,
+        },
       },
     },
+    connections::ModuleConnection,
   },
   warehouse::config::models::Config,
 };
@@ -52,6 +55,8 @@ pub struct Module {
   pub components: Vec<(String, bool)>,
   /// Either `com.reboot-codes.clover.hub` or the RFQDN of the app that manages this module.
   pub registered_by: String,
+  /// How is this module connected to modman?
+  pub connection: ModuleConnection,
 }
 
 impl Module {
@@ -195,13 +200,13 @@ pub enum PortStatus {
   /// Available but unused.
   #[serde(rename = "available")]
   Available,
-  /// Requested by $COMPONENT_ID, but the UART bus isn't initalized yet
+  /// Requested by $MODULE_ID, but the UART bus isn't initalized yet
   #[serde(rename = "requested")]
   Requested(String),
-  /// Currently being used by $COMPONENT_ID
+  /// Currently being used by $MODULE_ID
   #[serde(rename = "bound")]
   Bound(String),
-  /// Unavailable, but still requested by $COMPONENT_ID
+  /// Unavailable, but still requested by $MODULE_ID
   #[serde(rename = "unavailable")]
   Unavailable(String),
 }
@@ -267,7 +272,9 @@ pub struct GestureOverride {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModManConfig {
-  pub uart_ports: Vec<(String, u32)>,
+  /// All ports available for modman to use to connect to modules.
+  pub uart_ports: Vec<String>,
+  /// Whether to restart paused gestures automatically on startup.
   pub restart_gestures: bool,
   pub gesture_states: HashMap<String, GestureStates>,
   pub gestures_bg_by_default: bool,
@@ -312,6 +319,9 @@ impl Default for ModManConfig {
             (external_display_id.clone(), true),
           ],
           registered_by: "com.reboot-codes.clover.modman.default".to_string(),
+          connection: ModuleConnection::Simulated(
+            "com.reboot-codes.clover.debug-display:0".to_string(),
+          ),
         },
       );
 

@@ -4,7 +4,7 @@
 //!
 
 pub mod app;
-/*#[cfg(feature = "bt_classic")]
+#[cfg(feature = "bt_classic")]
 pub mod bt_classic;
 #[cfg(feature = "bt_le")]
 pub mod bt_le;
@@ -17,4 +17,4 @@ pub mod i2c;
 #[cfg(feature = "spi")]
 pub mod spi;
 #[cfg(feature = "uart")]
-pub mod uart;*/
+pub mod uart;

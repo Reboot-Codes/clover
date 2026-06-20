@@ -333,11 +333,11 @@ pub struct StaticGestureSpec {
 // TODO: Specify trait bounds (resolve async_fn_in_trait).
 pub trait ManifestCompilationFrom<T> {
   /// Perform the compilation on the RAW manifest value type to get the COMPILED manifest value with its dependencies and directives resolved. Put the *parsed* (use [Deserialize]), *`Raw`* value specification in the `spec` parameter.
-  async fn compile(
+  fn compile(
     spec: T,
     resolution_ctx: ResolutionCtx,
     repo_dir_path: OsPath,
-  ) -> Result<Self, SimpleError>
+  ) -> impl std::future::Future<Output = Result<Self, SimpleError>>
   where
     Self: Sized,
     T: for<'a> Deserialize<'a>;

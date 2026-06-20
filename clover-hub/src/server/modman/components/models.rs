@@ -8,9 +8,15 @@ use std::sync::Arc;
 /// All components must implement this trait, ensures standardization between component types, etc.
 pub trait CloverComponentTrait: Sized {
   /// Should initalize the component in the store, and ensure that 2-way communication is setup.
-  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error>;
+  fn init(
+    &mut self,
+    store: Arc<ModManStore>,
+  ) -> impl std::future::Future<Output = Result<(), anyhow::Error>> + Send;
   /// Tells the component that it will not be used in the *near* future, and may even power it down.
-  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error>;
+  fn deinit(
+    &mut self,
+    store: Arc<ModManStore>,
+  ) -> impl std::future::Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 /// Known and supported streaming protocols for Video and Audio
@@ -32,34 +38,4 @@ pub struct StreamingConnection {
   /// Either RTMP or RTSP
   pub protocol: StreamProtocol,
   pub path: Option<String>,
-}
-
-/// The Bus Proxy this component is connected through.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ProxiedConnection {
-  /// Device ID
-  Simulated(String),
-  /// App ID and Device ID
-  App(String, String),
-  /// Bus path and Device ID
-  #[cfg(feature = "can_fd")]
-  CANFD(String, String),
-  /// Bus path and Device ID
-  #[cfg(feature = "can_2")]
-  CAN2(String, String),
-  /// Device ID
-  #[cfg(feature = "bt_classic")]
-  BT(String),
-  /// Device ID
-  #[cfg(feature = "bt_le")]
-  BTLE(String),
-  /// Bus path and Device ID
-  #[cfg(feature = "spi")]
-  SPI(String, String),
-  /// Bus path and Device ID
-  #[cfg(feature = "i2c")]
-  I2C(String, String),
-  /// Bus path
-  #[cfg(feature = "uart")]
-  UART(String),
 }

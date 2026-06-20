@@ -24,7 +24,7 @@ pub async fn display_queryable(
   session: Arc<zenoh::Session>,
   cancellation_token: CancellationToken,
 ) {
-  let key_expr = format!("{MODULE_EVT_ID}/displays/get");
+  let key_expr = format!("{MODULE_EVT_ID}/components/by-type/video/displays/all");
 
   let queryable = session.declare_queryable(&key_expr).await.unwrap();
 

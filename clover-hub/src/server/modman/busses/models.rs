@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{
   Deserialize,
   Serialize,
@@ -25,10 +27,9 @@ pub enum BusTypes {
 pub trait Bus {
   /// Send a message and expect a reply to that message.
   /// Listen to the Bus (does NOT contain IDs.)
-  async fn subscribe_to_bus(
-    &mut self,
-    //from_bus: tokio::sync::broadcast::Sender<WsIn>,
-    //to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
-  ) -> Result<Vec<tokio::task::JoinHandle<()>>, anyhow::Error>;
+  fn subscribe_to_bus(
+    self,
+    session: Arc<zenoh::Session>,
+  ) -> impl std::future::Future<Output = Result<tokio::task::JoinHandle<()>, anyhow::Error>> + Send;
   fn get_type() -> BusTypes;
 }

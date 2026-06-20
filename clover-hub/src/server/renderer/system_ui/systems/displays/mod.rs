@@ -1,10 +1,7 @@
+use crate::server::modman::components::video::displays::models::VirtualDisplayComponent;
 use crate::server::renderer::system_ui::{
   AnyDisplayComponent,
   SystemUIIPC,
-};
-use crate::server::{
-  modman::components::video::displays::models::VirtualDisplayComponent,
-  renderer::system_ui::systems::view_management::Composition,
 };
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
@@ -96,13 +93,13 @@ pub fn display_registrar(
               match physical_display_component.virtual_display {
                 Some(vdisplay_id) => {
                   for (
-                    queried_vdisplay_entity, 
-                    _queried_vdisplay_component, 
+                    queried_vdisplay_entity,
+                    _queried_vdisplay_component,
                     queried_vdisplay_id
                   ) in &vdisplay_query {
                     if vdisplay_id == queried_vdisplay_id.id {
                       use bevy::window::WindowTheme;
-                  
+
                       let window = commands.get_entity(queried_vdisplay_entity).unwrap().insert((Window {
                         title: format!("Clover SystemUI: Virtual Display: {}", display_id.clone()),
                         mode: windowed,
@@ -110,7 +107,7 @@ pub fn display_registrar(
                         position,
                         ..Default::default()
                       }, DisplayWindow { id: vdisplay_id.to_string() })).id();
-                  
+
                       commands.spawn((
                         Camera3d::default(),
                         Camera {
@@ -120,7 +117,7 @@ pub fn display_registrar(
                         Transform::from_xyz(6.0, 0.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
                         DisplayCamera { id: vdisplay_id.to_string() }
                       ));
-                      
+
                       break;
                     }
                   }
@@ -152,19 +149,22 @@ pub fn display_registrar(
                 }
               }
             }
-            crate::server::modman::components::video::displays::models::ConnectionType::ModManProxy(
-              proxied_connection,
-            ) => {}
+            crate::server::modman::components::video::displays::models::ConnectionType::ModManProxy => todo!(),
             crate::server::modman::components::video::displays::models::ConnectionType::Stream(
               stream_config,
-            ) => {}
+            ) => todo!()
           }
         }
         AnyDisplayComponent::Virtual(virtual_display_component) => {
           debug!("Spawing VDisplay: {}", display_id.clone());
           // TODO: Spawn a composition for this display.
 
-          commands.spawn((virtual_display_component, VirtualDisplayID { id: display_id.clone() }));
+          commands.spawn((
+            virtual_display_component,
+            VirtualDisplayID {
+              id: display_id.clone(),
+            },
+          ));
 
           debug!("Done spawning VDisplay: {}!", display_id.clone());
         }

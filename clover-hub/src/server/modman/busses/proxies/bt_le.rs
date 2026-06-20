@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::server::modman::busses::models::{
   Bus,
   BusTypes,
@@ -9,10 +11,9 @@ pub struct BluetoothLEBus {}
 
 impl Bus for BluetoothLEBus {
   async fn subscribe_to_bus(
-    &mut self,
-    from_bus: tokio::sync::broadcast::Sender<WsIn>,
-    to_bus: tokio::sync::broadcast::Sender<IPCMessageWithId>,
-  ) -> Result<Vec<tokio::task::JoinHandle<()>>, anyhow::Error> {
+    mut self,
+    session: Arc<zenoh::Session>,
+  ) -> Result<tokio::task::JoinHandle<()>, anyhow::Error> {
     todo!()
   }
 

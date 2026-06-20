@@ -1,0 +1,38 @@
+# Zenoh Endpoints
+
+- com/reboot-codes/clover/
+  - hub
+    - telemetry
+      - B(C1000):log-stream ! OTelTrace
+    - warehouse
+      - B(C1):status
+    - modman
+      - B(C1):status
+      - gestures
+        - Q:update Vec<GestureCommand> Result<(), GestureError>
+      - components
+        - @routes
+          - by-type
+            - video
+              - displays
+                - Q:all ! Vec<AnyDisplayComponent>
+        - @endpoints
+          - Q:config
+          - B(C1):state ComponentState
+      - modules
+        - @routes
+          - by-id
+            - $MODULE_ID
+          - by-rfqdn
+            - $MODULE_RFQDN
+              - $INIT_ORDER
+        - @endpoints
+          - Q:config
+          - Q:send BusMessage Result<(), BusError>
+          - B(C100?):recv BusMessage 
+    - renderer
+      - B(C1):status
+    - inference_engine
+      - B(C1):status
+    - appdaemon
+      - B(C1):status

@@ -1,8 +1,5 @@
 use crate::server::modman::components::{
-  models::{
-    ProxiedConnection,
-    StreamingConnection,
-  },
+  models::StreamingConnection,
   video::VideoResolution,
 };
 use serde::{
@@ -19,7 +16,7 @@ pub enum ConnectionType {
   Video4Linux(String),
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
-  ModManProxy(ProxiedConnection),
+  ModManProxy,
   #[serde(rename = "stream")]
   #[strum(serialize = "stream")]
   Stream(StreamingConnection),

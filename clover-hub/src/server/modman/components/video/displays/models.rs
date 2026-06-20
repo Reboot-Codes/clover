@@ -1,9 +1,6 @@
 use crate::server::modman::{
   components::{
-    models::{
-      ProxiedConnection,
-      StreamingConnection,
-    },
+    models::StreamingConnection,
     video::VideoResolution,
   },
   models::GestureConfig,
@@ -68,7 +65,7 @@ pub enum ConnectionType {
   Direct(DirectConnection),
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
-  ModManProxy(ProxiedConnection),
+  ModManProxy,
   #[serde(rename = "stream")]
   #[strum(serialize = "stream")]
   Stream(StreamingConnection),

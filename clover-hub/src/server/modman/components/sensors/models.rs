@@ -1,7 +1,4 @@
-use crate::server::modman::{
-  components::models::ProxiedConnection,
-  models::GestureConfig,
-};
+use crate::server::modman::models::GestureConfig;
 use serde::{
   Deserialize,
   Serialize,
@@ -23,5 +20,5 @@ pub struct OutputSensorComponent {
 pub enum ConnectionType {
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
-  ModManProxy(ProxiedConnection),
+  ModManProxy,
 }

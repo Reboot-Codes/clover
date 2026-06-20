@@ -63,7 +63,7 @@ pub enum Error {
 /// 1. Ensures that the data directory exists,
 /// 2. Loads the core [configuration file](config) (paired management devices, permanently attached hardware, core Modules to initalize, etc),
 /// 3. and preps [Repository storage](repos).
-#[instrument]
+#[instrument(skip(store))]
 pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Result<(), Error> {
   let mut err = None;
   let mut data_dir_path = OsPath::new().join(data_dir.clone());
