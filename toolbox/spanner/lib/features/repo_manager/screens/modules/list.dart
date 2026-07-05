@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class ConfiguratorModulesOverview extends StatelessWidget {
-  const ConfiguratorModulesOverview({super.key});
+class RepoModulesList extends StatelessWidget {
+  const RepoModulesList({super.key});
 
   @override
   Widget build(BuildContext context) {

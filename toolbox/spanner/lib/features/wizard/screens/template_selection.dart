@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class WizardFromScratch extends ConsumerWidget {
-  const WizardFromScratch({super.key});
+class WizardTemplateSelection extends StatelessWidget {
+  const WizardTemplateSelection({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       padding: .only(left: 16, right: 16, top: 16),
       child: Column(
         crossAxisAlignment: .start,
         children: [
           Text(
-            "Building a Clover Instance",
+            "Start with a Template",
             style: Theme.of(context).textTheme.titleLarge,
           ),
+          Text("Or, pick any parts you like."),
         ],
       ),
     );

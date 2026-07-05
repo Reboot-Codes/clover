@@ -5,12 +5,14 @@ import 'package:spanner/components/window_controls.dart';
 class NavDestinationConfig {
   final String id; // Unique identifier for reordering/keys
   final String label; // Text shown below the icon
+  final String routePath; // The router path (base) target
   final IconData icon; // Default outlined icon
   final IconData selectedIcon; // Filled icon when active
 
   const NavDestinationConfig({
     required this.id,
     required this.label,
+    required this.routePath,
     required this.icon,
     required this.selectedIcon,
   });
@@ -21,41 +23,39 @@ const List<NavDestinationConfig> defaultNavDestinations = [
   NavDestinationConfig(
     id: 'overview',
     label: 'Overview',
+    routePath: '/repo_manager',
     icon: Icons.settings_outlined,
     selectedIcon: Icons.settings,
   ),
   NavDestinationConfig(
     id: 'modules',
     label: 'Modules',
+    routePath: '/repo_manager/modules',
     icon: Icons.extension_outlined,
     selectedIcon: Icons.extension,
   ),
   NavDestinationConfig(
     id: 'gestures',
     label: 'Gestures',
+    routePath: '/repo_manager/gestures',
     icon: Icons.gesture_outlined,
     selectedIcon: Icons.gesture,
   ),
   NavDestinationConfig(
     id: 'apps',
     label: 'Apps',
+    routePath: '/repo_manager/apps',
     icon: Icons.code_outlined,
     selectedIcon: Icons.code,
   ),
-  NavDestinationConfig(
-    id: 'repos',
-    label: 'Repos',
-    icon: Icons.cloud_outlined,
-    selectedIcon: Icons.cloud,
-  ),
 ];
 
-class ConfiguratorShell extends StatelessWidget {
+class RepoManagerShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
   // TODO: Store the order of navbar destinations in settings
   final List<NavDestinationConfig> activeDestinations = defaultNavDestinations;
 
-  const ConfiguratorShell({super.key, required this.navigationShell});
+  const RepoManagerShell({super.key, required this.navigationShell});
 
   void _onTabSelected(int index) {
     navigationShell.goBranch(
@@ -75,20 +75,8 @@ class ConfiguratorShell extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             leading: BackButton(onPressed: () => context.go("/")),
-            title: Text("Spanner"),
-            actions: [
-              Container(
-                padding: EdgeInsetsGeometry.only(right: 6.0),
-                child: IconButton(
-                  icon: Icon(Icons.settings_outlined),
-                  tooltip: "Settings",
-                  onPressed: () {
-                    context.push("/settings");
-                  },
-                ),
-              ),
-              WindowControls(),
-            ],
+            title: Text("Spanner | Repo"),
+            actions: [WindowControls()],
           ),
           bottomNavigationBar: isSmall
               ? NavigationBar(

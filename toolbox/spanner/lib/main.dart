@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:spanner/router.dart';
 
 void main() {
   // TODO: Custom window decorations when running on desktop.
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

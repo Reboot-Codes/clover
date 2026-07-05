@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class ConfiguratorAppsList extends StatelessWidget {
-  const ConfiguratorAppsList({super.key});
+class RepoAppsList extends StatelessWidget {
+  const RepoAppsList({super.key});
 
   @override
   Widget build(BuildContext context) {
