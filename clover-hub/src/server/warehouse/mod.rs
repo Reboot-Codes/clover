@@ -41,6 +41,7 @@ use zenoh_ext::{
 };
 
 use crate::server::warehouse::ipc::handle_ipc;
+use crate::utils::configure_zenoh;
 
 /// The primary startup Error enum.
 /// Warehouse will return this enum in [`setup_warehouse`].
@@ -231,105 +232,119 @@ pub async fn warehouse_main(
 ) {
   info!("Starting Warehouse...");
 
-  let mut zenoh_config = zenoh::Config::default();
-
-  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
-  zenoh_config
-    .insert_json5(
+  let config_ret = configure_zenoh(vec![
+    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,
-    )
-    .unwrap();
+    ),
+    ("mode", "\"client\""),
+  ]);
 
-  debug!("Connecting to Zenoh...");
-  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
-  debug!("Connected to Zenoh!");
+  match config_ret {
+    Ok(zenoh_config) => {
+      debug!("Connecting to Zenoh...");
 
-  let status_publisher = session
-    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
-    .cache(CacheConfig::default().max_samples(1))
-    .await
-    .unwrap();
+      match zenoh::open(zenoh_config).await {
+        Ok(raw_session) => {
+          let session = Arc::new(raw_session);
+          debug!("Connected to Zenoh!");
 
-  let ipc_token = cancellation_tokens.0.clone();
-  let ipc_session = session.clone();
-  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
-
-  // TODO: Move to Zenoh's persistent storage
-  let db_raw = Database::connect(format!(
-    "sqlite://{}?mode=rwc",
-    store.config.lock().await.data_dir.join("/db.sqlite")
-  ))
-  .await;
-
-  let init_store = Arc::new(store.clone());
-  let init_tokens = cancellation_tokens.clone();
-  cancellation_tokens
-    .0
-    .run_until_cancelled(async move {
-      match db_raw {
-        Ok(db) => {
-          init_store.config.lock().await.db = Some(Arc::new(db));
-        }
-        Err(e) => {
-          error!("Failed to access db file, due to:\n{}", e);
-          init_tokens.0.cancel();
-        }
-      }
-
-      status_publisher
-        .put("ready")
-        .await
-        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
-
-      info!("Warehouse Ready!");
-    })
-    .await;
-
-  let cleanup_token = cancellation_tokens.0.clone();
-  tokio::select! {
-    _ = cleanup_token.cancelled() => {
-      ipc_handle.abort();
-
-      info!("Buttoning up storage...");
-      // TODO: Lock db and clean up when done.
-      debug!("Writing Config File...");
-      let config = store.config.lock().await;
-      match fs::File::open(config.data_dir.join("/config.json")).await {
-        Ok(mut config_file) => {
-          debug!("Config file opened!");
-
-          match config_file
-            .write_all(
-              serde_json_lenient::to_string_pretty::<Config>(&config.clone() as &Config)
-                .unwrap()
-                .as_bytes(),
-            )
+          let status_publisher = session
+            .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+            .cache(CacheConfig::default().max_samples(1))
             .await
-          {
-            Ok(_) => {
-              debug!("Wrote config from store state!");
-            }
-            Err(e) => {
-              error!("Failed to write config file");
-              // TODO!
+            .unwrap();
+
+          let ipc_token = cancellation_tokens.0.clone();
+          let ipc_session = session.clone();
+          let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+
+          // TODO: Move to Zenoh's persistent storage
+          let db_raw = Database::connect(format!(
+            "sqlite://{}?mode=rwc",
+            store.config.lock().await.data_dir.join("/db.sqlite")
+          ))
+          .await;
+
+          let init_store = Arc::new(store.clone());
+          let init_tokens = cancellation_tokens.clone();
+          cancellation_tokens
+            .0
+            .run_until_cancelled(async move {
+              match db_raw {
+                Ok(db) => {
+                  init_store.config.lock().await.db = Some(Arc::new(db));
+                }
+                Err(e) => {
+                  error!("Failed to access db file, due to:\n{}", e);
+                  init_tokens.0.cancel();
+                }
+              }
+
+              status_publisher
+                .put("ready")
+                .await
+                .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+
+              info!("Warehouse Ready!");
+            })
+            .await;
+
+          let cleanup_token = cancellation_tokens.0.clone();
+          tokio::select! {
+            _ = cleanup_token.cancelled() => {
+              ipc_handle.abort();
+
+              info!("Buttoning up storage...");
+              // TODO: Lock db and clean up when done.
+              debug!("Writing Config File...");
+              let config = store.config.lock().await;
+              match fs::File::open(config.data_dir.join("/config.json")).await {
+                Ok(mut config_file) => {
+                  debug!("Config file opened!");
+
+                  match config_file
+                    .write_all(
+                      serde_json_lenient::to_string_pretty::<Config>(&config.clone() as &Config)
+                        .unwrap()
+                        .as_bytes(),
+                    )
+                    .await
+                  {
+                    Ok(_) => {
+                      debug!("Wrote config from store state!");
+                    }
+                    Err(e) => {
+                      error!("Failed to write config file");
+                      // TODO!
+                    }
+                  }
+
+                  std::mem::drop(config_file);
+                }
+                Err(e) => {
+                  error!("Unable to open config file");
+                  // TODO!
+                }
+              }
+
+              std::mem::drop(config);
+              std::mem::drop(store);
             }
           }
-
-          std::mem::drop(config_file);
         }
-        Err(e) => {
-          error!("Unable to open config file");
-          // TODO!
+        Err(err) => {
+          error!("FATAL: Failed to connect to zenoh due to:\n{err}");
         }
       }
-
-      std::mem::drop(config);
-      std::mem::drop(store);
-
-      cancellation_tokens.1.cancel();
+    }
+    Err(err) => {
+      error!("FATAL: Failed to write configuration for zenoh connection due to:\n{err}")
     }
   }
+
+  cancellation_tokens.1.cancel();
 
   info!("Warehouse has stopped!");
 }

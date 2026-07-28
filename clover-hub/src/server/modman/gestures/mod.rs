@@ -1,8 +1,8 @@
-// TODO: Manifests specify bodies? Allow globs.
+// TODO: Manifests specify bodies. Allow globs.
 // TODO: Each area has default applicable gestures
 /*
 Default area specification
-  - com.reboot-codes.clover.CORE.human
+  - com.reboot-codes.clover.CORE.humanoid
     - torso
       - core
         - back

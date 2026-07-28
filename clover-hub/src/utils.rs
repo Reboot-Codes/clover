@@ -114,3 +114,30 @@ where
     },
   }
 }
+
+pub fn configure_zenoh(
+  config_steps: Vec<(&str, &str)>,
+) -> Result<zenoh::Config, Box<dyn std::error::Error + Send + Sync>> {
+  let mut zenoh_config = zenoh::Config::default();
+
+  let mut config_ret = None;
+
+  for config_step in config_steps {
+    match zenoh_config.insert_json5(config_step.0, config_step.1) {
+      Ok(_) => {}
+      Err(err) => {
+        config_ret = Some(Err(err));
+        break;
+      }
+    }
+  }
+
+  match config_ret {
+    Some(err) => {
+      return err;
+    }
+    None => {
+      return Ok(zenoh_config);
+    }
+  }
+}

@@ -16,7 +16,10 @@ use crate::server::{
   modman::MODULE_EVT_ID as MODMAN_EVT_ID,
   renderer::ipc::handle_ipc,
 };
-use crate::utils::RecvSync;
+use crate::utils::{
+  configure_zenoh,
+  RecvSync,
+};
 use queues::*;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
@@ -64,200 +67,215 @@ pub async fn renderer_main(
 ) {
   info!("Starting Renderer...");
 
-  let mut zenoh_config = zenoh::Config::default();
-
-  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
-  zenoh_config
-    .insert_json5(
+  let config_ret = configure_zenoh(vec![
+    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,
-    )
-    .unwrap();
+    ),
+    ("mode", "\"client\""),
+  ]);
 
-  debug!("Connecting to Zenoh...");
-  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
-  debug!("Connected to Zenoh!");
+  match config_ret {
+    Ok(zenoh_config) => {
+      debug!("Connecting to Zenoh...");
 
-  let status_publisher = session
-    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
-    .cache(CacheConfig::default().max_samples(1))
-    .await
-    .unwrap();
+      match zenoh::open(zenoh_config).await {
+        Ok(raw_session) => {
+          let session = Arc::new(raw_session);
+          debug!("Connected to Zenoh!");
 
-  let ipc_token = cancellation_tokens.0.clone();
-  let ipc_session = session.clone();
-  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+          let status_publisher = session
+            .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+            .cache(CacheConfig::default().max_samples(1))
+            .await
+            .unwrap();
 
-  let display_registration_queue = Arc::new(StdMutex::new(queue![]));
+          let ipc_token = cancellation_tokens.0.clone();
+          let ipc_session = session.clone();
+          let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
 
-  let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
-  let system_ui_ipc = SystemUIIPC {
-    exit_channel: RecvSync(bevy_cancel_rx),
-    display_registration_queue: display_registration_queue.clone(),
-  };
+          let display_registration_queue = Arc::new(StdMutex::new(queue![]));
 
-  // TODO: Add this as a CLI/Config option!
-  let custom_bevy_ipc = system_ui_ipc;
-  let bevy_thread = std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
+          let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
+          let system_ui_ipc = SystemUIIPC {
+            exit_channel: RecvSync(bevy_cancel_rx),
+            display_registration_queue: display_registration_queue.clone(),
+          };
 
-  // let display_handles = Arc::new(HashMap::new());
+          // TODO: Add this as a CLI/Config option!
+          let custom_bevy_ipc = system_ui_ipc;
+          let bevy_thread =
+            std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
 
-  let init_session = session.clone();
-  cancellation_tokens
-    .0
-    .run_until_cancelled(async move {
-      debug!("Waiting for ModMan to be ready...");
+          // let display_handles = Arc::new(HashMap::new());
 
-      let modman_status_subscriber = init_session
-        .declare_subscriber(format!("{MODMAN_EVT_ID}/status"))
-        .history(HistoryConfig::default().detect_late_publishers())
-        .recovery(RecoveryConfig::default().heartbeat())
-        .await
-        .unwrap();
+          let init_session = session.clone();
+          cancellation_tokens
+            .0
+            .run_until_cancelled(async move {
+              debug!("Waiting for ModMan to be ready...");
 
-      let modman_ready = loop {
-        match tokio::time::timeout(
-          std::time::Duration::from_millis(500),
-          modman_status_subscriber.recv_async(),
-        )
-        .await
-        {
-          Ok(Ok(sample)) => {
-            let status = sample
-              .payload()
-              .try_to_string()
-              .unwrap_or_else(|e| e.to_string().into());
-            debug!("ModMan Status: {status}");
-            break status.to_string();
-          }
-          Ok(Err(e)) => {
-            error!("Subscriber channel error: {e}");
-            break "error".to_string();
-          }
-          Err(_) => {
-            debug!("Timed out waiting for ModMan status, querying cache directly...");
-            match init_session.get(format!("{MODMAN_EVT_ID}/status")).await {
-              Ok(replies) => {
-                if let Ok(reply) = replies.recv_async().await {
-                  if let Ok(sample) = reply.into_result() {
+              let modman_status_subscriber = init_session
+                .declare_subscriber(format!("{MODMAN_EVT_ID}/status"))
+                .history(HistoryConfig::default().detect_late_publishers())
+                .recovery(RecoveryConfig::default().heartbeat())
+                .await
+                .unwrap();
+
+              let modman_ready = loop {
+                match tokio::time::timeout(
+                  std::time::Duration::from_millis(500),
+                  modman_status_subscriber.recv_async(),
+                )
+                .await
+                {
+                  Ok(Ok(sample)) => {
                     let status = sample
                       .payload()
                       .try_to_string()
                       .unwrap_or_else(|e| e.to_string().into());
-                    debug!("ModMan Status (from cache query): {status}");
+                    debug!("ModMan Status: {status}");
                     break status.to_string();
                   }
+                  Ok(Err(e)) => {
+                    error!("Subscriber channel error: {e}");
+                    break "error".to_string();
+                  }
+                  Err(_) => {
+                    debug!("Timed out waiting for ModMan status, querying cache directly...");
+                    match init_session.get(format!("{MODMAN_EVT_ID}/status")).await {
+                      Ok(replies) => {
+                        if let Ok(reply) = replies.recv_async().await {
+                          if let Ok(sample) = reply.into_result() {
+                            let status = sample
+                              .payload()
+                              .try_to_string()
+                              .unwrap_or_else(|e| e.to_string().into());
+                            debug!("ModMan Status (from cache query): {status}");
+                            break status.to_string();
+                          }
+                        }
+                        debug!("No cached ModMan status yet, retrying...");
+                      }
+                      Err(e) => {
+                        error!("Failed to query ModMan status: {e}");
+                        break "error".to_string();
+                      }
+                    }
+                  }
                 }
-                debug!("No cached ModMan status yet, retrying...");
+              };
+
+              drop(modman_status_subscriber);
+
+              if modman_ready == "error" {
+                error!("Failed to get ModMan ready status!");
+                status_publisher
+                  .put("ready:incomplete")
+                  .await
+                  .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+                return;
               }
-              Err(e) => {
-                error!("Failed to query ModMan status: {e}");
-                break "error".to_string();
+
+              info!("Requesting displays to setup in SystemUI from ModMan...");
+
+              let displays_payload = loop {
+                match init_session
+                  .get(format!(
+                    "{MODMAN_EVT_ID}/components/by-type/video/displays/all"
+                  ))
+                  .await
+                {
+                  Ok(reply_fifo) => match reply_fifo.recv_async().await {
+                    Ok(reply) => match reply.result() {
+                      Ok(sample) => {
+                        break Ok(
+                          sample
+                            .payload()
+                            .try_to_string()
+                            .unwrap_or_else(|e| e.to_string().into())
+                            .to_string(),
+                        );
+                      }
+                      Err(e) => {
+                        break Err(
+                          e.payload()
+                            .try_to_string()
+                            .unwrap_or_else(|e| e.to_string().into())
+                            .to_string(),
+                        );
+                      }
+                    },
+                    Err(e) => {
+                      debug!("displays/get queryable not ready yet ({e}), retrying in 100ms...");
+                      tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
+                  },
+                  Err(e) => {
+                    error!("Unable to setup Querier:\n{e}");
+                    break Err(e.to_string());
+                  }
+                }
+              };
+
+              match displays_payload {
+                Ok(payload) => {
+                  debug!("Got displays: {:?}", payload);
+                  status_publisher
+                    .put("ready")
+                    .await
+                    .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+                }
+                Err(payload) => {
+                  error!("Got error payload:\n{payload}");
+                  status_publisher
+                    .put("ready:incomplete")
+                    .await
+                    .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+                }
               }
+
+              info!("Renderer Ready!");
+            })
+            .await;
+
+          let cleanup_token = cancellation_tokens.0.clone();
+          tokio::select! {
+            _ = cleanup_token.cancelled() => {
+              ipc_handle.abort();
+
+              info!("Cleaning up displays...");
+
+              let _ = bevy_cancel_tx.send(bevy::prelude::AppExit::Success);
+
+              info!("Waiting for Bevy to shut down...");
+              match bevy_thread.join() {
+                Ok(_) => {
+                  info!("Bevy thread exited cleanly");
+                }
+                Err(e) => {
+                  error!("Bevy thread panicked during shutdown: {:?}", e);
+                }
+              }
+
+              // TODO: Clean up registered displays when server is shutting down.
+
+              std::mem::drop(store);
             }
           }
         }
-      };
-
-      drop(modman_status_subscriber);
-
-      if modman_ready == "error" {
-        error!("Failed to get ModMan ready status!");
-        status_publisher
-          .put("ready:incomplete")
-          .await
-          .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
-        return;
-      }
-
-      info!("Requesting displays to setup in SystemUI from ModMan...");
-
-      let displays_payload = loop {
-        match init_session
-          .get(format!(
-            "{MODMAN_EVT_ID}/components/by-type/video/displays/all"
-          ))
-          .await
-        {
-          Ok(reply_fifo) => match reply_fifo.recv_async().await {
-            Ok(reply) => match reply.result() {
-              Ok(sample) => {
-                break Ok(
-                  sample
-                    .payload()
-                    .try_to_string()
-                    .unwrap_or_else(|e| e.to_string().into())
-                    .to_string(),
-                );
-              }
-              Err(e) => {
-                break Err(
-                  e.payload()
-                    .try_to_string()
-                    .unwrap_or_else(|e| e.to_string().into())
-                    .to_string(),
-                );
-              }
-            },
-            Err(e) => {
-              debug!("displays/get queryable not ready yet ({e}), retrying in 100ms...");
-              tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
-          },
-          Err(e) => {
-            error!("Unable to setup Querier:\n{e}");
-            break Err(e.to_string());
-          }
-        }
-      };
-
-      match displays_payload {
-        Ok(payload) => {
-          debug!("Got displays: {:?}", payload);
-          status_publisher
-            .put("ready")
-            .await
-            .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
-        }
-        Err(payload) => {
-          error!("Got error payload:\n{payload}");
-          status_publisher
-            .put("ready:incomplete")
-            .await
-            .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+        Err(err) => {
+          error!("FATAL: Failed to connect to zenoh due to:\n{err}");
         }
       }
-
-      info!("Renderer Ready!");
-    })
-    .await;
-
-  let cleanup_token = cancellation_tokens.0.clone();
-  tokio::select! {
-    _ = cleanup_token.cancelled() => {
-      ipc_handle.abort();
-
-      info!("Cleaning up displays...");
-
-      let _ = bevy_cancel_tx.send(bevy::prelude::AppExit::Success);
-
-      info!("Waiting for Bevy to shut down...");
-      match bevy_thread.join() {
-        Ok(_) => {
-          info!("Bevy thread exited cleanly");
-        }
-        Err(e) => {
-          error!("Bevy thread panicked during shutdown: {:?}", e);
-        }
-      }
-
-      // TODO: Clean up registered displays when server is shutting down.
-
-      std::mem::drop(store);
-
-      cancellation_tokens.1.cancel();
+    }
+    Err(err) => {
+      error!("FATAL: Failed to write configuration for zenoh connection due to:\n{err}")
     }
   }
+
+  cancellation_tokens.1.cancel();
 
   info!("Renderer has stopped!");
 }

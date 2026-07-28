@@ -21,7 +21,10 @@ use zenoh_ext::{
   CacheConfig,
 };
 
-use crate::server::inference_engine::ipc::handle_ipc;
+use crate::{
+  server::inference_engine::ipc::handle_ipc,
+  utils::configure_zenoh,
+};
 
 use super::warehouse::config::models::Config;
 
@@ -50,53 +53,67 @@ pub async fn inference_engine_main(
 ) {
   info!("Starting Inference Engine...");
 
-  let mut zenoh_config = zenoh::Config::default();
-
-  zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
-  zenoh_config
-    .insert_json5(
+  let config_ret = configure_zenoh(vec![
+    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,
-    )
-    .unwrap();
+    ),
+    ("mode", "\"client\""),
+  ]);
 
-  debug!("Connecting to Zenoh...");
-  let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
-  debug!("Connected to Zenoh!");
+  match config_ret {
+    Ok(zenoh_config) => {
+      debug!("Connecting to Zenoh...");
 
-  let status_publisher = session
-    .declare_publisher(format!("{MODULE_EVT_ID}/status"))
-    .cache(CacheConfig::default().max_samples(1))
-    .await
-    .unwrap();
+      match zenoh::open(zenoh_config).await {
+        Ok(raw_session) => {
+          let session = Arc::new(raw_session);
+          debug!("Connected to Zenoh!");
 
-  let ipc_token = cancellation_tokens.0.clone();
-  let ipc_session = session.clone();
-  let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
+          let status_publisher = session
+            .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+            .cache(CacheConfig::default().max_samples(1))
+            .await
+            .unwrap();
 
-  cancellation_tokens
-    .0
-    .run_until_cancelled(async move {
-      status_publisher
-        .put("ready")
-        .await
-        .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+          let ipc_token = cancellation_tokens.0.clone();
+          let ipc_session = session.clone();
+          let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
 
-      info!("InferenceEngine Ready!");
-    })
-    .await;
+          cancellation_tokens
+            .0
+            .run_until_cancelled(async move {
+              status_publisher
+                .put("ready")
+                .await
+                .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
 
-  let cleanup_token = cancellation_tokens.0.clone();
-  tokio::select! {
-    _ = cleanup_token.cancelled() => {
-      ipc_handle.abort();
+              info!("InferenceEngine Ready!");
+            })
+            .await;
 
-      info!("Cleaning up networks...");
-      // TODO: Clean up registered networks when server is shutting down.
+          let cleanup_token = cancellation_tokens.0.clone();
+          tokio::select! {
+            _ = cleanup_token.cancelled() => {
+              ipc_handle.abort();
 
-      cancellation_tokens.1.cancel();
+              info!("Cleaning up networks...");
+              // TODO: Clean up registered networks when server is shutting down.
+            }
+          }
+        }
+        Err(err) => {
+          error!("FATAL: Failed to connect to zenoh due to:\n{err}");
+        }
+      }
+    }
+    Err(err) => {
+      error!("FATAL: Failed to write configuration for zenoh connection due to:\n{err}");
     }
   }
+
+  cancellation_tokens.1.cancel();
 
   info!("Inference Engine has stopped!");
 }

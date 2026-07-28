@@ -1,0 +1,10 @@
+{
+  "name": "C.O.R.E. Blinkie Example",
+  "location": "@core.humanoid.chest",
+  "components": {
+    "light": {
+      "type": "indicator",
+      "input": "rgba"
+    }
+  }
+}

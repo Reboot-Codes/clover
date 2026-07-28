@@ -7,7 +7,10 @@ pub mod docker;
 pub mod ipc;
 pub mod models;
 
-use crate::server::appd::ipc::handle_ipc;
+use crate::{
+  server::appd::ipc::handle_ipc,
+  utils::configure_zenoh,
+};
 
 use self::docker::init_app;
 use bollard::{
@@ -48,124 +51,136 @@ pub async fn appd_main(
       info!("Connected to docker on {}!", docker_path.clone());
       let docker = Arc::new(docker_conn);
 
-      let mut zenoh_config = zenoh::Config::default();
-
-      zenoh_config.insert_json5("connect/endpoints", "tcp/localhost:6699");
-      zenoh_config
-        .insert_json5(
+      let config_ret = configure_zenoh(vec![
+        ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+        (
           "timestamping/enabled",
           r#"{ router: true, peer: true, client: true }"#,
-        )
-        .unwrap();
+        ),
+        ("mode", "\"client\""),
+      ]);
 
-      debug!("Connecting to Zenoh...");
-      let session = Arc::new(zenoh::open(zenoh_config).await.unwrap());
-      debug!("Connected to Zenoh!");
+      match config_ret {
+        Ok(zenoh_config) => {
+          debug!("Connecting to Zenoh...");
 
-      let status_publisher = session
-        .declare_publisher(format!("{MODULE_EVT_ID}/status"))
-        .cache(CacheConfig::default().max_samples(1))
-        .await
-        .unwrap();
+          match zenoh::open(zenoh_config).await {
+            Ok(raw_session) => {
+              let session = Arc::new(raw_session);
+              debug!("Connected to Zenoh!");
 
-      let ipc_token = cancellation_tokens.0.clone();
-      let ipc_session = session.clone();
-      let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
-
-      let init_session = session.clone();
-      let init_store = Arc::new(store.clone());
-      let init_docker = docker.clone();
-      cancellation_tokens
-        .0
-        .run_until_cancelled(async move {
-          let mut init_apps = init_store.applications.lock().await;
-          let mut apps_initialized = 0;
-
-          if init_apps.len() == 0 {
-            info!("No pre-configured applications to initialize.");
-          } else {
-            for (id, spec) in init_apps.iter_mut() {
-              match init_app(init_docker.clone(), id, spec).await {
-                Ok(_) => {
-                  apps_initialized += 1;
-                }
-                Err(_e) => {
-                  error!(
-                    "Failed to initialize application {} ({})!",
-                    spec.name.clone(),
-                    id.clone()
-                  );
-                }
-              }
-
-              // Update the application state.
-              init_store
-                .applications
-                .lock()
+              let status_publisher = session
+                .declare_publisher(format!("{MODULE_EVT_ID}/status"))
+                .cache(CacheConfig::default().max_samples(1))
                 .await
-                .insert(id.clone(), spec.clone());
-            }
-          }
+                .unwrap();
 
-          if apps_initialized != init_apps.len() {
-            warn!(
-              "Initialized {} apps out of {}!",
-              apps_initialized,
-              init_apps.len()
-            );
-            status_publisher
-              .put("ready:incomplete")
-              .await
-              .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
-          } else {
-            if apps_initialized != 0 {
-              info!("Initialized all {} apps!", apps_initialized);
-            }
-            status_publisher
-              .put("ready")
-              .await
-              .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
-          }
+              let ipc_token = cancellation_tokens.0.clone();
+              let ipc_session = session.clone();
+              let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
 
-          info!("AppDaemon Ready!");
-        })
-        .await;
+              let init_session = session.clone();
+              let init_store = Arc::new(store.clone());
+              let init_docker = docker.clone();
+              cancellation_tokens
+                .0
+                .run_until_cancelled(async move {
+                  let mut init_apps = init_store.applications.lock().await;
+                  let mut apps_initialized = 0;
 
-      let cleanup_store = store.clone();
-      let cleanup_docker = docker.clone();
-      let cleanup_token = cancellation_tokens.0.clone();
-      tokio::select! {
-        _ = cleanup_token.cancelled() => {
-          ipc_handle.abort();
+                  if init_apps.len() == 0 {
+                    info!("No pre-configured applications to initialize.");
+                  } else {
+                    for (id, spec) in init_apps.iter_mut() {
+                      match init_app(init_docker.clone(), id, spec).await {
+                        Ok(_) => {
+                          apps_initialized += 1;
+                        }
+                        Err(_e) => {
+                          error!(
+                            "Failed to initialize application {} ({})!",
+                            spec.name.clone(),
+                            id.clone()
+                          );
+                        }
+                      }
 
-          info!("Cleaning up applications...");
+                      // Update the application state.
+                      init_store
+                        .applications
+                        .lock()
+                        .await
+                        .insert(id.clone(), spec.clone());
+                    }
+                  }
 
-          let mut cleanup_apps = cleanup_store.applications.lock().await;
-          let mut apps_removed = 0;
+                  if apps_initialized != init_apps.len() {
+                    warn!(
+                      "Initialized {} apps out of {}!",
+                      apps_initialized,
+                      init_apps.len()
+                    );
+                    status_publisher
+                      .put("ready:incomplete")
+                      .await
+                      .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+                  } else {
+                    if apps_initialized != 0 {
+                      info!("Initialized all {} apps!", apps_initialized);
+                    }
+                    status_publisher
+                      .put("ready")
+                      .await
+                      .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
+                  }
 
-          if cleanup_apps.len() == 0 {
-            info!("No applications to remove.");
-          } else {
-            for (id, spec) in cleanup_apps.iter_mut() {
-              match remove_app(cleanup_docker.clone(), id, spec).await {
-                Ok(_) => { apps_removed += 1; },
-                Err(_e) => {
-                  error!("Failed to remove application {} ({})!", spec.name.clone(), id.clone());
+                  info!("AppDaemon Ready!");
+                })
+                .await;
+
+              let cleanup_store = store.clone();
+              let cleanup_docker = docker.clone();
+              let cleanup_token = cancellation_tokens.0.clone();
+              tokio::select! {
+                _ = cleanup_token.cancelled() => {
+                  ipc_handle.abort();
+
+                  info!("Cleaning up applications...");
+
+                  let mut cleanup_apps = cleanup_store.applications.lock().await;
+                  let mut apps_removed = 0;
+
+                  if cleanup_apps.len() == 0 {
+                    info!("No applications to remove.");
+                  } else {
+                    for (id, spec) in cleanup_apps.iter_mut() {
+                      match remove_app(cleanup_docker.clone(), id, spec).await {
+                        Ok(_) => { apps_removed += 1; },
+                        Err(_e) => {
+                          error!("Failed to remove application {} ({})!", spec.name.clone(), id.clone());
+                        }
+                      }
+
+                      // Update the application state.
+                      cleanup_store.applications.lock().await.insert(id.clone(), spec.clone());
+                    }
+                  }
+
+                  if apps_removed != cleanup_apps.len() {
+                    warn!("Only removed {} apps out of {}!", apps_removed, cleanup_apps.len());
+                  }
+
+                  std::mem::drop(store);
                 }
               }
-
-              // Update the application state.
-              cleanup_store.applications.lock().await.insert(id.clone(), spec.clone());
+            }
+            Err(err) => {
+              error!("FATAL: Failed to connect to zenoh due to:\n{err}");
             }
           }
-
-          if apps_removed != cleanup_apps.len() {
-            warn!("Only removed {} apps out of {}!", apps_removed, cleanup_apps.len());
-          }
-
-          std::mem::drop(store);
-
-          cancellation_tokens.1.cancel();
+        }
+        Err(err) => {
+          error!("FATAL: Failed to write configuration for zenoh connection due to:\n{err}");
         }
       }
     }
@@ -176,6 +191,8 @@ pub async fn appd_main(
       );
     }
   }
+
+  cancellation_tokens.1.cancel();
 
   info!("AppD has stopped!");
 }
