@@ -6,12 +6,12 @@ use serde::{
 use strum::VariantNames;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InputSensorComponent {
+pub struct SensorComponent {
   pub connection: ConnectionType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputSensorComponent {
+pub struct IndicatorComponent {
   pub gesture_config: Option<GestureConfig>,
   pub connection: ConnectionType,
 }
