@@ -12,7 +12,7 @@
       // Data type, in this case, each message must contain 2 floats.
       "input": "vec2d",
       // Data type, this phase has a position reporting function and will send a 2D vector back regularly
-      "output": "vec2d",
+      "output": "vec2d"
     },
     "phase-2": {
       "type": "movement",
@@ -21,7 +21,7 @@
     },
     "tip-light": {
       "type": "indicator",
-      "input": "rgba",
+      "input": "rgba"
     }
   }
 }

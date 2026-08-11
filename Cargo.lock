@@ -2097,6 +2097,7 @@ dependencies = [
  "clap",
  "clover-hub-macros",
  "decorum",
+ "embedded-can",
  "futures",
  "git2",
  "i2c",
@@ -4664,6 +4665,7 @@ dependencies = [
  "libc",
  "socket2 0.5.10",
  "socketcan",
+ "tokio",
 ]
 
 [[package]]

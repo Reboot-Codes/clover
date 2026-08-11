@@ -49,6 +49,7 @@ use tokio_stream::{
   wrappers::ReadDirStream,
   StreamExt,
 };
+use tracing::instrument;
 
 use super::models::WarehouseStore;
 
@@ -81,6 +82,7 @@ impl From<git2::Error> for Error {
 /// </div>
 ///
 // TODO: Make these a constant so all built-in strings get updated at once!
+#[instrument]
 pub fn builtin_rfqdn(is_core: bool) -> String {
   if is_core {
     String::from("com.reboot-codes.clover.CORE")
@@ -90,6 +92,7 @@ pub fn builtin_rfqdn(is_core: bool) -> String {
 }
 
 /// Replace `@here`, `@base`, and `@builtin` manifest value directives.
+#[instrument]
 pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -> String {
   debug!(
     "replace_simple_directives (provided): {} + {:#?}",
@@ -167,6 +170,7 @@ pub fn replace_simple_directives(value: String, resolution_ctx: ResolutionCtx) -
   String::from(val)
 }
 
+#[instrument]
 pub async fn resolve_list_entry<T, K>(
   raw_list: HashMap<String, RequiredSingleManifestEntry<T>>,
   resolution_ctx: ResolutionCtx,
@@ -174,7 +178,7 @@ pub async fn resolve_list_entry<T, K>(
 ) -> Result<HashMap<String, K>, SimpleError>
 where
   K: ManifestCompilationFrom<T>,
-  T: for<'a> Deserialize<'a>,
+  T: for<'a> Deserialize<'a> + std::fmt::Debug,
 {
   let mut err = None;
   let mut entries = HashMap::new();
@@ -327,6 +331,7 @@ where
 /// Source of filesystem structures like `/opt/clover/repos/com/reboot-codes/clover/@repo`.
 ///
 /// Using `@repo` for the actual repository keeps everything unique and organized and allows for nested repo bases (e.g. an unstable repo for testing out the latest apps). For this reason `@repo` is a banned directory name in Clover-compatible remote repositories.
+#[instrument(skip(store))]
 pub async fn update_repo_dir_structure(
   repo_dir_path: OsPath,
   store: Arc<WarehouseStore>,
@@ -364,6 +369,7 @@ pub async fn update_repo_dir_structure(
 
 /// Used to resolve repo manifest entry **values** that may have directives (`@import`, `@base`, `@here`, `@builtin`) in them.
 /// Hands off to [replace_simple_directives] if it isn't an import.
+#[instrument]
 pub async fn resolve_entry_value(
   value: String,
   resolution_ctx: ResolutionCtx,
@@ -521,6 +527,7 @@ pub async fn resolve_entry_value(
 
 /// Downloads repository updates from their origin remote using git.
 /// Git implicitly supports both HTTP(S) and SSH, so users have options when getting updates.
+#[instrument(skip(store))]
 pub async fn download_repo_updates(
   store: Arc<WarehouseStore>,
   repo_dir_path: OsPath,

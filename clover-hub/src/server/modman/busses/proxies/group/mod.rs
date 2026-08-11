@@ -17,6 +17,14 @@
 //! Module manager threads handle the actual zenoh endpoints for modules (like how drivers expose device paths in linux).
 //!
 
+use serde::{
+  Deserialize,
+  Serialize,
+};
+
+#[cfg(feature = "can_2")]
+use crate::server::modman::busses::proxies::group::can_2::CAN2Config;
+
 #[cfg(feature = "can_2")]
 pub mod can_2;
 #[cfg(feature = "can_fd")]
@@ -25,3 +33,9 @@ pub mod can_fd;
 pub mod i2c;
 #[cfg(feature = "spi")]
 pub mod spi;
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GroupBusConfigs {
+  #[cfg(feature = "can_2")]
+  pub can_2: CAN2Config,
+}

@@ -5,21 +5,23 @@ use serde::{
   Serialize,
 };
 
-use crate::server::modman::models::{
-  components::{
-    CloverComponent,
-    CloverComponentMeta,
+use crate::server::modman::{
+  busses::proxies::group::GroupBusConfigs,
+  models::{
+    components::{
+      CloverComponent,
+      CloverComponentMeta,
+    },
+    gestures::GestureStates,
+    modules::Module,
   },
-  gestures::GestureStates,
-  modules::Module,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModManConfig {
   /// All ports available for modman to use to connect to modules.
   pub uart_ports: Vec<String>,
-  /// All (CAN 2) network interfaces available for modman to use to connect to modules.
-  pub can_2_interfaces: Vec<String>,
+  pub group_busses: GroupBusConfigs,
   /// Whether to restart paused gestures automatically on startup.
   pub restart_gestures: bool,
   pub gesture_states: HashMap<String, GestureStates>,
@@ -140,7 +142,7 @@ impl Default for ModManConfig {
       static_components,
       static_modules,
       uart_ports: Default::default(),
-      can_2_interfaces: Default::default(),
+      group_busses: Default::default(),
       restart_gestures: Default::default(),
       gesture_states: Default::default(),
       gestures_bg_by_default: Default::default(),
