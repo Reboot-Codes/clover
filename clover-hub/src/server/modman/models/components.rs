@@ -40,7 +40,7 @@ pub struct CloverComponentMeta {
   /// Friendly name for this component to be shown to the User in any UI.
   pub name: String,
   /// Is this component required for the module to work? Default: yes.
-  /// If any critical component fails to initalize, the module will fail to initalize entirely.
+  /// If any critical component fails to initialize, the module will fail to initialize entirely.
   pub critical: bool,
   /// Where this component is on/in the user. RFQDN formatted, e.g. `com.reboot-codes.CORE.head.eyes.internal` for a HUD display
   pub location: String,

@@ -110,7 +110,7 @@ pub fn can_interface_lookout(ctx: Arc<CAN2Bus>, channel: UnboundedSender<CanLook
       }
       Err(err) => {
         if retries == 5 {
-          error!("Continously failed to get network interfaces even after inital check, did something happen to the network manager?");
+          error!("Continously failed to get network interfaces even after initial check, did something happen to the network manager?");
           debug!("{err}");
           ctx.cancellation_token.cancel();
           break;

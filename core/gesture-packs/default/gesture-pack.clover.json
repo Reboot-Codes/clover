@@ -20,11 +20,11 @@
               "keyframes": [
                 {
                   "x": -45.0,
-                  "y": "@inital"
+                  "y": "@initial"
                 },
                 {
                   "x": 45.0,
-                  "y": "@inital"
+                  "y": "@initial"
                 }
               ]
             }

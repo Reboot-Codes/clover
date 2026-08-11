@@ -21,7 +21,7 @@ pub enum PortStatus {
   /// Available but unused.
   #[serde(rename = "available")]
   Available,
-  /// Requested by $MODULE_ID, but the UART bus isn't initalized yet
+  /// Requested by $MODULE_ID, but the UART bus isn't initialized yet
   #[serde(rename = "requested")]
   Requested(String),
   /// Currently being used by $MODULE_ID

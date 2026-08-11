@@ -75,19 +75,19 @@ pub async fn init_component(
 
       if component_meta.critical {
         info!(
-          "Module: {}, initalizing CRITICAL component: {}...",
+          "Module: {}, initializing CRITICAL component: {}...",
           module_id.clone(),
           component_id.clone()
         );
       } else {
         info!(
-          "Module: {}, initalizing component: {}...",
+          "Module: {}, initializing component: {}...",
           module_id.clone(),
           component_id.clone()
         );
       }
 
-      let component_initalized = match component.init(Arc::new(store.clone())).await {
+      let component_initialized = match component.init(Arc::new(store.clone())).await {
         Ok(_) => true,
         Err(e) => {
           failiure = Some(e);
@@ -95,9 +95,9 @@ pub async fn init_component(
         }
       };
 
-      if component_initalized {
+      if component_initialized {
         info!(
-          "Module: {}, successfully initalized component: {}!",
+          "Module: {}, successfully initialized component: {}!",
           module_id.clone(),
           component_id.clone()
         );
@@ -164,7 +164,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
               critical_failiure = Some((component_id.clone(), e));
             } else {
               error!(
-                "Module: {}, Failed to initalize component \"{}\", due to: {}",
+                "Module: {}, Failed to initialize component \"{}\", due to: {}",
                 id.clone(),
                 component_id.clone(),
                 e
@@ -180,7 +180,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
         Some(failiure) => {
           let (component_id, e) = failiure;
           error!(
-            "Module: {}, failed to initalize critical component: {}, due to: {}\nSkipping rest of Module init...",
+            "Module: {}, failed to initialize critical component: {}, due to: {}\nSkipping rest of Module init...",
             id.clone(),
             component_id,
             e
@@ -200,7 +200,7 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
               error!("Module: {}, failed to initialize!", id.clone());
             }
           } else {
-            debug!("Finished initalizing module.");
+            debug!("Finished initializing module.");
             initialized_module = true;
           }
         }
@@ -262,19 +262,19 @@ pub async fn deinit_component(
 
       if component_meta.critical {
         info!(
-          "Module: {}, deinitalizing CRITICAL component: {}...",
+          "Module: {}, deinitializing CRITICAL component: {}...",
           module_id.clone(),
           component_id.clone()
         );
       } else {
         info!(
-          "Module: {}, deinitalizing component: {}...",
+          "Module: {}, deinitializing component: {}...",
           module_id.clone(),
           component_id.clone()
         );
       }
 
-      let component_initalized = match component.deinit(Arc::new(store.clone())).await {
+      let component_initialized = match component.deinit(Arc::new(store.clone())).await {
         Ok(_) => true,
         Err(e) => {
           failiure = Some(e);
@@ -282,9 +282,9 @@ pub async fn deinit_component(
         }
       };
 
-      if component_initalized {
+      if component_initialized {
         info!(
-          "Module: {}, successfully deinitalized component: {}!",
+          "Module: {}, successfully deinitialized component: {}!",
           module_id.clone(),
           component_id.clone()
         );
@@ -346,7 +346,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
               critical_failiure = Some((component_id.clone(), e));
             } else {
               error!(
-                "Module: {}, Failed to deinitalize component \"{}\", due to: {}",
+                "Module: {}, Failed to deinitialize component \"{}\", due to: {}",
                 id.clone(),
                 component_id.clone(),
                 e
@@ -360,7 +360,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
         Some(failiure) => {
           let (component_id, e) = failiure;
           error!(
-            "Module: {}, failed to deinitalize critical component: {}, due to: {}\nSkipping rest of Module init...",
+            "Module: {}, failed to deinitialize critical component: {}, due to: {}\nSkipping rest of Module init...",
             id.clone(),
             component_id,
             e

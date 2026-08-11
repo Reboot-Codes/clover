@@ -121,8 +121,8 @@ pub enum DegreesOfFreedomGestureParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovementComponent {
-  /// The inital position of this component, also determines how many degrees of freedom it uses. **NON OPTIONAL!**
-  pub inital_position: DegreesOfFreedom,
+  /// The initial position of this component, also determines how many degrees of freedom it uses. **NON OPTIONAL!**
+  pub initial_position: DegreesOfFreedom,
   pub gesture_config: GestureConfig,
   pub connection: ConnectionType,
 }

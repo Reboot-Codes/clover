@@ -60,7 +60,7 @@
       - [ ] Ratchet
         - [ ] Transition to Flutter
           - [ ] use `flutter_scene`, and specifically enable impeller on desktop builds.
-        - [ ] Inital Setup Flow
+        - [ ] initial Setup Flow
           - [ ] i18n
         - [ ] Repos
           - [ ] Repo registration
@@ -96,7 +96,7 @@
   - [ ] CloverHub
     - [ ] Module proxy config
   - [ ] User setup
-    - [ ] Inital config tutorial (WIP, actually)
+    - [ ] initial config tutorial (WIP, actually)
   - [ ] Developer Tutorials
     - [ ] Repo setup
       - [ ] Manifest setup (clover manifest helper in Deno/TS?)

@@ -4,7 +4,7 @@
 //!
 //! Before starting its sibling components, CHServer will first call [`setup_warehouse`] to get the Clover warehouse/primary storage directory (by default: `/opt/clover`) ready for use.
 //!
-//! Later, after an inital connection to Zenoh is initalized, Warehouse will then monitor for [events](ipc) using its primary service defined in [`warehouse_main`].
+//! Later, after an initial connection to Zenoh is initialized, Warehouse will then monitor for [events](ipc) using its primary service defined in [`warehouse_main`].
 //!
 
 pub mod config;
@@ -62,7 +62,7 @@ pub enum Error {
 /// Warehouse's data directory preparation function.
 ///
 /// 1. Ensures that the data directory exists,
-/// 2. Loads the core [configuration file](config) (paired management devices, permanently attached hardware, core Modules to initalize, etc),
+/// 2. Loads the core [configuration file](config) (paired management devices, permanently attached hardware, core Modules to initialize, etc),
 /// 3. and preps [Repository storage](repos).
 #[instrument(skip(store))]
 pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Result<(), Error> {

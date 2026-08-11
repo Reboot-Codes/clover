@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 /// All components must implement this trait, ensures standardization between component types, etc.
 pub trait CloverComponentTrait: Sized {
-  /// Should initalize the component in the store, and ensure that 2-way communication is setup.
+  /// Should initialize the component in the store, and ensure that 2-way communication is setup.
   fn init(
     &mut self,
     store: Arc<ModManStore>,

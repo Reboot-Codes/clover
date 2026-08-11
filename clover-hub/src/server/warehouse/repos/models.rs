@@ -241,8 +241,8 @@ pub struct RawRepoCreds {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawGesturePackSpec {
   pub name: Option<String>,
-  #[serde(default)]
-  pub gestures: OptionalListManifestSpecEntry<RawGestureSpec>,
+  //#[serde(default)]
+  //pub gestures: OptionalListManifestSpecEntry<RawGestureSpec>,
 }
 
 #[cfg(feature = "core")]
@@ -312,8 +312,8 @@ pub struct ContainerSpec {
 pub struct GesturePackSpec {
   #[serde(default)]
   pub name: OptionalString,
-  #[serde(default)]
-  pub gestures: OptionalStrTHashMap<GestureSpec>,
+  //#[serde(default)]
+  //pub gestures: OptionalStrTHashMap<GestureSpec>,
 }
 
 #[cfg(feature = "core")]

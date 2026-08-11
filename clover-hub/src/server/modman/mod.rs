@@ -113,7 +113,7 @@ pub async fn modman_main(
 
                 hashmap
               };
-              let mut modules_initalized: usize = 0;
+              let mut modules_initialized: usize = 0;
 
               debug!("Checking for statically defined modules to init...");
               if static_modules.len() > 0 {
@@ -150,7 +150,7 @@ pub async fn modman_main(
 
               drop(config);
 
-              info!("Initalizing modules...");
+              info!("initializing modules...");
               if total_modules > 0 {
                 // Initialize modules that were registered already via configuration and persistence.
                 for (id, module) in modules_to_init.iter() {
@@ -158,27 +158,27 @@ pub async fn modman_main(
                     init_module(&init_store, id.clone(), module.clone()).await;
 
                   if initialized {
-                    modules_initalized += 1;
+                    modules_initialized += 1;
                   }
                 }
               } else {
                 info!("No static modules to initialize.");
               }
 
-              (modules_initalized, total_modules)
+              (modules_initialized, total_modules)
             })
             .await;
 
-          if let Some((modules_initalized, total_modules)) = init_results {
-            if modules_initalized != total_modules {
-              warn!("Initalized {modules_initalized} out of {total_modules} module(s)!");
+          if let Some((modules_initialized, total_modules)) = init_results {
+            if modules_initialized != total_modules {
+              warn!("initialized {modules_initialized} out of {total_modules} module(s)!");
               status_publisher
                 .put("ready:incomplete")
                 .await
                 .unwrap_or_else(|e| error!("Failed to publish status due to:\n{e}"));
             } else {
-              if modules_initalized != 0 {
-                info!("Initalized all {modules_initalized} module(s)");
+              if modules_initialized != 0 {
+                info!("initialized all {modules_initialized} module(s)");
               }
               status_publisher
                 .put("ready")
@@ -212,18 +212,18 @@ pub async fn modman_main(
               };
 
               let total = modules_snapshot.len();
-              let mut modules_deinitalized: usize = 0;
+              let mut modules_deinitialized: usize = 0;
 
               if total > 0 {
                 for (id, module) in modules_snapshot {
                   let (de_initialized, _) = deinit_module(&store, id, module).await;
-                  if de_initialized { modules_deinitalized += 1; }
+                  if de_initialized { modules_deinitialized += 1; }
                 }
 
-                if modules_deinitalized != total {
-                  warn!("Deinitalized {} out of {} module(s)!", modules_deinitalized, total);
+                if modules_deinitialized != total {
+                  warn!("Deinitialized {} out of {} module(s)!", modules_deinitialized, total);
                 } else {
-                  info!("Deinitalized all {} module(s)", modules_deinitalized);
+                  info!("Deinitialized all {} module(s)", modules_deinitialized);
                 }
               } else {
                 debug!("No modules to deinit.");

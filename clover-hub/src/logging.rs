@@ -43,7 +43,7 @@ pub fn setup_logging(use_stdout: bool) -> SdkLoggerProvider {
     .with_thread_names(true)
     .with_filter(env_filter);
 
-  // No, I can't just option the .with(...) because rust is stupid when it comes to traits as types in uninitalized variables.
+  // No, I can't just option the .with(...) because rust is stupid when it comes to traits as types in uninitialized variables.
   if use_stdout {
     let subscriber = tracing_subscriber::registry()
       .with(otel_layer)

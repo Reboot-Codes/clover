@@ -10,7 +10,7 @@
 //!
 //! ## Bus Manager Threads
 //!
-//! Bus manager threads handle the creation and deletion of module threads. These handle the inital handshake between a module and ModMan, and then creat a module manager to handle Zenoh proxying.
+//! Bus manager threads handle the creation and deletion of module threads. These handle the initial handshake between a module and ModMan, and then creat a module manager to handle Zenoh proxying.
 //!
 //! ## Module Manager Threads
 //!

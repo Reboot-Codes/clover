@@ -103,7 +103,7 @@ pub async fn server_main(
     Ok(_) => {
       match connect_db(warehouse_store.clone()).await {
         Ok(_) => {
-          debug!("Initalizing Stores...");
+          debug!("initializing Stores...");
           let renderer_store = RendererStore::new(Some(warehouse_store.config.clone()));
           let modman_store = ModManStore::new(Some(warehouse_store.config.clone()));
           let inference_engine_store =
@@ -117,7 +117,7 @@ pub async fn server_main(
             .await
             .primary_api_key
             .clone();
-          debug!("Stores initalized!");
+          debug!("Stores initialized!");
 
           let mut services = Vec::new();
 

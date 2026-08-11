@@ -1,8 +1,8 @@
 # Welcome
 
-Opening ratchet for the first time, a user will see the welcome screen, showing any last used connections, and/or the inital setup buttons.
+Opening ratchet for the first time, a user will see the welcome screen, showing any last used connections, and/or the initial setup buttons.
 
-## Inital Setup...
+## initial Setup...
 
 ### From Scratch
 
