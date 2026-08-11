@@ -9,7 +9,7 @@ use std::{
   sync::Arc,
 };
 
-use crate::server::modman::models::ModManConfig;
+use crate::server::modman::models::config::ModManConfig;
 use crate::server::renderer::models::RendererConfig;
 
 /// Clover Base Configuration, generally pulled from `/opt/clover/config.jsonc`.

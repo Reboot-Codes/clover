@@ -29,6 +29,10 @@
       - [ ] Finish module init and de-init methods
       - [ ] Finish gesture event schema
       - [ ] Build gesture message generator.
+      - [ ] Reorganize module security levels to match:
+        - [ ] L1: Static symmetric key.
+        - [ ] L2: Asymmetric-powered session key exchange.
+        - [ ] L3: Asymmetric-powered message key exchange.
       - [ ] i18n
     - [ ] Warehouse
       - [ ] Finish models

@@ -9,7 +9,7 @@ use crate::server::modman::{
     displays::display_queryable,
     gestures::gesture_queryable,
   },
-  models::ModManStore,
+  models::store::ModManStore,
 };
 
 use std::sync::Arc;

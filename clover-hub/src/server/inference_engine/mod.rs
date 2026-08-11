@@ -14,7 +14,6 @@ use tracing::{
   error,
   info,
   instrument,
-  span,
 };
 use zenoh_ext::{
   AdvancedPublisherBuilderExt,
@@ -32,7 +31,7 @@ pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/inference_engine";
 
 #[derive(Debug, Clone)]
 pub struct InferenceEngineStore {
-  config: Arc<Mutex<Config>>,
+  pub config: Arc<Mutex<Config>>,
 }
 
 impl InferenceEngineStore {

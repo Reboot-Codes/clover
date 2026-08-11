@@ -10,21 +10,15 @@ use log::{
 use os_path::OsPath;
 use serde::Deserialize;
 use simple_error::SimpleError;
-use std::{
-  hash::{
-    DefaultHasher,
-    Hash,
-    Hasher,
-  },
-  sync::Arc,
+use std::hash::{
+  DefaultHasher,
+  Hash,
+  Hasher,
 };
 use tokio::{
   fs,
   io::AsyncReadExt,
 };
-use tokio_util::sync::CancellationToken;
-use tracing::instrument;
-use zenoh_ext::AdvancedPublisher;
 
 pub struct RecvSync<T>(pub std::sync::mpsc::Receiver<T>);
 

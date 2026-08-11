@@ -3,19 +3,30 @@
 //! The UART proxy bus is designed bind one serial port per module, then expose I/O over Zenoh.
 //!
 
+pub mod reader;
+pub mod rx;
+pub mod tx;
+
 use std::sync::Arc;
 
 use crate::server::modman::{
-  busses::models::{
-    Bus,
-    BusTypes,
+  busses::{
+    models::{
+      Bus,
+      BusMessage,
+      BusTypes,
+    },
+    proxies::uart::{
+      reader::uart_reader,
+      rx::uart_rx_thread,
+      tx::uart_tx_thread,
+    },
   },
   connections::ModuleConnection,
   models::{
     ModManStore,
     PortStatus,
   },
-  MODULE_EVT_ID,
 };
 use anyhow::anyhow;
 use serialport::{
@@ -23,26 +34,19 @@ use serialport::{
   SerialPortInfo,
 };
 use tokio::{
-  io::{
-    split,
-    AsyncReadExt,
-    AsyncWriteExt,
-    ReadHalf,
-    WriteHalf,
-  },
+  io::split,
   task::JoinHandle,
 };
 use tokio_serial::{
   self,
   SerialStream,
 };
+use tokio_util::io::SyncIoBridge;
 use tracing::{
   debug,
   error,
   instrument,
-  warn,
 };
-
 #[derive(Debug, Clone)]
 pub struct UARTBus {
   pub store: Arc<ModManStore>,
@@ -208,10 +212,17 @@ pub async fn bind_uart_port(
             uart_tx_thread(tx_bind_info, tx_session, tx_port_ctx, port_write).await;
           }));
 
+          let (read_channel, rx_channel) = tokio::sync::mpsc::unbounded_channel::<BusMessage>();
+
           let rx_port_ctx = (bind_info.module_id.clone(), port.port_name.clone());
           let rx_session = port_session.clone();
           sub_handles.push(tokio::task::spawn(async move {
-            uart_rx_thread(rx_port_ctx, port_read, rx_session).await;
+            uart_rx_thread(rx_port_ctx, rx_channel, rx_session).await;
+          }));
+
+          let bridge = SyncIoBridge::new(port_read);
+          sub_handles.push(tokio::task::spawn_blocking(move || {
+            uart_reader(bridge, read_channel);
           }));
 
           Ok(sub_handles)
@@ -224,75 +235,6 @@ pub async fn bind_uart_port(
     _ => {
       error!("UART port: {}, was requested for Module ID: {}, but the module connection configuration is not for UART. This is unnaceptable and a bug, please report!", bind_info.path, bind_info.module_id);
       Err(anyhow!("Module Connection is not UART."))
-    }
-  }
-}
-
-#[instrument(skip(port_session, port_write))]
-pub async fn uart_tx_thread(
-  tx_bind_info: PortToBind,
-  port_session: Arc<zenoh::Session>,
-  tx_port_ctx: (String, String),
-  mut port_write: WriteHalf<SerialStream>,
-) {
-  let key_expr = format!(
-    "{MODULE_EVT_ID}/modules/by-id/{}/send",
-    tx_bind_info.module_id.clone()
-  );
-  let (module_id, port_name) = tx_port_ctx;
-
-  match port_session.declare_queryable(&key_expr).await {
-    Ok(queryable) => {
-      match queryable.recv_async().await {
-        Ok(query) => {
-          match query.payload() {
-            Some(payload) => {
-              match payload.try_to_string() {
-                Ok(payload_str) => {
-                  debug!("Sending message: {payload_str}...");
-
-                  // TODO: Encrypt
-                  match rmp_serde::to_vec(&payload_str) {
-                    Ok(msg_vec) => match port_write.write(msg_vec.as_slice()).await {
-                      Ok(size) => match query.reply(key_expr, format!("{size}")).await {
-                        Ok(_) => {}
-                        Err(err) => todo!(),
-                      },
-                      Err(err) => todo!(),
-                    },
-                    Err(err) => todo!(),
-                  }
-                }
-                Err(err) => todo!(),
-              }
-            }
-            None => todo!(),
-          }
-        }
-        Err(err) => todo!(),
-      }
-    }
-    Err(err) => todo!(),
-  }
-}
-
-#[instrument(skip(port_read, port_session))]
-pub async fn uart_rx_thread(
-  rx_port_ctx: (String, String),
-  mut port_read: ReadHalf<SerialStream>,
-  port_session: Arc<zenoh::Session>,
-) {
-  let mut buffer = Vec::new();
-
-  loop {
-    match port_read.read(buffer.as_mut_slice()).await {
-      Ok(0) => {
-        warn!("Got EOF, was the module disconnected?");
-        // TODO: Send tokio oneshot to reconnect to serial port.
-        break;
-      }
-      Ok(bytes) => {}
-      Err(err) => todo!(),
     }
   }
 }

@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2021"
 
 [features]
-default = ["core", "compositor", "all_busses"]
+default = ["core", "compositor", "can"]
 
 # Usage specific features
 core = []
@@ -15,20 +15,18 @@ compositor = ["bevy/bevy_winit"]
 # HW busses
 all_busses = ["can", "bt", "spi", "i2c", "uart"]
 
-can = ["can_fd", "can_2"]
-
-can_fd = ["dep:can", "socketcan"]
+can = ["can_2"]
 
 # Includes support for CAN 2.0A and 2.0B
-can_2 = ["dep:can", "socketcan"]
+can_2 = ["dep:can-iso-tp", "dep:linux-socketcan-iso-tp"]
 
 bt = ["bt_classic", "bt_le"]
 
-bt_classic = ["bluer"]
+bt_classic = ["dep:bluer"]
 
-bt_le = ["bluer"]
+bt_le = ["dep:bluer"]
 
-spi = ["spidev"]
+spi = ["dep:spidev"]
 
 i2c = ["dep:i2c", "i2cdev"]
 
@@ -61,6 +59,7 @@ overflow-proof = "0.1.0"
 decorum = "0.4.0"
 queues = "1.1.0"
 anyhow = "1.0.97"
+nix = { version = "0.31.3", features = ["net"] }
 
 # HTTP/WS
 zenoh = { workspace = true }
@@ -92,8 +91,8 @@ sea-orm = { workspace = true }
 bevy = "0.15.0"
 
 # Busses
-can = { version = "0.2.0", optional = true }
-socketcan = { version = "3.3.1", optional = true }
+can-iso-tp = { workspace = true, optional = true }
+linux-socketcan-iso-tp = { version = "0.1.3", optional = true }
 bluer = { version = "0.17.3", optional = true }
 spidev = { version = "0.6.0", optional = true }
 i2c = { version = "0.1.0", optional = true }
@@ -105,3 +104,5 @@ strum = { version = "0.27.1", features = ["derive"] }
 base64 = "0.22.1"
 rmp-serde = "1.3.0"
 rodio = "0.20.1"
+serde_bytes = { workspace = true }
+strum_macros = "0.28.0"

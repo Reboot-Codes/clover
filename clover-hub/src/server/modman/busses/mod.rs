@@ -6,9 +6,8 @@
 pub mod models;
 pub mod proxies;
 
-use super::models::ModManStore;
+use super::models::store::ModManStore;
 use log::info;
-use models::Bus;
 use std::sync::Arc;
 
 pub async fn start_busses(
@@ -23,39 +22,34 @@ pub async fn start_busses(
     info!("Starting App Bus...");
   }));
 
-  #[cfg(feature = "can_fd")]
-  handles.push(tokio::task::spawn(async move {
-    info!("Starting CANFD Bus...");
-  }));
-
   #[cfg(feature = "can_2")]
   handles.push(tokio::task::spawn(async move {
     info!("Starting CAN 2 A/B Bus...");
   }));
 
-  #[cfg(feature = "bt_classic")]
-  handles.push(tokio::task::spawn(async move {
-    info!("Starting Bluetooth Classic Bus...");
-  }));
+  // #[cfg(feature = "bt_classic")]
+  // handles.push(tokio::task::spawn(async move {
+  //   info!("Starting Bluetooth Classic Bus...");
+  // }));
 
   #[cfg(feature = "bt_le")]
   handles.push(tokio::task::spawn(async move {
     info!("Starting Bluetooth LE Bus...");
   }));
 
-  #[cfg(feature = "spi")]
-  handles.push(tokio::task::spawn(async move {
-    info!("Starting SPI Bus...");
-  }));
+  // #[cfg(feature = "spi")]
+  // handles.push(tokio::task::spawn(async move {
+  //   info!("Starting SPI Bus...");
+  // }));
 
-  #[cfg(feature = "i2c")]
-  handles.push(tokio::task::spawn(async move {
-    info!("Starting I2C Bus...");
-  }));
+  // #[cfg(feature = "i2c")]
+  // handles.push(tokio::task::spawn(async move {
+  //   info!("Starting I2C Bus...");
+  // }));
 
   #[cfg(feature = "uart")]
   {
-    use proxies::uart::UARTBus;
+    use proxies::individual::uart::UARTBus;
 
     let uart_session = session.clone();
     info!("Starting UART Bus...");

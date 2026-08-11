@@ -15,7 +15,6 @@ use bevy::{
   render::camera::RenderTarget,
   window::{
     PresentMode,
-    PrimaryWindow,
     WindowRef,
     WindowTheme,
   },

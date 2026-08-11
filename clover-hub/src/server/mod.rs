@@ -28,7 +28,7 @@ use inference_engine::{
   InferenceEngineStore,
 };
 use modman::{
-  models::ModManStore,
+  models::store::ModManStore,
   modman_main,
 };
 use renderer::{

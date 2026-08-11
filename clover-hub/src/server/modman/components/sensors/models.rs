@@ -1,4 +1,4 @@
-use crate::server::modman::models::GestureConfig;
+use crate::server::modman::models::gestures::GestureConfig;
 use serde::{
   Deserialize,
   Serialize,

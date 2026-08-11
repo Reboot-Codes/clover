@@ -330,7 +330,6 @@ pub struct StaticGestureSpec {
 }
 
 /// Used in conjunction with the [clover_hub_macros] crate provide a function to compile possibly disjointed manifest files into a single object in-memory.
-// TODO: Specify trait bounds (resolve async_fn_in_trait).
 pub trait ManifestCompilationFrom<T> {
   /// Perform the compilation on the RAW manifest value type to get the COMPILED manifest value with its dependencies and directives resolved. Put the *parsed* (use [Deserialize]), *`Raw`* value specification in the `spec` parameter.
   fn compile(

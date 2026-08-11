@@ -1,4 +1,4 @@
-use crate::server::modman::models::ModManStore;
+use crate::server::modman::models::store::ModManStore;
 use serde::{
   Deserialize,
   Serialize,

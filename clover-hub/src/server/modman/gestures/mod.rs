@@ -77,7 +77,7 @@ use tracing::{
 
 use crate::server::modman::{
   gestures::command_generator::gesture_command_generator,
-  models::ModManStore,
+  models::store::ModManStore,
 };
 
 /// Thread to calculate

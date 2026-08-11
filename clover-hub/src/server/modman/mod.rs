@@ -15,7 +15,7 @@ pub mod models;
 pub mod modules;
 
 use busses::start_busses;
-use models::ModManStore;
+use models::store::ModManStore;
 use modules::{
   deinit_module,
   init_module,
@@ -40,7 +40,7 @@ use zenoh_ext::{
 use crate::{
   server::modman::{
     ipc::handle_ipc,
-    models::Module,
+    models::modules::Module,
   },
   utils::configure_zenoh,
 };

@@ -7,22 +7,13 @@ use ratatui::{
     KeyEventKind,
   },
   prelude::*,
-  widgets::{
-    Block,
-    Borders,
-    Tabs,
-  },
 };
 use std::{
   io,
   time::Duration,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{
-  debug,
-  info,
-  instrument,
-};
+use tracing::instrument;
 use tui_logger::{
   TuiLoggerLevelOutput,
   TuiLoggerSmartWidget,

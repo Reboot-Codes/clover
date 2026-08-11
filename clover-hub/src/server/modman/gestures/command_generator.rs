@@ -3,8 +3,7 @@ use tracing::{
   instrument,
 };
 
-use crate::server::modman::models::{
-  GestureParameters,
+use crate::server::modman::models::gestures::{
   GestureState,
   GestureStates,
 };

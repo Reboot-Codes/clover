@@ -33,3 +33,30 @@ pub trait Bus {
   ) -> impl std::future::Future<Output = Result<tokio::task::JoinHandle<()>, anyhow::Error>> + Send;
   fn get_type() -> BusTypes;
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "t")]
+pub enum BusMessage {
+  #[serde(rename = "p")]
+  Probe(AdoptionProbe),
+  #[serde(rename = "h")]
+  Hello(AdoptionHello),
+  #[serde(rename = "c")]
+  Content(ContentMessage),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AdoptionProbe {} // TODO: this.
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AdoptionHello {} // TODO: this.
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ContentMessage {
+  #[serde(rename = "n", with = "serde_bytes")]
+  pub nonce: Vec<u8>,
+  #[serde(rename = "d", with = "serde_bytes")]
+  pub data: Vec<u8>,
+  #[serde(rename = "h", with = "serde_bytes")]
+  pub hmac: Vec<u8>,
+}

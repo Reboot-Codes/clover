@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use opentelemetry_appender_tracing::layer;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::Resource;

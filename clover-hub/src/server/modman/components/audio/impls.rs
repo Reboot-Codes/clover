@@ -4,7 +4,10 @@ use super::models::{
   ConnectionType,
   DirectConnection,
 };
-use crate::server::modman::components::models::CloverComponentTrait;
+use crate::server::modman::{
+  components::models::CloverComponentTrait,
+  models::store::ModManStore,
+};
 use anyhow::anyhow;
 use log::{
   debug,
@@ -20,10 +23,7 @@ use rodio::{
 use std::sync::Arc;
 
 impl CloverComponentTrait for AudioInputComponent {
-  async fn init(
-    &mut self,
-    store: Arc<crate::server::modman::models::ModManStore>,
-  ) -> Result<(), anyhow::Error> {
+  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     let mut ret = Ok(());
 
     match self.connection.clone() {
@@ -106,19 +106,13 @@ impl CloverComponentTrait for AudioInputComponent {
     return ret;
   }
 
-  async fn deinit(
-    &mut self,
-    store: Arc<crate::server::modman::models::ModManStore>,
-  ) -> Result<(), anyhow::Error> {
+  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     todo!()
   }
 }
 
 impl CloverComponentTrait for AudioOutputComponent {
-  async fn init(
-    &mut self,
-    store: Arc<crate::server::modman::models::ModManStore>,
-  ) -> Result<(), anyhow::Error> {
+  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     let mut ret = Ok(());
 
     match self.connection.clone() {
@@ -202,10 +196,7 @@ impl CloverComponentTrait for AudioOutputComponent {
     return ret;
   }
 
-  async fn deinit(
-    &mut self,
-    store: Arc<crate::server::modman::models::ModManStore>,
-  ) -> Result<(), anyhow::Error> {
+  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
     todo!()
   }
 }

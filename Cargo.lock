@@ -1627,12 +1627,6 @@ checksum = "1e4b40c7323adcfc0a41c4b88143ed58346ff65a288fc144329c5c45e05d70c6"
 
 [[package]]
 name = "bitflags"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
-
-[[package]]
-name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
@@ -1734,7 +1728,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af68112f5c60196495c8b0eea68349817855f565df5b04b2477916d09fb1a901"
 dependencies = [
  "futures",
- "hex 0.4.3",
+ "hex",
  "libc",
  "log",
  "macaddr",
@@ -1759,7 +1753,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-util",
- "hex 0.4.3",
+ "hex",
  "http",
  "http-body-util",
  "hyper",
@@ -1918,15 +1912,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "can"
+name = "can-iso-tp"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "971b31136f95a97d341ad18bf0394c0dc36bf8a34d0275c77b2d16fcadab3c2e"
+checksum = "7e3cc33fd363c3f532f0105fcdd22481b646a6607a5a27320b391a1a64832b93"
 dependencies = [
- "bitflags 1.3.2",
- "bytes",
- "embedded-can 0.3.0",
- "socketcan 1.7.0",
+ "embedded-can",
+ "embedded-can-interface",
+]
+
+[[package]]
+name = "can-isotp-interface"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f94e711660d8503f5a40dc0356a382d3e0f6c46a79cab7d0c931fe01c5a697b8"
+
+[[package]]
+name = "can-uds"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a451bb127f44f2d523b4fdb9013a0075254b8969c8e7b83fb2bdfb2aabf5cd17"
+dependencies = [
+ "embedded-can",
+ "embedded-can-interface",
 ]
 
 [[package]]
@@ -2084,7 +2092,7 @@ dependencies = [
  "bevy",
  "bluer",
  "bollard",
- "can",
+ "can-iso-tp",
  "chrono",
  "clap",
  "clover-hub-macros",
@@ -2094,7 +2102,9 @@ dependencies = [
  "i2c",
  "i2cdev",
  "image",
+ "linux-socketcan-iso-tp",
  "log",
+ "nix 0.31.3",
  "opentelemetry-appender-tracing",
  "opentelemetry_sdk",
  "os_path",
@@ -2107,13 +2117,14 @@ dependencies = [
  "rodio 0.20.1",
  "sea-orm",
  "serde",
+ "serde_bytes",
  "serde_json",
  "serde_json_lenient",
  "serialport",
  "simple-error",
- "socketcan 3.6.2",
  "spidev",
  "strum 0.27.2",
+ "strum_macros 0.28.0",
  "thiserror 1.0.69",
  "tokio",
  "tokio-serial",
@@ -2850,19 +2861,20 @@ dependencies = [
 
 [[package]]
 name = "embedded-can"
-version = "0.3.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12719661dce6080d174aa0a9df1f61756022dc105c1761bcd37091a0ee5de635"
+checksum = "e9d2e857f87ac832df68fa498d18ddc679175cf3d2e4aa893988e5601baf9438"
 dependencies = [
  "nb",
 ]
 
 [[package]]
-name = "embedded-can"
-version = "0.4.1"
+name = "embedded-can-interface"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9d2e857f87ac832df68fa498d18ddc679175cf3d2e4aa893988e5601baf9438"
+checksum = "a58850a2c48624af6385d155b7a603349a4e674b6f0e9706c9b190ea91b0cf1e"
 dependencies = [
+ "embedded-can",
  "nb",
 ]
 
@@ -3718,12 +3730,6 @@ checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
 
 [[package]]
 name = "hex"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6a22814455d41612f41161581c2883c0c6a1c41852729b17d5ed88f01e153aa"
-
-[[package]]
-name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
@@ -3856,7 +3862,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73b7d8abf35697b81a825e386fc151e0d503e8cb5fcb93cc8669c376dfd6f278"
 dependencies = [
- "hex 0.4.3",
+ "hex",
  "hyper",
  "hyper-util",
  "pin-project-lite",
@@ -3891,7 +3897,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "986c5ce3b994526b3cd75578e62554abd09f0899d6206de48b3e96ab34ccc8c7"
 dependencies = [
- "hex 0.4.3",
+ "hex",
  "http-body-util",
  "hyper",
  "hyper-util",
@@ -4230,12 +4236,6 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
-
-[[package]]
-name = "itertools"
-version = "0.4.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4a9b56eb56058f43dc66e58f40a214b2ccbc9f3df51861b63d51dec7b65bc3f"
 
 [[package]]
 name = "itertools"
@@ -4653,6 +4653,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
+name = "linux-socketcan-iso-tp"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58254506a925d8211ba485f81a3d4bde61f0784d1263744140f18668bc800cf3"
+dependencies = [
+ "can-isotp-interface",
+ "can-uds",
+ "embedded-can",
+ "libc",
+ "socket2 0.5.10",
+ "socketcan",
+]
+
+[[package]]
 name = "litemap"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5024,16 +5038,6 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nix"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfb3ddedaa14746434a02041940495bf11325c22f6d36125d3bdd56090d50a79"
-dependencies = [
- "bitflags 0.4.0",
- "libc",
-]
-
-[[package]]
-name = "nix"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
@@ -5068,6 +5072,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.1",
  "libc",
+ "memoffset 0.9.1",
 ]
 
 [[package]]
@@ -7331,6 +7336,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7427,7 +7442,7 @@ dependencies = [
  "base64 0.22.1",
  "bs58",
  "chrono",
- "hex 0.4.3",
+ "hex",
  "indexmap 1.9.3",
  "indexmap 2.14.0",
  "schemars 0.9.0",
@@ -7699,26 +7714,13 @@ dependencies = [
 
 [[package]]
 name = "socketcan"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3101efc6ef5af6f1c1a488241b469757b7a183baca63af958cd90e4696446c80"
-dependencies = [
- "hex 0.2.0",
- "itertools 0.4.19",
- "libc",
- "nix 0.5.1",
- "try_from",
-]
-
-[[package]]
-name = "socketcan"
 version = "3.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea24328be148eea05f36bc3991b1c174c586853e04d1480b92429b2df6aea865"
 dependencies = [
  "bitflags 2.13.0",
- "embedded-can 0.4.1",
- "hex 0.4.3",
+ "embedded-can",
+ "hex",
  "itertools 0.13.0",
  "libc",
  "log",
@@ -7850,7 +7852,7 @@ dependencies = [
  "dotenvy",
  "either",
  "heck 0.5.0",
- "hex 0.4.3",
+ "hex",
  "once_cell",
  "proc-macro2",
  "quote",
@@ -7888,7 +7890,7 @@ dependencies = [
  "futures-io",
  "futures-util",
  "generic-array",
- "hex 0.4.3",
+ "hex",
  "hkdf",
  "hmac",
  "itoa",
@@ -7931,7 +7933,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "hex 0.4.3",
+ "hex",
  "hkdf",
  "hmac",
  "home",
@@ -8321,7 +8323,7 @@ dependencies = [
  "filedescriptor",
  "finl_unicode",
  "fixedbitset 0.4.2",
- "hex 0.4.3",
+ "hex",
  "lazy_static",
  "libc",
  "log",
@@ -8791,12 +8793,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "try_from"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "923a7ee3e97dbfe8685261beb4511cc9620a1252405d02693d43169729570111"
 
 [[package]]
 name = "ttf-parser"

@@ -43,8 +43,8 @@
 use super::{
   components::models::CloverComponentTrait,
   models::{
-    ModManStore,
-    Module,
+    modules::Module,
+    store::ModManStore,
   },
 };
 use std::sync::Arc;

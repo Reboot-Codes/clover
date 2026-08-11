@@ -1,16 +1,22 @@
+//! # UART Bus Proxy
+//!
+//! <div class="warning">
+//!
+//! To meet a deadline of 2027-01-01, UART support is currently left as broken.
+//!
+//! </div>
+//!
+
 use std::sync::Arc;
 
 use crate::server::modman::busses::models::{
   Bus,
   BusTypes,
 };
-use can;
-use socketcan;
 
-#[derive(Debug, Clone)]
-pub struct CANFDBus {}
+pub struct AppBus {}
 
-impl Bus for CANFDBus {
+impl Bus for AppBus {
   async fn subscribe_to_bus(
     mut self,
     session: Arc<zenoh::Session>,
@@ -19,6 +25,6 @@ impl Bus for CANFDBus {
   }
 
   fn get_type() -> BusTypes {
-    BusTypes::CANFD
+    BusTypes::App
   }
 }

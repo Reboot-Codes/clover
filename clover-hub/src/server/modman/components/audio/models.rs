@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::server::modman::{
   components::models::StreamingConnection,
-  models::GestureConfig,
+  models::gestures::GestureConfig,
 };
 use serde::{
   Deserialize,

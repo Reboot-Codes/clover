@@ -10,8 +10,8 @@ use tracing::{
 use crate::server::{
   modman::{
     models::{
-      CloverComponent,
-      ModManStore,
+      components::CloverComponent,
+      store::ModManStore,
     },
     MODULE_EVT_ID,
   },

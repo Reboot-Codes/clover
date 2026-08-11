@@ -22,31 +22,31 @@ pub enum View {
 
 #[derive(Component)]
 pub struct ViewPosition {
-  x: f64,
-  y: f64,
-  z: f64,
+  pub x: f64,
+  pub y: f64,
+  pub z: f64,
 }
 
 #[derive(Component)]
 pub struct ViewDimensions {
-  x: i64,
-  y: i64,
+  pub x: i64,
+  pub y: i64,
   /// A 0 here will be determined as a 2D view.
-  z: i64,
+  pub z: i64,
 }
 
 #[derive(Component)]
 pub struct ViewMixingProps {
-  visible: bool,
+  pub visible: bool,
 }
 
 /// Each (virtual) display must have a composition attached to it to have frames ready to send.
 #[derive(Component)]
 pub struct Composition {
   /// Holds all Entity Ids for the Views within this Compositon.
-  views: HashMap<String, Entity>,
+  pub views: HashMap<String, Entity>,
   /// Should this composition be trusted with user-focused content? This has nothing to do with being exclusive to CloverHub usage.
-  internal: bool,
+  pub internal: bool,
 }
 
 /// Themes are set for each composition. A ThemeSet can be loaded for each type of composition.

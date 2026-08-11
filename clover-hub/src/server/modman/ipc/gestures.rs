@@ -11,10 +11,12 @@ use tracing::instrument;
 
 use crate::server::modman::{
   models::{
-    GestureCommand,
-    GestureState,
-    GestureStates,
-    ModManStore,
+    gestures::{
+      GestureCommand,
+      GestureState,
+      GestureStates,
+    },
+    store::ModManStore,
   },
   MODULE_EVT_ID,
 };

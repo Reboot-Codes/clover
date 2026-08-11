@@ -25,8 +25,9 @@ ratchet = { path = "./toolbox/ratchet" }
 tesseract = { path = "./core/libs/tesseract" }
 carbon-fiber = { path = "./core/libs/carbon-fiber" }
 
-tokio-util = "0.7.12"
+tokio-util = { version = "0.7.12", features = ["io", "io-util"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11.19"
 serde_json_lenient = "0.2.4"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
@@ -35,6 +36,7 @@ opentelemetry_sdk = "0.32.0"
 opentelemetry-appender-tracing = "0.32.0"
 zenoh = "1.9.0"
 zenoh-ext = { version = "1.9.0", features = ["unstable"] }
+can-iso-tp = "0.2.0"
 
 [workspace.dependencies.tokio]
 version = "1.42.0"

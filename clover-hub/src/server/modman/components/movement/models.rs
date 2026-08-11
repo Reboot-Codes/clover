@@ -1,4 +1,4 @@
-use crate::server::modman::models::{
+use crate::server::modman::models::gestures::{
   GestureConfig,
   GestureParameters,
 };

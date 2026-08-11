@@ -3,10 +3,9 @@ use crate::server::modman::{
     models::StreamingConnection,
     video::VideoResolution,
   },
-  models::GestureConfig,
+  models::gestures::GestureConfig,
 };
 use bevy::prelude::Component;
-use decorum::Real;
 use serde::{
   Deserialize,
   Serialize,
