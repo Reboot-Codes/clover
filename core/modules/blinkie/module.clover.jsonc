@@ -1,6 +1,7 @@
 {
   "name": "C.O.R.E. Blinkie Example",
   "location": "@core.humanoid.chest",
+  "internal": false,
   "components": {
     "light": {
       "type": "indicator",

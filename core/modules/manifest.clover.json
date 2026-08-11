@@ -1,3 +1,4 @@
 {
-  "@base.*": "@import('./*/module.clover.jsonc')"
+  "@base.blinkie": "@import('./blinkie/module.clover.jsonc')",
+  "@base.two-phase-tail": "@import('./two-phase-tail/module.clover.jsonc')"
 }
