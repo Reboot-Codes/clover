@@ -4,7 +4,8 @@
 //!
 
 pub mod bus_manager;
-pub mod lookout;
+pub mod interface_lookout;
+pub mod module_listener;
 
 use std::{
   sync::Arc,
@@ -12,7 +13,7 @@ use std::{
 };
 
 use crate::server::modman::{
-  busses::proxies::group::can_2::lookout::can_lookout_thread,
+  busses::proxies::group::can_2::interface_lookout::can_lookout_thread,
   models::store::ModManStore,
 };
 

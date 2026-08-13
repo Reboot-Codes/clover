@@ -2,6 +2,13 @@
   "name": "C.O.R.E. Blinkie Example",
   "location": "@core.humanoid.chest",
   "internal": false,
+  "connection": {
+    "@default": {
+      "type": "can_2",
+      "tx_id": 201,
+      "rx_id": 101
+    }
+  },
   "components": {
     "light": {
       "type": "indicator",

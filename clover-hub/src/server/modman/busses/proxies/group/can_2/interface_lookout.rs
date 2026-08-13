@@ -5,6 +5,7 @@ use std::{
   thread::sleep as std_sleep,
 };
 
+use crate::server::modman::busses::proxies::group::can_2::bus_manager::can_bus_manager;
 use crate::server::modman::busses::proxies::group::can_2::CAN2Bus;
 
 use nix::net::if_::if_nameindex;
@@ -36,7 +37,8 @@ pub async fn can_lookout_thread(ctx: Arc<CAN2Bus>) {
 
   // Something something tokio task pool is limited.
   std::thread::spawn(|| can_interface_lookout(lookout_ctx, lookout_tx));
-  tokio::task::spawn(async move { can_bus_registrar(registrar_ctx, lookout_rx).await }).await;
+  let _ =
+    tokio::task::spawn(async move { can_bus_registrar(registrar_ctx, lookout_rx).await }).await;
 }
 
 /// Detects network interfaces to try and bind.
@@ -135,23 +137,43 @@ pub async fn can_bus_registrar(ctx: Arc<CAN2Bus>, mut channel: UnboundedReceiver
     if let Some(lookout_event) = channel.recv().await {
       match lookout_event {
         CanLookoutEvent::IFaceCreate(iface_details) => {
-          let (iface_name, iface_index) = iface_details;
+          let (iface_name, _iface_index) = iface_details;
 
           for permitted_iface in can2_config.permitted_interfaces.clone() {
-            if permitted_iface == iface_name {
+            if permitted_iface == iface_name.clone() {
               match bus_registry.get(&iface_name) {
                 Some(_) => {}
                 None => {
                   info!(
-                    "Found configured interface: {}, starting up a CAN bus listener...",
+                    "Found configured interface: {}, starting up a CAN bus manager...",
                     iface_name.clone()
                   );
+
+                  let manager_token = CancellationToken::new();
+                  let manager_ctx = ctx.clone();
+                  let manager_iface_name = iface_name.clone();
+
+                  bus_registry.insert(iface_name.clone(), manager_token.clone());
+
+                  tokio::task::spawn(async move {
+                    can_bus_manager(manager_ctx, manager_token.clone(), manager_iface_name).await;
+                  });
                 }
               }
             }
           }
         }
-        CanLookoutEvent::IFaceDestroy(iface_name) => todo!(),
+        CanLookoutEvent::IFaceDestroy(iface_name) => match bus_registry.get(&iface_name) {
+          Some(manager_token) => {
+            info!("Shutting down CAN 2 bus manager for interface: {iface_name}...");
+            manager_token.cancel();
+          }
+          // We assume that the other branch has loaded values in for the allowed interfaces.
+          // We could do that check again, and error out, but we is lazy.
+          // Also that check would be subject to a race condition if the interface no longer existed while being created,
+          // so we just do nothing.
+          None => {}
+        },
       }
     }
   }
