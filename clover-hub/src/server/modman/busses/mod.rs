@@ -9,10 +9,12 @@ pub mod proxies;
 use super::models::store::ModManStore;
 use log::info;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 pub async fn start_busses(
   store: Arc<ModManStore>,
   session: Arc<zenoh::Session>,
+  cancellation_token: CancellationToken,
 ) -> futures::future::JoinAll<tokio::task::JoinHandle<()>> {
   info!("Starting ModMan Proxy Busses...");
   let mut handles = vec![];
@@ -24,7 +26,19 @@ pub async fn start_busses(
 
   #[cfg(feature = "can_2")]
   handles.push(tokio::task::spawn(async move {
+    use crate::server::modman::busses::proxies::group::can_2::{
+      interface_lookout::can_lookout_thread,
+      CAN2Bus,
+    };
+
+    let ctx = Arc::new(CAN2Bus {
+      session: session.clone(),
+      store: store.clone(),
+      cancellation_token: cancellation_token.clone(),
+    });
+
     info!("Starting CAN 2 A/B Bus...");
+    can_lookout_thread(ctx).await;
   }));
 
   // #[cfg(feature = "bt_classic")]

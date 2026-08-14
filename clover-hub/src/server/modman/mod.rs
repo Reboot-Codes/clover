@@ -88,12 +88,7 @@ pub async fn modman_main(
           let bus_token = cancellation_tokens.0.clone();
           let bus_session = session.clone();
           let bus_handle = tokio::task::spawn(async move {
-            tokio::select! {
-              _ = bus_token.cancelled() => {
-                debug!("bus_handle exited");
-              },
-              _ = start_busses(bus_store, bus_session) => {}
-            }
+            start_busses(bus_store, bus_session, bus_token).await.await;
           });
 
           let init_store = Arc::new(store.clone());

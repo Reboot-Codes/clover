@@ -8,7 +8,6 @@ use embedded_can::Id;
 use linux_socketcan_iso_tp::{
   self,
   flags,
-  IsoTpFlowControlOptions,
   IsoTpKernelOptions,
   IsoTpSocketOptions,
   TokioSocketCanIsoTp,
@@ -142,8 +141,6 @@ pub async fn setup_listener(
   id_tuple: (&str, &str),
   listener_registry: Arc<Mutex<HashMap<String, CancellationToken>>>,
 ) {
-  let mut ret: Option<anyhow::Error> = None;
-
   match parse_id_str(id_tuple.0) {
     Ok(raw_rx_id) => match parse_id_str(id_tuple.1) {
       Ok(raw_tx_id) => {
@@ -198,35 +195,32 @@ pub async fn setup_listener(
                           can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
                         });
                       },
-                      Err(err) => todo!(),
+                      Err(err) => {
+                        error!("Error while binding socketcan port: {} for TX, due to:\n{err}", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
+                      },
                     }
                   },
                   Err(err) => {
-                    ret = Some(err.into());
+                    error!("Error while binding socketcan port: {} for RX, due to:\n{err}", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
                   },
                 }
               },
               Err(err) => {
-                ret = Some(err.into());
+                error!("{err}");
               },
             }
           },
           Err(err) => {
-            ret = Some(err.into());
+            error!("{err}");
           },
         }
       }
       Err(err) => {
-        ret = Some(err.into());
+        error!("Error while parsing the tx id: {}:\n{err}", id_tuple.1);
       }
     },
     Err(err) => {
-      ret = Some(err.into());
+      error!("Error while parsing the rx id: {}:\n{err}", id_tuple.0);
     }
-  }
-
-  match ret {
-    Some(err) => todo!(),
-    None => {}
   }
 }
