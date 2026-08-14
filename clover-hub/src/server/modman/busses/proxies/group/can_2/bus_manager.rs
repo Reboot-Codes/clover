@@ -1,6 +1,7 @@
 use std::{
   collections::HashMap,
   sync::Arc,
+  time::Duration,
 };
 
 use anyhow::anyhow;
@@ -20,6 +21,7 @@ use tracing::{
   error,
   info,
   instrument,
+  warn,
 };
 
 use crate::server::modman::{
@@ -35,7 +37,15 @@ use crate::server::modman::{
 
 #[instrument]
 pub fn parse_id_str(id_str: &str) -> Result<u16, anyhow::Error> {
-  todo!()
+  let digits = id_str
+    .strip_prefix("0x")
+    .or_else(|| id_str.strip_prefix("0X"))
+    .unwrap_or(id_str);
+
+  match u16::from_str_radix(digits, 16) {
+    Ok(val) => Ok(val),
+    Err(err) => Err(err.into()),
+  }
 }
 
 pub fn match_to_str(match_struct: regex::Match<'_>) -> &str {
@@ -52,6 +62,8 @@ pub async fn can_bus_manager(
   let listener_registry: Arc<Mutex<HashMap<String, CancellationToken>>> =
     Arc::new(Mutex::new(HashMap::new()));
 
+  debug!("Now listening for requests for bus: {iface_name}...");
+
   while !cancellation_token.is_cancelled() {
     let port_statuses = can_2_port_status_mutex.lock().await;
     let mut port_statuses_snapshot = Vec::new();
@@ -59,10 +71,9 @@ pub async fn can_bus_manager(
     // Matches against strings like: `"can0/0xFFF:0xFFF"`.
     // This regex does not validate if the specified IDs are within the CAN range though.
     // That's done later by `embedded_can`.
-    let port_specifier_re = Regex::new(
-      r"^(?<iface>(?:\\w|[0-9])+)\\/(?<rx_id>0[xX][0-9a-fA-F]{3}):(?<tx_id>0[xX][0-9a-fA-F]{3})$",
-    )
-    .unwrap();
+    let port_specifier_re =
+      Regex::new(r"^(?<iface>\w+)\/(?<rx_id>0[xX][0-9a-fA-F]{3}):(?<tx_id>0[xX][0-9a-fA-F]{3})$")
+        .unwrap();
 
     // We need to make sure that we're not leaving that mutex locked for too long.
     for port_status in port_statuses.iter() {
@@ -77,32 +88,18 @@ pub async fn can_bus_manager(
       match port_specifier_re.captures(&port_path) {
         Some(re_captures) => {
           // Known good value since the regex is static, and the haystack matched.
-          let requested_iface = re_captures.name("iface").unwrap();
+          let requested_iface = match_to_str(re_captures.get(1).unwrap());
+          let rx_id = match_to_str(re_captures.get(2).unwrap());
+          let tx_id = match_to_str(re_captures.get(3).unwrap());
 
-          if match_to_str(requested_iface) == &iface_name {
+          if requested_iface == &iface_name {
             match port_status {
               PortStatus::Requested(module_id) => {
                 setup_listener(
                   ctx.clone(),
-                  port_path.clone(),
+                  iface_name.clone(),
                   module_id,
-                  (
-                    match_to_str(re_captures.name("rx_id").unwrap()),
-                    match_to_str(re_captures.name("tx_id").unwrap()),
-                  ),
-                  listener_registry.clone(),
-                )
-                .await;
-              }
-              PortStatus::Unavailable(module_id) => {
-                setup_listener(
-                  ctx.clone(),
-                  port_path.clone(),
-                  module_id,
-                  (
-                    match_to_str(re_captures.name("tx_id").unwrap()),
-                    match_to_str(re_captures.name("tx_id").unwrap()),
-                  ),
+                  (rx_id, tx_id),
                   listener_registry.clone(),
                 )
                 .await;
@@ -125,6 +122,9 @@ pub async fn can_bus_manager(
         None => {}
       }
     }
+
+    // We don't wanna obliterate the CPU.
+    tokio::time::sleep(Duration::from_millis(100)).await;
   }
 
   for (module_id, listener_token) in listener_registry.lock().await.iter() {
@@ -141,6 +141,8 @@ pub async fn setup_listener(
   id_tuple: (&str, &str),
   listener_registry: Arc<Mutex<HashMap<String, CancellationToken>>>,
 ) {
+  let mut bound_port = false;
+
   match parse_id_str(id_tuple.0) {
     Ok(raw_rx_id) => match parse_id_str(id_tuple.1) {
       Ok(raw_tx_id) => {
@@ -177,6 +179,8 @@ pub async fn setup_listener(
                       &tx_options
                     ) {
                       Ok(tx_socket) => {
+                        info!("Bound port: {}, for module: {module_id}!", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
+
                         let listener_token = CancellationToken::new();
 
                         listener_registry.lock().await.insert(module_id.clone(), listener_token.clone());
@@ -194,6 +198,8 @@ pub async fn setup_listener(
                         tokio::task::spawn(async move {
                           can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
                         });
+
+                        bound_port = true;
                       },
                       Err(err) => {
                         error!("Error while binding socketcan port: {} for TX, due to:\n{err}", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
@@ -222,5 +228,31 @@ pub async fn setup_listener(
     Err(err) => {
       error!("Error while parsing the rx id: {}:\n{err}", id_tuple.0);
     }
+  }
+
+  if bound_port {
+    debug!(
+      "Letting the rest of ModMan know that: {}, was bound!",
+      format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1)
+    );
+
+    let mut port_statuses = ctx.store.port_statuses.can_2.lock().await;
+
+    port_statuses.insert(
+      format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1),
+      PortStatus::Bound(module_id),
+    );
+  } else {
+    warn!(
+      "Letting the rest of ModMan know that: {}, was not bound.",
+      format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1)
+    );
+
+    let mut port_statuses = ctx.store.port_statuses.can_2.lock().await;
+
+    port_statuses.insert(
+      format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1),
+      PortStatus::Unavailable(module_id),
+    );
   }
 }

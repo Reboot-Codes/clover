@@ -109,6 +109,9 @@ pub fn can_interface_lookout(ctx: Arc<CAN2Bus>, channel: UnboundedSender<CanLook
             }
           }
         }
+
+        // We don't wanna obliterate the CPU.
+        std_sleep(Duration::from_millis(1000));
       }
       Err(err) => {
         if retries == 5 {

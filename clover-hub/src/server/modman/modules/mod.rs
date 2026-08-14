@@ -40,6 +40,8 @@
 //! Similar to Level 3, however, the asymmetric keys are changed constantly to ensure perfect forward secrecy.
 //!
 
+pub mod connections;
+
 use super::{
   components::models::CloverComponentTrait,
   models::{
@@ -47,6 +49,7 @@ use super::{
     store::ModManStore,
   },
 };
+use anyhow::anyhow;
 use std::sync::Arc;
 use tracing::{
   debug,
@@ -125,8 +128,13 @@ pub async fn init_component(
   }
 }
 
-#[instrument(skip(store))]
-pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
+#[instrument(skip(store, session))]
+pub async fn init_module(
+  store: &ModManStore,
+  id: String,
+  module: Module,
+  session: Arc<zenoh::Session>,
+) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut initialized_module_components = 0;
 
@@ -147,44 +155,87 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
     } else {
       let mut critical_failiure = None;
 
-      for (component_id, is_critical) in module.components.iter() {
-        match init_component(
-          &store.clone(),
-          id.clone(),
-          component_id.clone(),
-          is_critical,
-        )
-        .await
-        {
-          Ok(_) => {
-            initialized_module_components += 1;
-          }
-          Err(e) => {
-            if is_critical.to_owned() {
-              critical_failiure = Some((component_id.clone(), e));
-            } else {
-              error!(
-                "Module: {}, Failed to initialize component \"{}\", due to: {}",
-                id.clone(),
-                component_id.clone(),
-                e
-              );
+      match module.connection.clone() {
+        crate::server::modman::connections::ModuleConnection::Simulated(_) => {
+          // TODO: Check for simulation bindings, and load them
+          // Otherwise fail.
+        }
+        crate::server::modman::connections::ModuleConnection::App(app_connection) => {
+          // TODO: App Module binding.
+          critical_failiure = Some(anyhow!(format!(
+            "Module: {id}, failed to bind to app: {app_connection}, due to: Unimplemented.",
+          )));
+        }
+        #[cfg(feature = "can_2")]
+        crate::server::modman::connections::ModuleConnection::CAN2(can2_connection) => {
+          use crate::server::modman::modules::connections::can_2::setup_can_2_connection;
+
+          match setup_can_2_connection(
+            &store,
+            &module,
+            &id,
+            can2_connection.clone(),
+            session.clone(),
+          )
+          .await
+          {
+            Ok(_) => {}
+            Err(err) => {
+              critical_failiure = Some(anyhow!(format!(
+                "Module: {id}, failed to bind CAN 2 bus proxy: {}, due to:\n{err}",
+                format!(
+                  "{}/{}:{}",
+                  can2_connection.bus_id, can2_connection.reply_id, can2_connection.device_id
+                )
+              )));
             }
           }
         }
       }
 
-      debug!("Module: {id}, Done initializing components!");
+      match critical_failiure {
+        None => {
+          for (component_id, is_critical) in module.components.iter() {
+            match init_component(
+              &store.clone(),
+              id.clone(),
+              component_id.clone(),
+              is_critical,
+            )
+            .await
+            {
+              Ok(_) => {
+                initialized_module_components += 1;
+              }
+              Err(e) => {
+                if is_critical.to_owned() {
+                  critical_failiure = Some(anyhow!(format!(
+                    "Module: {id}, failed to initialize critical component: {}, due to: {}",
+                    component_id.clone(),
+                    e
+                  )));
+                } else {
+                  error!(
+                    "Module: {}, Failed to initialize component \"{}\", due to: {}",
+                    id.clone(),
+                    component_id.clone(),
+                    e
+                  );
+                }
+              }
+            }
+          }
+
+          info!("Module: {id}, Done initializing components!");
+        }
+        Some(_) => {
+          warn!("There was a critical failiure when binding the module to the Bus, we're skipping component initialization!");
+        }
+      }
 
       match critical_failiure {
         Some(failiure) => {
-          let (component_id, e) = failiure;
-          error!(
-            "Module: {}, failed to initialize critical component: {}, due to: {}\nSkipping rest of Module init...",
-            id.clone(),
-            component_id,
-            e
-          );
+          error!("{failiure}\nSkipping rest of Module init...");
         }
         Option::None => {
           if initialized_module_components != module.components.len() {
@@ -196,19 +247,19 @@ pub async fn init_module(store: &ModManStore, id: String, module: Module) -> (bo
                 module.components.len()
               );
               initialized_module = true;
+              debug!("Module: {id}, Marked as initialized.");
             } else {
               error!("Module: {}, failed to initialize!", id.clone());
             }
           } else {
             debug!("Finished initializing module.");
             initialized_module = true;
+            debug!("Module: {id}, Marked as initialized.");
           }
         }
       }
     }
   }
-
-  debug!("Module: {id}, Marked as initialized.");
 
   // Update the store with new state of the module.
   if initialized_module {

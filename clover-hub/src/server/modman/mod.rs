@@ -91,6 +91,7 @@ pub async fn modman_main(
             start_busses(bus_store, bus_session, bus_token).await.await;
           });
 
+          let init_session = session.clone();
           let init_store = Arc::new(store.clone());
           let init_results = cancellation_tokens
             .0
@@ -149,8 +150,13 @@ pub async fn modman_main(
               if total_modules > 0 {
                 // Initialize modules that were registered already via configuration and persistence.
                 for (id, module) in modules_to_init.iter() {
-                  let (initialized, _components_initialized) =
-                    init_module(&init_store, id.clone(), module.clone()).await;
+                  let (initialized, _components_initialized) = init_module(
+                    &init_store,
+                    id.clone(),
+                    module.clone(),
+                    init_session.clone(),
+                  )
+                  .await;
 
                   if initialized {
                     modules_initialized += 1;

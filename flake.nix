@@ -196,6 +196,7 @@
               cloverHubCMD
               cloverHubZenoh
               flutter
+              can-utils
             ])
             ++ libraries;
           };

@@ -8,7 +8,8 @@ use serde::{
 pub enum ModuleConnection {
   /// Device ID
   Simulated(String),
-  App(AppConnection),
+  // RFQDN of the App to bind to. Module ID will be passed to the app automatically.
+  App(String),
   /// Bus path and Device ID
   #[cfg(feature = "can_fd")]
   CANFD(CANFDConnection),
@@ -33,12 +34,6 @@ pub enum ModuleConnection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConnection {
-  pub app_id: String,
-  pub device_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CANFDConnection {
   pub bus_id: String,
   pub device_id: String,
@@ -48,6 +43,7 @@ pub struct CANFDConnection {
 pub struct CAN2Connection {
   pub bus_id: String,
   pub device_id: String,
+  pub reply_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

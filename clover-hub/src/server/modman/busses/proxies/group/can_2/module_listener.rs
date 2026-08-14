@@ -55,25 +55,29 @@ pub async fn can_module_rx(
           })
           .await
         {
-          Ok(_) => match rmp_serde::from_slice::<BusMessage>(&payload) {
-            Ok(decoded_payload) => match serde_json::to_string(&decoded_payload) {
-              Ok(json_payload) => match publisher.put(json_payload).await {
-                Ok(_) => {
-                  debug!("Successfully proxied CAN 2 message from module: {module_id}!");
-                }
+          Ok(_) => {
+            if payload.len() > 0 {
+              match rmp_serde::from_slice::<BusMessage>(&payload) {
+                Ok(decoded_payload) => match serde_json::to_string(&decoded_payload) {
+                  Ok(json_payload) => match publisher.put(json_payload).await {
+                    Ok(_) => {
+                      debug!("Successfully proxied CAN 2 message from module: {module_id}!");
+                    }
+                    Err(err) => {
+                      error!("Failed to publish message to Zenoh, at this stage, we've either lost connectivity, or there's a massive problem. (Might be a bug) Due to:\n{err}");
+                    }
+                  },
+                  Err(err) => {
+                    error!("Failed to produce a JSON payload from the decoded message, this is a bug and should be reported! Due to:\n{err}");
+                  }
+                },
                 Err(err) => {
-                  error!("Failed to publish message to Zenoh, at this stage, we've either lost connectivity, or there's a massive problem. (Might be a bug) Due to:\n{err}");
+                  // TODO: Do we want to tell the module that it fucked up?
+                  error!("Invalid message from module: {module_id}, this is a bug (or bad connection) and should (probably) be reported to the module maintainer! Happened due to:\n{err}");
                 }
-              },
-              Err(err) => {
-                error!("Failed to produce a JSON payload from the decoded message, this is a bug and should be reported! Due to:\n{err}");
               }
-            },
-            Err(err) => {
-              // TODO: Do we want to tell the module that it fucked up?
-              error!("Invalid message from module: {module_id}, this is a bug (or bad connection) and should (probably) be reported to the module maintainer! Happened due to:\n{err}");
             }
-          },
+          }
           Err(err) => match err {
             RecvError::BufferTooSmall { needed, got } => {
               error!(
@@ -95,6 +99,8 @@ pub async fn can_module_rx(
         // I trust rustc, but also we need to save memory!!!
         drop(payload);
       }
+
+      debug!("Shutting down CAN 2 RX thread.");
     }
     Err(err) => {
       error!("Unable to create a zenoh broadcaster at: {key_expr}, there's probably an error in your configuration. Due to:\n{err}");
@@ -207,6 +213,8 @@ pub async fn can_module_tx(
           }
         }
       }
+
+      debug!("Shutting down CAN 2 TX thread.");
     }
     Err(err) => {
       error!("Unable to create a zenoh queryable at: {key_expr}, there's probably an error in your configuration. Due to:\n{err}");
