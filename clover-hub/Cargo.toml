@@ -107,3 +107,4 @@ rodio = "0.20.1"
 serde_bytes = { workspace = true }
 strum_macros = "0.28.0"
 embedded-can = "0.4.1"
+can-isotp-interface = "0.1.0"

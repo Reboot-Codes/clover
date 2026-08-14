@@ -7,7 +7,10 @@ use anyhow::anyhow;
 use embedded_can::Id;
 use linux_socketcan_iso_tp::{
   self,
+  flags,
+  IsoTpFlowControlOptions,
   IsoTpKernelOptions,
+  IsoTpSocketOptions,
   TokioSocketCanIsoTp,
 };
 use regex::Regex;
@@ -22,7 +25,10 @@ use tracing::{
 
 use crate::server::modman::{
   busses::proxies::group::can_2::{
-    module_listener::can_bus_listener,
+    module_listener::{
+      can_module_rx,
+      can_module_tx,
+    },
     CAN2Bus,
   },
   models::PortStatus,
@@ -141,7 +147,14 @@ pub async fn setup_listener(
   match parse_id_str(id_tuple.0) {
     Ok(raw_rx_id) => match parse_id_str(id_tuple.1) {
       Ok(raw_tx_id) => {
-        let options = IsoTpKernelOptions::default();
+        let rx_options = IsoTpKernelOptions::default();
+        let tx_options = IsoTpKernelOptions {
+          socket: IsoTpSocketOptions {
+            flags: flags::CAN_ISOTP_LISTEN_MODE,
+            ..Default::default()
+          },
+          ..Default::default()
+        };
 
         match embedded_can::StandardId::new(raw_rx_id).ok_or(anyhow!(
           "We expect that an RX ID of {}, is valid. Check your config or there's a bug in manifest validation!",
@@ -157,16 +170,36 @@ pub async fn setup_listener(
                   &iface_name,
                   Id::Standard(rx_id),
                   Id::Standard(tx_id),
-                  &options,
+                  &rx_options,
                 ) {
-                  Ok(socket) => {
-                    let listener_token = CancellationToken::new();
+                  Ok(rx_socket) => {
+                    match TokioSocketCanIsoTp::open(
+                      &iface_name,
+                      Id::Standard(rx_id),
+                      Id::Standard(tx_id),
+                      &tx_options
+                    ) {
+                      Ok(tx_socket) => {
+                        let listener_token = CancellationToken::new();
 
-                    listener_registry.lock().await.insert(module_id.clone(), listener_token.clone());
+                        listener_registry.lock().await.insert(module_id.clone(), listener_token.clone());
 
-                    tokio::task::spawn(async move {
-                      can_bus_listener(ctx.clone(), listener_token.clone(), module_id, socket).await
-                    });
+                        let rx_session = ctx.session.clone();
+                        let rx_token = listener_token.clone();
+                        let rx_id = module_id.clone();
+                        tokio::task::spawn(async move {
+                          can_module_rx(rx_session, rx_token, rx_socket, rx_id).await;
+                        });
+
+                        let tx_session = ctx.session.clone();
+                        let tx_token = listener_token.clone();
+                        let tx_id = module_id.clone();
+                        tokio::task::spawn(async move {
+                          can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
+                        });
+                      },
+                      Err(err) => todo!(),
+                    }
                   },
                   Err(err) => {
                     ret = Some(err.into());

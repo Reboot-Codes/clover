@@ -2104,6 +2104,7 @@ dependencies = [
  "bluer",
  "bollard",
  "can-iso-tp",
+ "can-isotp-interface",
  "chrono",
  "clap",
  "clover-hub-macros",
