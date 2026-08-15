@@ -32,7 +32,7 @@ We also plan to make pre-built binaries available through a Nix cache to cut dow
 
 ## License, Disclaimer, and Other Legal Preface
 
-C.L.O.V.E.R.'s primary orchestration process(es, a.k.a. CloverHub), reference API implementations (Tesseract, CarbonSteel), management software (Ratchet, Screwdriver), hardware (C.O.R.E.), and documentation are licensed under the GNU Affero General Public License version 3. CloverHub ships with or will download a copy of the repository it was built from to run C.O.R.E. and ensure AGPL compliance.
+C.L.O.V.E.R.'s primary orchestration process(es, a.k.a. CloverHub), reference API implementations (Tesseract, CarbonSteel, CarbonFiber), management software (Spanner), hardware (C.O.R.E.), and documentation are licensed under the GNU Affero General Public License version 3. CloverHub ships with or will download a copy of the repository it was built from to run C.O.R.E. and ensure AGPL compliance.
 
 Software developed with any reference API implementations (Tesseract, CarbonSteel) may be covered under the AGPL as well. ***This is not legal advice***, but a notice to developers who may be considering building for C.L.O.V.E.R., that you may be required to publish your source code in accordance with the AGPL if you choose to make your software publicly accessable at all.
 

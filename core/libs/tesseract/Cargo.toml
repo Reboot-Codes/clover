@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 quote = "1.0.38"
-serde = "1.0.217"
+serde = { workspace = true }
 syn = "2.0.93"
-tokio = "1.42.0"
+tokio = { workspace = true }

@@ -186,17 +186,28 @@
               toolchain
             ]
             ++ (with pkgs; [
-              nodejs_22
-              yarn-berry
+              # Dev tools
               rust-analyzer
               tokio-console
               zenoh
               process-compose
+
+              # Run scripts
               cloverCompose
               cloverHubCMD
               cloverHubZenoh
+
+              # Docs
+              nodejs_22
+              yarn-berry
+
+              # Spanner
               flutter
+
+              # Embedded
               can-utils
+              probe-rs-tools
+              elf2uf2-rs
             ])
             ++ libraries;
           };

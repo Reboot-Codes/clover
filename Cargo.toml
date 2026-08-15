@@ -1,3 +1,5 @@
+cargo-features = ["per-package-target"]
+
 [workspace]
 resolver = "2"
 
@@ -7,6 +9,7 @@ members = [
   "toolbox/carbon-steel",
   "core/libs/tesseract",
   "core/libs/carbon-fiber",
+  "core/modules/blinkie",
 ]
 
 # [profile.dev]
