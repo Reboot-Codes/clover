@@ -8,10 +8,31 @@ rustflags = [
   "tokio_unstable"
 ]
 
+# For RP2040
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 # runner = "probe-rs run --chip RP2040" # for jtag
 runner = "elf2uf2-rs --deploy --serial --verbose" # for elf2uf2
 
 rustflags = [
   "-C", "panic=abort",
+]
+
+# This and the next is for ESP32
+[target.'cfg(target_arch = "riscv32")']
+runner    = "espflash flash --monitor"
+rustflags = [
+  "-C", "link-arg=-Tlinkall.x",
+  "-C", "force-frame-pointers",
+]
+
+[target.'cfg(target_arch = "xtensa")']
+runner    = "espflash flash --monitor"
+rustflags = [
+  # GNU LD
+  "-C", "link-arg=-Wl,-Tlinkall.x",
+  "-C", "link-arg=-nostartfiles",
+
+  # LLD
+  # "-C", "link-arg=-Tlinkall.x",
+  # "-C", "linker=rust-lld",
 ]

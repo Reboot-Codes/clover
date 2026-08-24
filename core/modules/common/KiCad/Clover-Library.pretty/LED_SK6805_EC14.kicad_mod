@@ -1,0 +1,224 @@
+(footprint "LED_SK6805_EC14"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "sk6805-ec14-3")
+	(tags "Integrated Circuit")
+	(property "Reference" "IC**"
+		(at 0 1.3 0)
+		(layer "F.SilkS")
+		(uuid "95970b25-29aa-478b-a5ce-1f4edf6719a1")
+		(effects
+			(font
+				(size 0.5 0.5)
+				(thickness 0.254)
+			)
+		)
+	)
+	(property "Value" "LED_SK6805_EC14"
+		(at 0 0 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "074a6fce-ecb9-4c7a-acf2-bbcc414ac1cd")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.254)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "e9bcecac-c7ef-4cfe-9763-a93d6fc783a3")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "81e46887-fe67-433c-a8e9-de4f14b0750c")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -0.45 -1.2)
+		(end -0.45 -1.2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "c9669ace-9606-4ba1-88c8-b8a40a810550")
+	)
+	(fp_line
+		(start -0.45 -1.1)
+		(end -0.45 -1.1)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "5018c9ef-5041-4bb2-b282-f30356f3f736")
+	)
+	(fp_arc
+		(start -0.45 -1.2)
+		(mid -0.4 -1.15)
+		(end -0.45 -1.1)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "362563d1-7693-4881-a085-1e5b33e24c50")
+	)
+	(fp_arc
+		(start -0.45 -1.1)
+		(mid -0.5 -1.15)
+		(end -0.45 -1.2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "2808ca43-e033-4c50-917c-bd485cac1c05")
+	)
+	(fp_line
+		(start -0.8 -0.8)
+		(end 0.8 -0.8)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "af7210c0-7e6a-4e45-be8e-415f6873a453")
+	)
+	(fp_line
+		(start -0.8 0.8)
+		(end -0.8 -0.8)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "df559869-4227-4c6e-b27a-0f0a6c8a768b")
+	)
+	(fp_line
+		(start 0.8 -0.8)
+		(end 0.8 0.8)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "940de1cd-a5d0-4447-a501-dffa335502da")
+	)
+	(fp_line
+		(start 0.8 0.8)
+		(end -0.8 0.8)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "694f31e3-6170-49ee-81ff-bdc3d469c9fd")
+	)
+	(fp_line
+		(start -0.7 -0.7)
+		(end 0.7 -0.7)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "9da81838-9771-43ba-a2fa-42dac11b0828")
+	)
+	(fp_line
+		(start -0.7 0.7)
+		(end -0.7 -0.7)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "06d1f982-3f28-4ca0-99c9-c4bdab9766a9")
+	)
+	(fp_line
+		(start 0.7 -0.7)
+		(end 0.7 0.7)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "ac09fc19-44a5-4fab-9389-78c4d4dacf7e")
+	)
+	(fp_line
+		(start 0.7 0.7)
+		(end -0.7 0.7)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "f39f1514-0f60-409f-8a7e-278ebe78d726")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 3 0)
+		(layer "F.Fab")
+		(uuid "3c515bd0-aa9b-4fe6-b939-e0e33b57e418")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.254)
+			)
+		)
+	)
+	(pad "1" smd rect
+		(at -0.45 -0.45 90)
+		(size 0.5 0.5)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "ad645017-b6cc-49a3-8597-c3399a20f23b")
+	)
+	(pad "2" smd rect
+		(at -0.45 0.45 90)
+		(size 0.5 0.5)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "1bed81eb-8ec6-40b8-98a9-a91dee7bcc68")
+	)
+	(pad "3" smd rect
+		(at 0.45 0.45 90)
+		(size 0.5 0.5)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "6e7e4ae2-280e-460e-a51f-30c9187d6a22")
+	)
+	(pad "4" smd rect
+		(at 0.45 -0.45 90)
+		(size 0.5 0.5)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "497e490c-623f-43e6-be21-094f9c165812")
+	)
+	(embedded_fonts no)
+	(model "/home/reboot/dev/clover/core/modules/common/KiCad/3D/LED_SK6805_EC14.stp"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz -90 -0 -0)
+		)
+	)
+)
