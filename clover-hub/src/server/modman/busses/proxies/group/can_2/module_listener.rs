@@ -22,10 +22,8 @@ use zenoh_ext::{
   CacheConfig,
 };
 
-use crate::server::modman::{
-  busses::models::BusMessage,
-  MODULE_EVT_ID,
-};
+use crate::server::modman::MODULE_EVT_ID;
+use carbon_fiber::comms::models::BusMessage;
 
 #[instrument(skip(session, cancellation_token, socket))]
 pub async fn can_module_rx(

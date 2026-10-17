@@ -1,0 +1,77 @@
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+  // Determine whether rustdoc is currently using a dark theme
+  function isDarkTheme() {
+    const theme =
+      document.documentElement.dataset.theme ||
+      localStorage.getItem('rustdoc-theme') ||
+      '';
+
+    if (theme.includes('dark') || theme.includes('ayu')) {
+      return true;
+    }
+    if (theme.includes('light')) {
+      return false;
+    }
+    // Fallback to system preference if rustdoc is set to follow system
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function renderMermaid() {
+    const dark = isDarkTheme();
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: dark ? 'dark' : 'default',
+      // Optional: align background with rustdoc theme
+      themeVariables: {
+        darkMode: dark,
+        background: dark ? '#353535' : '#ffffff',
+      }
+    });
+
+    // Replace rustdoc code blocks with container divs
+    document.querySelectorAll("pre.language-mermaid, pre > code.language-mermaid").forEach((elem) => {
+      const target = elem.tagName === 'CODE' ? elem.parentElement : elem;
+
+      // Prevent double-processing
+      if (target.dataset.mermaidProcessed) return;
+      target.dataset.mermaidProcessed = "true";
+
+      const container = document.createElement("div");
+      container.className = "mermaid";
+      container.textContent = elem.textContent;
+      target.replaceWith(container);
+    });
+
+    mermaid.run();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    renderMermaid();
+
+    // Re-render when the user toggles the theme picker in rustdoc
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'attributes' && (mutation.attributeName === 'data-theme' || mutation.attributeName === 'class')) {
+          // Re-evaluate mermaid on theme toggle
+          document.querySelectorAll('.mermaid').forEach((el) => {
+            // Restore original text so mermaid can parse it fresh
+            if (el.dataset.rawCode) {
+              el.textContent = el.dataset.rawCode;
+              el.removeAttribute('data-processed');
+            } else {
+              el.dataset.rawCode = el.textContent;
+            }
+          });
+          renderMermaid();
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'class'],
+    });
+  });
+</script>

@@ -1,16 +1,29 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-pub fn add(left: u64, right: u64) -> u64 {
-  left + right
-}
+pub mod adoption;
+pub mod alerts;
+pub mod commands;
+pub mod models;
+pub mod module;
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
+const fn parse_u8(s: &str) -> u8 {
+  let bytes = s.as_bytes();
+  let mut val: u8 = 0;
+  let mut i = 0;
+  while i < bytes.len() {
+    let digit = bytes[i] - b'0';
+    val = val * 10 + digit;
+    i += 1;
   }
+  val
 }
+
+pub const PROTOCOL_VERSION_MAJOR: u8 = parse_u8(env!("CARGO_PKG_VERSION_MAJOR"));
+pub const PROTOCOL_VERSION_MINOR: u8 = parse_u8(env!("CARGO_PKG_VERSION_MINOR"));
+pub const PROTOCOL_VERSION_PATCH: u8 = parse_u8(env!("CARGO_PKG_VERSION_PATCH"));
+
+pub const PROTOCOL_VERSION: (u8, u8, u8) = (
+  PROTOCOL_VERSION_MAJOR,
+  PROTOCOL_VERSION_MINOR,
+  PROTOCOL_VERSION_PATCH,
+);

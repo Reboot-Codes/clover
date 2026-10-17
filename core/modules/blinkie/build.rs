@@ -9,28 +9,33 @@
 //! new memory settings.
 
 use std::env;
-use std::fs::File;
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 fn main() {
-  // Put `memory.x` in our output directory and ensure it's
-  // on the linker search path.
-  let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
-  File::create(out.join("memory.x"))
-    .unwrap()
-    .write_all(include_bytes!("memory.x"))
-    .unwrap();
-  println!("cargo:rustc-link-search={}", out.display());
+  let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
   // By default, Cargo will re-run a build script whenever
   // any file in the project changes. By specifying `memory.x`
   // here, we ensure the build script is only re-run when
   // `memory.x` is changed.
-  println!("cargo:rerun-if-changed=memory.x");
+  if env::var("CARGO_FEATURE_PICO_1").is_ok() {
+    fs::write(out.join("memory.x"), include_bytes!("rp2040_memory.x")).unwrap();
+  } else if env::var("CARGO_FEATURE_PICO_2").is_ok() {
+    fs::write(out.join("memory.x"), include_bytes!("rp235x_memory.x")).unwrap();
+  }
+
+  println!("cargo:rustc-link-search={}", out.display());
+
+  println!("cargo:rerun-if-env-changed=CARGO_FEATURE_PICO_1");
+  println!("cargo:rerun-if-env-changed=CARGO_FEATURE_PICO_2");
+  println!("cargo:rerun-if-changed=rp2040_memory.x");
+  println!("cargo:rerun-if-changed=rp235x_memory.x");
 
   println!("cargo:rustc-link-arg-bins=--nmagic");
   println!("cargo:rustc-link-arg-bins=-Tlink.x");
-  println!("cargo:rustc-link-arg-bins=-Tlink-rp.x");
+  if env::var("CARGO_FEATURE_PICO_1").is_ok() {
+    println!("cargo:rustc-link-arg-bins=-Tlink-rp.x");
+  }
   println!("cargo:rustc-link-arg-bins=-Tdefmt.x");
 }

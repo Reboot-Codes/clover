@@ -27,6 +27,8 @@ targets = [
   # WebAssembly
   "wasm32-unknown-unknown",
 
+  # Pi Pico 1
+  "thumbv6m-none-eabi",
   # Pi Pico 2
-  "thumbv6m-none-eabi"
+  "thumbv8m.main-none-eabihf"
 ]

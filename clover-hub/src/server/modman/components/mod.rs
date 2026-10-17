@@ -4,6 +4,7 @@
 //!
 
 pub mod audio;
+pub mod indicators;
 pub mod models;
 pub mod movement;
 pub mod sensors;

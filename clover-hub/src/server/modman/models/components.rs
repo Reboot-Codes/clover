@@ -14,12 +14,10 @@ use crate::server::modman::{
       AudioInputComponent,
       AudioOutputComponent,
     },
+    indicators::models::IndicatorComponent,
     models::CloverComponentTrait,
     movement::models::MovementComponent,
-    sensors::models::{
-      IndicatorComponent,
-      SensorComponent,
-    },
+    sensors::models::SensorComponent,
     video::{
       cameras::models::CameraComponent,
       displays::models::{

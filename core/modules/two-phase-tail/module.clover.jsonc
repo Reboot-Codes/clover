@@ -1,25 +1,16 @@
 {
-  // Display name when running through config flows
-  "name": "C.O.R.E. Two-Phase Tail",
-  "location": "@core.humanoid.pelvis.waist",
+  "name": "C.O.R.E. Blinkie Example",
+  "location": "@core.humanoid.chest",
   "internal": false,
-  // define all components. they will be available as the next url segment after com.reboot-codes.clover.CORE.3-phase-tail.components
+  "connection": {
+    "@default": {
+      "type": "can_2",
+      "tx_id": 201,
+      "rx_id": 101
+    }
+  },
   "components": {
-    // EG: com.reboot-codes.clover.CORE.3-phase-tail.components.phase-1-motor-1 for this component
-    "phase-1": {
-      // Permission model grouping and optimizations
-      "type": "movement",
-      // Data type, in this case, each message must contain 2 floats.
-      "input": "vec2d",
-      // Data type, this phase has a position reporting function and will send a 2D vector back regularly
-      "output": "vec2d"
-    },
-    "phase-2": {
-      "type": "movement",
-      "input": "vec2d",
-      "output": "vec2d"
-    },
-    "tip-light": {
+    "light": {
       "type": "indicator",
       "input": "rgba"
     }
