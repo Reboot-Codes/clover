@@ -16,9 +16,9 @@ pub struct StagedTarget {
   pub flags: Option<GestureFlags>,
 }
 
-/// In memory state tracker for components.
+/// In memory state tracker for Command Components.
 #[derive(Debug, Clone, Copy)]
-pub struct ComponentPipeline {
+pub struct CommandComponentPipeline {
   /// Used to backtrack to the previous state of the module.
   pub prev_target: Option<StagedTarget>,
   /// The current target,
@@ -28,7 +28,7 @@ pub struct ComponentPipeline {
   pub paused: bool,
 }
 
-impl ComponentPipeline {
+impl CommandComponentPipeline {
   pub const fn new() -> Self {
     Self {
       prev_target: None,

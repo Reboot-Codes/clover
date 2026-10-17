@@ -1,5 +1,5 @@
 use crate::commands::module::{
-  components::ComponentPipeline,
+  components::CommandComponentPipeline,
   interpolation::Interpolation,
 };
 
@@ -24,5 +24,5 @@ where
   pub tentacle_cfg: Option<TentacleConfig>,
   pub kinematic_parent: Option<u8>,
   pub interpolator: I,
-  pub pipeline: ComponentPipeline,
+  pub pipeline: CommandComponentPipeline,
 }

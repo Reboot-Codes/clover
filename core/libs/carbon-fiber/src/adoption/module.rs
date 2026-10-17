@@ -24,15 +24,15 @@ use crate::{
   commands::module::ModuleCommandContext,
 };
 
+/// Convinience struct for modules waiting to be adopted.
+/// It generally calls on utility functions to do cryptographic
+/// maths, and as such, requires the vendor struct.
 pub struct ModuleAdoptionContext<'a> {
   pub module_id: &'a str,
   pub module_rfqdn: &'a str,
   pub pin: [u8; 6],
 }
 
-/// Convinience struct for modules waiting to be adopted.
-/// It generally calls on utility functions to do cryptographic
-/// maths, and as such, requires the vendor struct.
 impl<'a> ModuleAdoptionContext<'a> {
   pub fn new() -> Self {
     todo!();

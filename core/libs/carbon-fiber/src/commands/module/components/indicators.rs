@@ -1,19 +1,15 @@
-use crate::{
-  commands::{
-    models::components::indicators::IndicatorComponent,
-    module::{
-      CommandComponent,
-      components::ComponentPipeline,
-      interpolation::{
-        Interpolation,
-        LinearInterpolation,
-        SmoothInterpolation,
-      },
+use crate::commands::{
+  models::components::indicators::IndicatorComponent,
+  module::{
+    CommandComponent,
+    CommandComponentBuilder,
+    components::CommandComponentPipeline,
+    interpolation::{
+      CubicInterpolation,
+      Interpolation,
+      LinearInterpolation,
+      SmoothInterpolation,
     },
-  },
-  module::component::{
-    Component,
-    ComponentTypes,
   },
 };
 
@@ -22,34 +18,18 @@ impl IndicatorComponent<LinearInterpolation> {
     IndicatorComponent {
       id: id,
       interpolator: LinearInterpolation::new(),
-      pipeline: ComponentPipeline::new(),
+      pipeline: CommandComponentPipeline::new(),
     }
   }
 }
 
-impl<I: Interpolation> IndicatorComponent<I> {
-  pub fn neopixels_pin(self) -> Self {
-    todo!()
-  }
-}
-
-impl<I: Interpolation> Component for IndicatorComponent<I> {
-  fn new<C: Component>(id: u8) -> C {
-    todo!()
-  }
-
-  fn id(&self) -> u8 {
-    todo!()
-  }
-
-  fn type_of() -> ComponentTypes {
-    ComponentTypes::Command
-  }
-}
-
 impl<I: Interpolation> CommandComponent for IndicatorComponent<I> {
+  fn id(&self) -> u8 {
+    self.id
+  }
+
   fn on_target(
-    self,
+    &mut self,
     target: crate::commands::models::components::ComponentTarget,
     transition_ms: u16,
     flags: Option<crate::commands::models::components::GestureFlags>,
@@ -59,7 +39,7 @@ impl<I: Interpolation> CommandComponent for IndicatorComponent<I> {
   }
 
   fn step(
-    self,
+    &mut self,
     dt_ms: u32,
   ) -> Option<(
     [u8; 16],
@@ -68,10 +48,12 @@ impl<I: Interpolation> CommandComponent for IndicatorComponent<I> {
     todo!()
   }
 
-  fn backtrack(self, return_ms: u16) {
-    todo!()
+  fn backtrack(&mut self, return_ms: u16) {
+    self.pipeline.backtrack(return_ms);
   }
+}
 
+impl<I: Interpolation> CommandComponentBuilder for IndicatorComponent<I> {
   type WithInterpolator<NewI: Interpolation> = IndicatorComponent<NewI>;
 
   fn interpolate_with<NewI: Interpolation>(
@@ -99,5 +81,25 @@ impl<I: Interpolation> CommandComponent for IndicatorComponent<I> {
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
     }
+  }
+
+  fn interpolate_cubic(
+    self,
+    x1: u16,
+    y1: u16,
+    x2: u16,
+    y2: u16,
+  ) -> Self::WithInterpolator<crate::commands::module::interpolation::CubicInterpolation> {
+    IndicatorComponent {
+      id: self.id,
+      interpolator: CubicInterpolation::new(x1, y1, x2, y2),
+      pipeline: self.pipeline,
+    }
+  }
+}
+
+impl<I: Interpolation> IndicatorComponent<I> {
+  pub fn neopixels_pin(self) -> Self {
+    todo!()
   }
 }

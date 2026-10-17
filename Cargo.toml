@@ -10,6 +10,7 @@ members = [
   "core/libs/tesseract",
   "core/libs/carbon-fiber",
   "core/modules/blinkie",
+  "core/modules/two-phase-tail",
 ]
 
 # [profile.dev]
