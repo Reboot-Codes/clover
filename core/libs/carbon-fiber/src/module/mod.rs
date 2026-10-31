@@ -4,6 +4,19 @@ use crate::{
     models::components::ComponentTarget,
     module::CommandComponent,
   },
+  module::comms::{
+    CommsBus,
+    CommsToModule,
+    CommsWorker,
+    ModuleChannels,
+    ModuleToComms,
+  },
+};
+
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::channel::{
+  Receiver,
+  Sender,
 };
 
 pub mod comms;
@@ -12,25 +25,22 @@ pub mod rand;
 
 pub struct Module<
   'a,
-  B,
   const MAX_COMMAND_COMPONENTS: usize = 8,
   const MAX_ALERT_COMPONENTS: usize = 8,
 > {
-  bus: B,
-  command_components: [Option<&'a mut dyn CommandComponent>; MAX_COMMAND_COMPONENTS],
-  alert_components: [Option<&'a mut dyn AlertComponent>; MAX_ALERT_COMPONENTS],
-  count: usize,
+  pub command_components: [Option<&'a mut dyn CommandComponent>; MAX_COMMAND_COMPONENTS],
+  pub alert_components: [Option<&'a mut dyn AlertComponent>; MAX_ALERT_COMPONENTS],
+  pub count: usize,
 }
 
-impl<'a, B, const MAX_COMMAND_COMPONENTS: usize, const MAX_ALERT_COMPONENTS: usize>
-  Module<'a, B, MAX_COMMAND_COMPONENTS, MAX_ALERT_COMPONENTS>
+impl<'a, const MAX_COMMAND_COMPONENTS: usize, const MAX_ALERT_COMPONENTS: usize>
+  Module<'a, MAX_COMMAND_COMPONENTS, MAX_ALERT_COMPONENTS>
 {
   const NONE_CMD: Option<&'a mut dyn CommandComponent> = None;
   const NONE_ALERT: Option<&'a mut dyn AlertComponent> = None;
 
-  pub const fn new(bus: B) -> Self {
+  pub const fn new() -> Self {
     Self {
-      bus,
       command_components: [Self::NONE_CMD; MAX_COMMAND_COMPONENTS],
       alert_components: [Self::NONE_ALERT; MAX_ALERT_COMPONENTS],
       count: 0,
@@ -65,4 +75,34 @@ impl<'a, B, const MAX_COMMAND_COMPONENTS: usize, const MAX_ALERT_COMPONENTS: usi
       }
     }
   }
+
+  pub fn build<Bus: CommsBus>(
+    self,
+    bus: Bus,
+    channels: &'static ModuleChannels<8, 16>,
+  ) -> (
+    CommsWorker<Bus>,
+    ModuleWorker<'a, MAX_COMMAND_COMPONENTS, MAX_ALERT_COMPONENTS>,
+  ) {
+    (
+      CommsWorker {
+        bus,
+        rx_from_module: channels.to_comms.receiver(),
+        tx_to_module: channels.to_module.sender(),
+      },
+      ModuleWorker {
+        module: self,
+        rx_from_comms: channels.to_module.receiver(),
+        tx_to_comms: channels.to_comms.sender(),
+      },
+    )
+  }
+}
+
+/// Core 0: Owns the components and physical hardware pins.
+/// Runs exclusively on the Core 0 local thread.
+pub struct ModuleWorker<'a, const MAX_CMDS: usize, const MAX_ALERTS: usize> {
+  pub module: Module<'a, MAX_CMDS, MAX_ALERTS>,
+  pub rx_from_comms: Receiver<'static, CriticalSectionRawMutex, CommsToModule, 8>,
+  pub tx_to_comms: Sender<'static, CriticalSectionRawMutex, ModuleToComms, 16>,
 }

@@ -1,7 +1,9 @@
-pub mod audio;
-pub mod displays;
+//! # All Command Components
+
+pub mod display;
 pub mod indicators;
 pub mod movement;
+pub mod speaker;
 
 use serde::{
   Deserialize,

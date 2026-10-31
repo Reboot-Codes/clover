@@ -1,3 +1,5 @@
+//! # Self Test Message Data
+
 use serde::{
   Deserialize,
   Serialize,

@@ -1,8 +1,5 @@
 use crate::commands::{
-  models::components::movement::{
-    MovementComponent,
-    TentacleConfig,
-  },
+  models::components::movement::MovementComponent,
   module::{
     CommandComponent,
     CommandComponentBuilder,
@@ -26,21 +23,15 @@ impl MovementComponent<(), (), (), (), (), (), SmoothInterpolation> {
       actuator4: None,
       actuator5: None,
       actuator6: None,
-      tentacle_cfg: None,
-      kinematic_parent: None,
       interpolator: SmoothInterpolation {},
       pipeline: CommandComponentPipeline::new(),
     }
   }
 }
 
-impl<P1, P2, P3, P4, P5, P6, I: Interpolation> MovementComponent<P1, P2, P3, P4, P5, P6, I> {
-  pub fn tentacle(mut self, config: TentacleConfig) -> Self {
-    self.tentacle_cfg = Some(config);
-    self
-  }
-
-  pub fn degree1_servo<NewP1>(self, pin: NewP1) -> MovementComponent<NewP1, P2, P3, P4, P5, P6, I> {
+impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4, A5, A6, I> {
+  /// Set the Actuator for the 1st degree of freedom (x).
+  pub fn set_degree1<NewP1>(self, pin: NewP1) -> MovementComponent<NewP1, A2, A3, A4, A5, A6, I> {
     MovementComponent {
       id: self.id,
       actuator1: Some(pin),
@@ -49,33 +40,84 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> MovementComponent<P1, P2, P3, P4,
       actuator4: self.actuator4,
       actuator5: self.actuator5,
       actuator6: self.actuator6,
-      tentacle_cfg: self.tentacle_cfg,
-      kinematic_parent: self.kinematic_parent,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
     }
   }
 
-  pub fn degree2_servo(mut self, pin: P2) -> Self {
-    self.actuator2 = Some(pin);
-    self
+  /// Set the Actuator for the 2nd degree of freedom (y).
+  pub fn set_degree2<NewP2>(self, pin: NewP2) -> MovementComponent<A1, NewP2, A3, A4, A5, A6, I> {
+    MovementComponent {
+      id: self.id,
+      actuator1: self.actuator1,
+      actuator2: Some(pin),
+      actuator3: self.actuator3,
+      actuator4: self.actuator4,
+      actuator5: self.actuator5,
+      actuator6: self.actuator6,
+      interpolator: self.interpolator,
+      pipeline: self.pipeline,
+    }
   }
 
-  pub fn degree3_servo(mut self, pin: P3) -> Self {
-    self.actuator3 = Some(pin);
-    self
+  /// Set the Actuator for the 3rd degree of freedom (z).
+  pub fn set_degree3<NewP3>(self, pin: NewP3) -> MovementComponent<A1, A2, NewP3, A4, A5, A6, I> {
+    MovementComponent {
+      id: self.id,
+      actuator1: self.actuator1,
+      actuator2: self.actuator2,
+      actuator3: Some(pin),
+      actuator4: self.actuator4,
+      actuator5: self.actuator5,
+      actuator6: self.actuator6,
+      interpolator: self.interpolator,
+      pipeline: self.pipeline,
+    }
   }
-  pub fn degree4_servo(mut self, pin: P4) -> Self {
-    self.actuator4 = Some(pin);
-    self
+
+  /// Set the Actuator for the 4th degree of freedom (u).
+  pub fn set_degree4<NewP4>(self, pin: NewP4) -> MovementComponent<A1, A2, A3, NewP4, A5, A6, I> {
+    MovementComponent {
+      id: self.id,
+      actuator1: self.actuator1,
+      actuator2: self.actuator2,
+      actuator3: self.actuator3,
+      actuator4: Some(pin),
+      actuator5: self.actuator5,
+      actuator6: self.actuator6,
+      interpolator: self.interpolator,
+      pipeline: self.pipeline,
+    }
   }
-  pub fn degree5_servo(mut self, pin: P5) -> Self {
-    self.actuator5 = Some(pin);
-    self
+
+  /// Set the Actuator for the 5th degree of freedom (v).
+  pub fn set_degree5<NewP5>(self, pin: NewP5) -> MovementComponent<A1, A2, A3, A4, NewP5, A6, I> {
+    MovementComponent {
+      id: self.id,
+      actuator1: self.actuator1,
+      actuator2: self.actuator2,
+      actuator3: self.actuator3,
+      actuator4: self.actuator4,
+      actuator5: Some(pin),
+      actuator6: self.actuator6,
+      interpolator: self.interpolator,
+      pipeline: self.pipeline,
+    }
   }
-  pub fn degree6_servo(mut self, pin: P6) -> Self {
-    self.actuator6 = Some(pin);
-    self
+
+  /// Set the Actuator for the 6th degree of freedom (w).
+  pub fn set_degree6<NewP6>(self, pin: NewP6) -> MovementComponent<A1, A2, A3, A4, A5, NewP6, I> {
+    MovementComponent {
+      id: self.id,
+      actuator1: self.actuator1,
+      actuator2: self.actuator2,
+      actuator3: self.actuator3,
+      actuator4: self.actuator4,
+      actuator5: self.actuator5,
+      actuator6: Some(pin),
+      interpolator: self.interpolator,
+      pipeline: self.pipeline,
+    }
   }
 }
 
@@ -125,8 +167,6 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator4: self.actuator4,
       actuator5: self.actuator5,
       actuator6: self.actuator6,
-      tentacle_cfg: self.tentacle_cfg,
-      kinematic_parent: self.kinematic_parent,
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
     }
@@ -141,8 +181,6 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator4: self.actuator4,
       actuator5: self.actuator5,
       actuator6: self.actuator6,
-      tentacle_cfg: self.tentacle_cfg,
-      kinematic_parent: self.kinematic_parent,
       interpolator: LinearInterpolation::new(),
       pipeline: self.pipeline,
     }
@@ -160,8 +198,6 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator4: self.actuator4,
       actuator5: self.actuator5,
       actuator6: self.actuator6,
-      tentacle_cfg: self.tentacle_cfg,
-      kinematic_parent: self.kinematic_parent,
       interpolator,
       pipeline: self.pipeline,
     }
@@ -182,8 +218,6 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator4: self.actuator4,
       actuator5: self.actuator5,
       actuator6: self.actuator6,
-      tentacle_cfg: self.tentacle_cfg,
-      kinematic_parent: self.kinematic_parent,
       interpolator: CubicInterpolation::new(x1, y1, x2, y2),
       pipeline: self.pipeline,
     }

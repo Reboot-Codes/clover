@@ -1,5 +1,9 @@
+//! # Command Component Implementations and Helpers
+
+pub mod display;
 pub mod indicators;
 pub mod movement;
+pub mod speaker;
 
 use crate::commands::models::components::{
   ComponentFaliure,
@@ -9,6 +13,7 @@ use crate::commands::models::components::{
 };
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct StagedTarget {
   pub transaction_id: [u8; 16],
   pub target: ComponentTarget,
@@ -18,6 +23,7 @@ pub struct StagedTarget {
 
 /// In memory state tracker for Command Components.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandComponentPipeline {
   /// Used to backtrack to the previous state of the module.
   pub prev_target: Option<StagedTarget>,

@@ -4,6 +4,12 @@
 pub mod blinker;
 pub mod comms;
 
+use carbon_fiber::commands::models::components::indicators::{
+  BinaryIndicator,
+  IndicatorComponent,
+};
+use carbon_fiber::module::Module;
+use carbon_fiber::module::comms::ModuleChannels;
 use core::cell::RefCell;
 use core::ptr::addr_of_mut;
 use defmt::*;
@@ -40,11 +46,10 @@ use crate::{
 pub type SpiBus =
   Mutex<CriticalSectionRawMutex, RefCell<Spi<'static, SPI0, embassy_rp::spi::Blocking>>>;
 
+static CHANNELS: StaticCell<ModuleChannels<8, 16>> = StaticCell::new();
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-  // Clear any stale spinlock state from previous debug sessions
-  embassy_rp::pac::SIO.spinlock(31).write_value(0);
-
   let p = embassy_rp::init(Default::default());
 
   info!("Starting up com.reboot-codes.clover.CORE.blinky...");
@@ -79,6 +84,17 @@ async fn main(spawner: Spawner) {
       })
     },
   );
+
+  let channels = CHANNELS.init(ModuleChannels::new());
+
+  let mut light_comp = IndicatorComponent::new(
+    0,
+    BinaryIndicator::new(Output::new(p.PIN_25, Level::low), false),
+  );
+
+  let (comms, module) = Module::new()
+    .add_command_component(&mut light_comp)
+    .build(None, channels);
 
   spawner
     .spawn(blinker_thread(Output::new(p.PIN_25, Level::Low)))

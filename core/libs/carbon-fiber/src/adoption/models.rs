@@ -1,3 +1,6 @@
+//! # Common Data Structures and Constants for Adoption
+//!
+
 use serde::{
   Deserialize,
   Serialize,

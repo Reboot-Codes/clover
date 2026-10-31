@@ -1,3 +1,6 @@
+//! # Module Specific Command Component Types and Code
+
+pub mod components;
 pub mod interpolation;
 
 use crate::commands::{
@@ -18,8 +21,6 @@ use crate::commands::{
     },
   },
 };
-
-pub mod components;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -71,6 +72,11 @@ impl<const NUM_COMPONENTS: usize> ModuleCommandContext<NUM_COMPONENTS> {
 pub trait CommandComponent {
   /// Get the ID of the component
   fn id(&self) -> u8;
+
+  // The default behavior when the module is asked to self-test.
+  fn self_test(&mut self) -> Result<(), ComponentFaliure> {
+    Ok(())
+  }
 
   /// Called by CarbonFiber when a new target arrives from the comms thread.
   fn on_target(

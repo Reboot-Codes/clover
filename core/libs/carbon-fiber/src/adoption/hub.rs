@@ -1,3 +1,10 @@
+//! # Hub-Specific Adoption Code
+//!
+//! For simplicity, adoption crypto and data structures are
+//! fully defined in the CarbonFiber crate to make testing and
+//! updates easier.
+//!
+
 use crate::{
   adoption::models::{
     AbortionReason,

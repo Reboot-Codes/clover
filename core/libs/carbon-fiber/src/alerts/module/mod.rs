@@ -1,4 +1,9 @@
-use crate::commands::models::components::ComponentTelemetry;
+//! # Module Specific Alert Component Types and Code
+
+pub mod components;
+pub mod sensitivity;
+
+use crate::alerts::models::components::AlertMessage;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -9,7 +14,7 @@ pub trait AlertComponent {
   fn id(&self) -> u8;
 
   /// Get the current status of the component if the status has sufficently changed.
-  fn get_status(&self) -> Option<ComponentTelemetry>;
+  fn get_status(&self) -> Option<AlertMessage>;
 }
 
 pub trait AlertComponentBuilder {}
