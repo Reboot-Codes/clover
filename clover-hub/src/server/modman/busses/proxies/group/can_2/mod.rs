@@ -3,6 +3,7 @@
 //! The primary proxy bus for Clover.
 //!
 
+pub mod adoption;
 pub mod bus_manager;
 pub mod interface_lookout;
 pub mod module_listener;

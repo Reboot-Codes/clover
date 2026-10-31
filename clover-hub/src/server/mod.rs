@@ -105,7 +105,10 @@ pub async fn server_main(
         Ok(_) => {
           debug!("initializing Stores...");
           let renderer_store = RendererStore::new(Some(warehouse_store.config.clone()));
-          let modman_store = ModManStore::new(Some(warehouse_store.config.clone()));
+          let modman_store = ModManStore::new(
+            Some(warehouse_store.config.clone()),
+            Some(warehouse_store.repos.clone()),
+          );
           let inference_engine_store =
             InferenceEngineStore::new(Some(warehouse_store.config.clone()));
           let appd_store = AppDStore::new(Some(warehouse_store.config.clone()));

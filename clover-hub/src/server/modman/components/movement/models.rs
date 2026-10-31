@@ -17,45 +17,45 @@ pub enum ConnectionType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position2D {
-  x: f64,
-  y: f64,
+  pub x: f64,
+  pub y: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position3D {
-  x: f64,
-  y: f64,
-  z: f64,
+  pub x: f64,
+  pub y: f64,
+  pub z: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position4D {
-  x: f64,
-  y: f64,
-  z: f64,
+  pub x: f64,
+  pub y: f64,
+  pub z: f64,
 
-  u: f64,
+  pub u: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position5D {
-  x: f64,
-  y: f64,
-  z: f64,
+  pub x: f64,
+  pub y: f64,
+  pub z: f64,
 
-  u: f64,
-  v: f64,
+  pub u: f64,
+  pub v: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position6D {
-  x: f64,
-  y: f64,
-  z: f64,
+  pub x: f64,
+  pub y: f64,
+  pub z: f64,
 
-  u: f64,
-  v: f64,
-  w: f64,
+  pub u: f64,
+  pub v: f64,
+  pub w: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,50 +64,51 @@ pub enum DegreesOfFreedom {
   TwoDegrees(Position2D),
   ThreeDegrees(Position3D),
   FourDegrees(Position4D),
+  FiveDegrees(Position5D),
   SixDegrees(Position6D),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GestureParamsPosition2D {
-  x: GestureParameters,
-  y: GestureParameters,
+  pub x: GestureParameters,
+  pub y: GestureParameters,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GestureParamsPosition3D {
-  x: GestureParameters,
-  y: GestureParameters,
-  z: GestureParameters,
+  pub x: GestureParameters,
+  pub y: GestureParameters,
+  pub z: GestureParameters,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GestureParamsPosition4D {
-  x: GestureParameters,
-  y: GestureParameters,
-  z: GestureParameters,
+  pub x: GestureParameters,
+  pub y: GestureParameters,
+  pub z: GestureParameters,
 
-  u: GestureParameters,
+  pub u: GestureParameters,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GestureParamsPosition5D {
-  x: GestureParameters,
-  y: GestureParameters,
-  z: GestureParameters,
+  pub x: GestureParameters,
+  pub y: GestureParameters,
+  pub z: GestureParameters,
 
-  u: GestureParameters,
-  v: GestureParameters,
+  pub u: GestureParameters,
+  pub v: GestureParameters,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GestureParamsPosition6D {
-  x: GestureParameters,
-  y: GestureParameters,
-  z: GestureParameters,
+  pub x: GestureParameters,
+  pub y: GestureParameters,
+  pub z: GestureParameters,
 
-  u: GestureParameters,
-  v: GestureParameters,
-  w: GestureParameters,
+  pub u: GestureParameters,
+  pub v: GestureParameters,
+  pub w: GestureParameters,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +117,7 @@ pub enum DegreesOfFreedomGestureParams {
   TwoDegrees(GestureParamsPosition2D),
   ThreeDegrees(GestureParamsPosition3D),
   FourDegrees(GestureParamsPosition4D),
+  FiveDegrees(GestureParamsPosition5D),
   SixDegrees(GestureParamsPosition6D),
 }
 

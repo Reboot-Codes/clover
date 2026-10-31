@@ -26,6 +26,7 @@ use tracing::{
 
 use crate::server::modman::{
   busses::proxies::group::can_2::{
+    adoption::run_can2_adoption_handshake,
     module_listener::{
       can_module_rx,
       can_module_tx,
@@ -105,15 +106,17 @@ pub async fn can_bus_manager(
                 .await;
               }
               PortStatus::Unrequested(module_id) => {
-                match listener_registry.lock().await.get(&module_id) {
-                  Some(listener_token) => {
-                    info!("Shutting down CAN 2 listener for Module: {module_id}...");
-                    listener_token.cancel();
-                  }
-                  None => {
-                    error!("Listener for Module: {module_id}, was asked to be unbound, but there's no listener for that module; this is a bug and should be reported!");
-                  }
+                let mut registry = listener_registry.lock().await;
+                if let Some(listener_token) = registry.remove(&module_id) {
+                  info!("Shutting down CAN 2 listener for Module: {module_id}...");
+                  listener_token.cancel();
+                } else {
+                  error!("Listener for Module: {module_id}, was asked to be unbound, but there's no listener for that module; this is a bug and should be reported!");
                 }
+                drop(registry);
+
+                let mut port_statuses = ctx.store.port_statuses.can_2.lock().await;
+                port_statuses.insert(port_path.clone(), PortStatus::Unavailable(module_id));
               }
               _ => {}
             }
@@ -143,6 +146,21 @@ pub async fn setup_listener(
 ) {
   let mut bound_port = false;
 
+  let expected_rfqdn = {
+    let modules = ctx.store.modules.lock().await;
+    if let Some(m) = modules.get(&module_id) {
+      m.module_type.clone()
+    } else {
+      let cfg = ctx.store.config.lock().await;
+      cfg
+        .modman
+        .static_modules
+        .get(&module_id)
+        .map(|m| m.module_type.clone())
+        .unwrap_or_default()
+    }
+  };
+
   match parse_id_str(id_tuple.0) {
     Ok(raw_rx_id) => match parse_id_str(id_tuple.1) {
       Ok(raw_tx_id) => {
@@ -171,44 +189,76 @@ pub async fn setup_listener(
                   Id::Standard(tx_id),
                   &rx_options,
                 ) {
-                  Ok(rx_socket) => {
+                  Ok(mut rx_socket) => {
                     match TokioSocketCanIsoTp::open(
                       &iface_name,
                       Id::Standard(rx_id),
                       Id::Standard(tx_id),
-                      &tx_options
+                      &tx_options,
                     ) {
-                      Ok(tx_socket) => {
-                        info!("Bound port: {}, for module: {module_id}!", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
+                      Ok(mut tx_socket) => {
+                        match run_can2_adoption_handshake(
+                          &mut rx_socket,
+                          &mut tx_socket,
+                          &module_id,
+                          &expected_rfqdn,
+                          [0u8; 6],
+                          Duration::from_millis(500),
+                        )
+                        .await
+                        {
+                          Ok(_) => {
+                            info!(
+                              "Bound port: {}, for module: {module_id}!",
+                              format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1)
+                            );
 
-                        let listener_token = CancellationToken::new();
+                            let listener_token = CancellationToken::new();
 
-                        listener_registry.lock().await.insert(module_id.clone(), listener_token.clone());
+                            listener_registry
+                              .lock()
+                              .await
+                              .insert(module_id.clone(), listener_token.clone());
 
-                        let rx_session = ctx.session.clone();
-                        let rx_token = listener_token.clone();
-                        let rx_id = module_id.clone();
-                        tokio::task::spawn(async move {
-                          can_module_rx(rx_session, rx_token, rx_socket, rx_id).await;
-                        });
+                            let rx_session = ctx.session.clone();
+                            let rx_token = listener_token.clone();
+                            let rx_id = module_id.clone();
+                            let rx_store = ctx.store.clone();
+                            tokio::task::spawn(async move {
+                              can_module_rx(rx_session, rx_token, rx_socket, rx_id, rx_store).await;
+                            });
 
-                        let tx_session = ctx.session.clone();
-                        let tx_token = listener_token.clone();
-                        let tx_id = module_id.clone();
-                        tokio::task::spawn(async move {
-                          can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
-                        });
+                            let tx_session = ctx.session.clone();
+                            let tx_token = listener_token.clone();
+                            let tx_id = module_id.clone();
+                            tokio::task::spawn(async move {
+                              can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
+                            });
 
-                        bound_port = true;
-                      },
+                            bound_port = true;
+                          }
+                          Err(err) => {
+                            error!(
+                              "Failed adoption handshake for module: {module_id} on {iface_name}/{}:{}: {err}",
+                              id_tuple.0, id_tuple.1
+                            );
+                          }
+                        }
+                      }
                       Err(err) => {
-                        error!("Error while binding socketcan port: {} for TX, due to:\n{err}", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
-                      },
+                        error!(
+                          "Error while binding socketcan port: {} for TX, due to:\n{err}",
+                          format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1)
+                        );
+                      }
                     }
-                  },
+                  }
                   Err(err) => {
-                    error!("Error while binding socketcan port: {} for RX, due to:\n{err}", format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1));
-                  },
+                    error!(
+                      "Error while binding socketcan port: {} for RX, due to:\n{err}",
+                      format!("{iface_name}/{}:{}", id_tuple.0, id_tuple.1)
+                    );
+                  }
                 }
               },
               Err(err) => {

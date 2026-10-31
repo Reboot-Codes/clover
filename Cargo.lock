@@ -2034,7 +2034,7 @@ dependencies = [
 
 [[package]]
 name = "carbon_fiber"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "can-iso-tp",
  "cortex-m",

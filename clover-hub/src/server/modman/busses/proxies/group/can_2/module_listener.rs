@@ -22,15 +22,23 @@ use zenoh_ext::{
   CacheConfig,
 };
 
-use crate::server::modman::MODULE_EVT_ID;
-use carbon_fiber::comms::models::BusMessage;
+use crate::server::modman::{
+  models::store::ModManStore,
+  MODULE_EVT_ID,
+};
+use carbon_fiber::{
+  alerts::models::components::AlertMessage,
+  comms::models::BusMessage,
+  module::comms::ModuleToComms,
+};
 
-#[instrument(skip(session, cancellation_token, socket))]
+#[instrument(skip(session, cancellation_token, socket, store))]
 pub async fn can_module_rx(
   session: Arc<zenoh::Session>,
   cancellation_token: CancellationToken,
   mut socket: TokioSocketCanIsoTp,
   module_id: String,
+  store: Arc<ModManStore>,
 ) {
   let key_expr = format!("{MODULE_EVT_ID}/modules/by-id/{}/recv", &module_id);
 
@@ -55,6 +63,49 @@ pub async fn can_module_rx(
         {
           Ok(_) => {
             if payload.len() > 0 {
+              // Check for AlertMessage directly, inside ModuleToComms, or inside BusMessage::Content
+              let alert_opt: Option<AlertMessage> = if let Ok(BusMessage::Content(ref raw)) =
+                postcard::from_bytes::<BusMessage>(&payload)
+              {
+                if let Ok(ModuleToComms::Alert(alert)) =
+                  postcard::from_bytes::<ModuleToComms>(raw.data)
+                {
+                  Some(alert)
+                } else if let Ok(alert) = postcard::from_bytes::<AlertMessage>(raw.data) {
+                  Some(alert)
+                } else {
+                  None
+                }
+              } else if let Ok(ModuleToComms::Alert(alert)) =
+                postcard::from_bytes::<ModuleToComms>(&payload)
+              {
+                Some(alert)
+              } else if let Ok(alert) = postcard::from_bytes::<AlertMessage>(&payload) {
+                Some(alert)
+              } else {
+                None
+              };
+
+              if let Some(ref alert) = alert_opt {
+                let comp_id_str = {
+                  let modules = store.modules.lock().await;
+                  modules
+                    .get(&module_id)
+                    .and_then(|m| m.components.get(alert.component_id as usize))
+                    .map(|(c_id, _)| c_id.clone())
+                    .unwrap_or_else(|| format!("{module_id}/component_{}", alert.component_id))
+                };
+                let alert_key_expr =
+                  format!("{MODULE_EVT_ID}/components/by-id/{comp_id_str}/alerts");
+                if let Ok(alert_json) = serde_json::to_string(&alert) {
+                  if let Err(err) = session.put(&alert_key_expr, alert_json).await {
+                    warn!("Failed to publish alert to {alert_key_expr}: {err}");
+                  } else {
+                    debug!("Published alert for component {comp_id_str} to {alert_key_expr}");
+                  }
+                }
+              }
+
               match postcard::from_bytes::<BusMessage>(&payload) {
                 Ok(decoded_payload) => match serde_json::to_string(&decoded_payload) {
                   Ok(json_payload) => match publisher.put(json_payload).await {
@@ -70,8 +121,14 @@ pub async fn can_module_rx(
                   }
                 },
                 Err(err) => {
-                  // TODO: Do we want to tell the module that it fucked up?
-                  error!("Invalid message from module: {module_id}, this is a bug (or bad connection) and should (probably) be reported to the module maintainer! Happened due to:\n{err}");
+                  // If payload was an alert or ModuleToComms, publish it to recv as well
+                  if let Ok(mod_to_comms) = postcard::from_bytes::<ModuleToComms>(&payload) {
+                    if let Ok(json_payload) = serde_json::to_string(&mod_to_comms) {
+                      let _ = publisher.put(json_payload).await;
+                    }
+                  } else {
+                    error!("Invalid message from module: {module_id}, this is a bug (or bad connection) and should (probably) be reported to the module maintainer! Happened due to:\n{err}");
+                  }
                 }
               }
             }
@@ -159,14 +216,27 @@ pub async fn can_module_tx(
                       {
                         Ok(_) => {
                           debug!("Successfully sent CAN 2 message to module: {module_id}!");
+                          let _ = query.reply(&key_expr, r#"{"status":"sent"}"#).await;
                         }
                         Err(err) => {
                           error!("Unable to send message to CAN 2 socket due to:\n{err:#?}");
+                          let _ = query
+                            .reply(
+                              &key_expr,
+                              &format!(r#"{{"status":"error","message":"{err:?}"}}"#),
+                            )
+                            .await;
                         }
                       }
                     }
                     Err(err) => {
                       error!("Could not turn the BusMessage into a valid Postcard byte array, this is a bug and should be reported! Due to:\n{err}");
+                      let _ = query
+                        .reply(
+                          &key_expr,
+                          &format!(r#"{{"status":"error","message":"{err}"}}"#),
+                        )
+                        .await;
                     }
                   },
                   Err(err) => {

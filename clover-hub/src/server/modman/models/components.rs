@@ -65,30 +65,106 @@ pub enum CloverComponent {
 
 impl CloverComponentTrait for CloverComponent {
   /// Passes the context to the inner-component function implementation.
-  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+  async fn init(
+    &mut self,
+    store: Arc<ModManStore>,
+    module_id: &str,
+    component_id: &str,
+    session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
     match self {
-      CloverComponent::AudioInputComponent(component) => component.init(store.clone()).await,
-      CloverComponent::AudioOutputComponent(component) => component.init(store.clone()).await,
-      CloverComponent::MovementComponent(component) => component.init(store.clone()).await,
-      CloverComponent::SensorComponent(component) => component.init(store.clone()).await,
-      CloverComponent::IndicatorComponent(component) => component.init(store.clone()).await,
-      CloverComponent::CameraComponent(component) => component.init(store.clone()).await,
-      CloverComponent::PhysicalDisplayComponent(component) => component.init(store.clone()).await,
-      CloverComponent::VirtualDisplayComponent(component) => component.init(store.clone()).await,
+      CloverComponent::AudioInputComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::AudioOutputComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::MovementComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::SensorComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::IndicatorComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::CameraComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::PhysicalDisplayComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::VirtualDisplayComponent(component) => {
+        component
+          .init(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
     }
   }
 
   /// Passes the context to the inner-component function implementation.
-  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+  async fn deinit(
+    &mut self,
+    store: Arc<ModManStore>,
+    module_id: &str,
+    component_id: &str,
+    session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
     match self {
-      CloverComponent::AudioInputComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::AudioOutputComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::MovementComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::SensorComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::IndicatorComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::CameraComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::PhysicalDisplayComponent(component) => component.deinit(store.clone()).await,
-      CloverComponent::VirtualDisplayComponent(component) => component.deinit(store.clone()).await,
+      CloverComponent::AudioInputComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::AudioOutputComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::MovementComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::SensorComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::IndicatorComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::CameraComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::PhysicalDisplayComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
+      CloverComponent::VirtualDisplayComponent(component) => {
+        component
+          .deinit(store.clone(), module_id, component_id, session.clone())
+          .await
+      }
     }
   }
 }

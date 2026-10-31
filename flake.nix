@@ -182,6 +182,12 @@
           craneLib.devShell {
             inherit buildInputs;
 
+            LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
+
+            shellHook = ''
+              export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath libraries}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            '';
+
             packages = [
               toolchain
             ]

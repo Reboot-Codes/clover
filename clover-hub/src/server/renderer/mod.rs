@@ -108,6 +108,12 @@ pub async fn renderer_main(
           let bevy_thread =
             std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
 
+          // Signal that the renderer engine has initialized and is accepting displays
+          status_publisher
+            .put("ready:engine")
+            .await
+            .unwrap_or_else(|e| error!("Failed to publish renderer status: {e}"));
+
           // let display_handles = Arc::new(HashMap::new());
 
           let init_session = session.clone();

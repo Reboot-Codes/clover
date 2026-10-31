@@ -23,7 +23,13 @@ use rodio::{
 use std::sync::Arc;
 
 impl CloverComponentTrait for AudioInputComponent {
-  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+  async fn init(
+    &mut self,
+    _store: Arc<ModManStore>,
+    _module_id: &str,
+    _component_id: &str,
+    _session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
     let mut ret = Ok(());
 
     match self.connection.clone() {
@@ -106,13 +112,36 @@ impl CloverComponentTrait for AudioInputComponent {
     return ret;
   }
 
-  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
-    todo!()
+  async fn deinit(
+    &mut self,
+    _store: Arc<ModManStore>,
+    _module_id: &str,
+    _component_id: &str,
+    _session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
+    match self.connection.clone() {
+      ConnectionType::Direct(direct_connection) => {
+        debug!("Deinitializing direct audio input device: {}", direct_connection.device_id);
+        self.connection = ConnectionType::Direct(DirectConnection {
+          device_id: direct_connection.device_id,
+          connection: None,
+        });
+        Ok(())
+      }
+      ConnectionType::ModManProxy => todo!(),
+      ConnectionType::Stream(_) => todo!(),
+    }
   }
 }
 
 impl CloverComponentTrait for AudioOutputComponent {
-  async fn init(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
+  async fn init(
+    &mut self,
+    _store: Arc<ModManStore>,
+    _module_id: &str,
+    _component_id: &str,
+    _session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
     let mut ret = Ok(());
 
     match self.connection.clone() {
@@ -196,7 +225,24 @@ impl CloverComponentTrait for AudioOutputComponent {
     return ret;
   }
 
-  async fn deinit(&mut self, store: Arc<ModManStore>) -> Result<(), anyhow::Error> {
-    todo!()
+  async fn deinit(
+    &mut self,
+    _store: Arc<ModManStore>,
+    _module_id: &str,
+    _component_id: &str,
+    _session: Arc<zenoh::Session>,
+  ) -> Result<(), anyhow::Error> {
+    match self.connection.clone() {
+      ConnectionType::Direct(direct_connection) => {
+        debug!("Deinitializing direct audio output device: {}", direct_connection.device_id);
+        self.connection = ConnectionType::Direct(DirectConnection {
+          device_id: direct_connection.device_id,
+          connection: None,
+        });
+        Ok(())
+      }
+      ConnectionType::ModManProxy => todo!(),
+      ConnectionType::Stream(_) => todo!(),
+    }
   }
 }

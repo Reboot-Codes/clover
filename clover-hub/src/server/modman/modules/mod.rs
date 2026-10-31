@@ -59,12 +59,13 @@ use tracing::{
   warn,
 };
 
-#[instrument(skip(store))]
+#[instrument(skip(store, session))]
 pub async fn init_component(
   store: &ModManStore,
   module_id: String,
   component_id: String,
   is_critical: &bool,
+  session: Arc<zenoh::Session>,
 ) -> Result<(), anyhow::Error> {
   let components = store.components.lock().await;
   let mut failiure = None;
@@ -90,7 +91,15 @@ pub async fn init_component(
         );
       }
 
-      let component_initialized = match component.init(Arc::new(store.clone())).await {
+      let component_initialized = match component
+        .init(
+          Arc::new(store.clone()),
+          &module_id,
+          &component_id,
+          session.clone(),
+        )
+        .await
+      {
         Ok(_) => true,
         Err(e) => {
           failiure = Some(e);
@@ -201,6 +210,7 @@ pub async fn init_module(
               id.clone(),
               component_id.clone(),
               is_critical,
+              session.clone(),
             )
             .await
             {
@@ -294,12 +304,13 @@ pub async fn init_module(
   (initialized_module, initialized_module_components)
 }
 
-#[instrument(skip(store))]
+#[instrument(skip(store, session))]
 pub async fn deinit_component(
   store: &ModManStore,
   module_id: String,
   component_id: String,
   is_critical: &bool,
+  session: Arc<zenoh::Session>,
 ) -> Result<(), anyhow::Error> {
   let components = store.components.lock().await;
   let mut failiure = None;
@@ -325,7 +336,15 @@ pub async fn deinit_component(
         );
       }
 
-      let component_initialized = match component.deinit(Arc::new(store.clone())).await {
+      let component_initialized = match component
+        .deinit(
+          Arc::new(store.clone()),
+          &module_id,
+          &component_id,
+          session.clone(),
+        )
+        .await
+      {
         Ok(_) => true,
         Err(e) => {
           failiure = Some(e);
@@ -358,8 +377,13 @@ pub async fn deinit_component(
   }
 }
 
-#[instrument(skip(store))]
-pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (bool, usize) {
+#[instrument(skip(store, session))]
+pub async fn deinit_module(
+  store: &ModManStore,
+  id: String,
+  module: Module,
+  session: Arc<zenoh::Session>,
+) -> (bool, usize) {
   let mut initialized_module = module.initialized;
   let mut deinitialized_module_components = 0;
 
@@ -386,6 +410,7 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
           id.clone(),
           component_id.clone(),
           is_critical,
+          session.clone(),
         )
         .await
         {
@@ -439,27 +464,37 @@ pub async fn deinit_module(store: &ModManStore, id: String, module: Module) -> (
   }
 
   if !initialized_module {
-    // Update the store with new state of the module.
-    if !initialized_module {
-      store.modules.lock().await.insert(
-        id.clone(),
-        Module {
-          module_type: module.module_type.clone(),
-          module_name: module.module_name.clone(),
-          custom_name: module.custom_name.clone(),
-          initialized: false,
-          components: module.components.clone(),
-          registered_by: module.registered_by.clone(),
-          connection: module.connection.clone(),
-        },
-      );
-
-      info!(
-        "Module: {} ({}), Deinitialized!",
-        module.get_name(),
-        id.clone()
-      );
+    // Teardown the module's bus connection
+    match module.connection.clone() {
+      #[cfg(feature = "can_2")]
+      crate::server::modman::connections::ModuleConnection::CAN2(can2_connection) => {
+        use crate::server::modman::modules::connections::can_2::teardown_can_2_connection;
+        if let Err(err) = teardown_can_2_connection(store, &id, can2_connection).await {
+          error!("Module: {id}, failed to teardown CAN 2 connection: {err}");
+        }
+      }
+      _ => {}
     }
+
+    // Update the store with new state of the module.
+    store.modules.lock().await.insert(
+      id.clone(),
+      Module {
+        module_type: module.module_type.clone(),
+        module_name: module.module_name.clone(),
+        custom_name: module.custom_name.clone(),
+        initialized: false,
+        components: module.components.clone(),
+        registered_by: module.registered_by.clone(),
+        connection: module.connection.clone(),
+      },
+    );
+
+    info!(
+      "Module: {} ({}), Deinitialized!",
+      module.get_name(),
+      id.clone()
+    );
   }
 
   (!initialized_module, deinitialized_module_components)

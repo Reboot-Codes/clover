@@ -200,6 +200,10 @@ pub struct RawDirectorySpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawModuleSpec {
   pub name: Option<String>,
+  #[serde(default)]
+  pub location: Option<String>,
+  #[serde(default)]
+  pub internal: OptionalSingleManifestSpecEntry<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,8 +245,10 @@ pub struct RawRepoCreds {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawGesturePackSpec {
   pub name: Option<String>,
-  //#[serde(default)]
-  //pub gestures: OptionalListManifestSpecEntry<RawGestureSpec>,
+  #[serde(default)]
+  pub description: Option<String>,
+  #[serde(default)]
+  pub gestures: OptionalListManifestSpecEntry<RawGestureSpec>,
 }
 
 #[cfg(feature = "core")]
@@ -250,6 +256,7 @@ pub struct RawGesturePackSpec {
 #[serde(untagged)]
 pub enum RawGestureSpec {
   RawStaticGestureSpec(RawStaticGestureSpec),
+  RawDynamicGestureSpec(RawDynamicGestureSpec),
 }
 
 #[cfg(feature = "core")]
@@ -257,6 +264,41 @@ pub enum RawGestureSpec {
 pub struct RawStaticGestureSpec {
   #[serde(rename = "static-url")]
   pub static_url: String,
+}
+
+#[cfg(feature = "core")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RawDynamicGestureSpec {
+  pub name: Option<String>,
+  #[serde(default)]
+  pub configs: OptionalListManifestSpecEntry<RawArchetypeTargetSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RawArchetypeTargetSpec {
+  #[serde(default)]
+  pub targets: OptionalListManifestSpecEntry<RawAreaTargetSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RawAreaTargetSpec {
+  #[serde(rename = "@animation", default)]
+  pub animation: OptionalSingleManifestSpecEntry<RawAnimationSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RawAnimationSpec {
+  #[serde(rename = "type", default)]
+  pub anim_type: Option<String>,
+  #[serde(default)]
+  pub curve: Option<String>,
+  #[serde(default)]
+  pub duration: Option<f64>,
+  #[serde(default)]
+  pub keyframes: Option<serde_json::Value>,
 }
 
 // ---------- ***COMPILED*** Manifest Entry Types Start Here ----------
@@ -287,6 +329,10 @@ pub struct DirectorySpec {
 pub struct ModuleSpec {
   #[serde(default)]
   pub name: OptionalString,
+  #[serde(default)]
+  pub location: OptionalString,
+  #[serde(default)]
+  pub internal: OptionalBoolean,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ManifestCompile)]
@@ -312,8 +358,10 @@ pub struct ContainerSpec {
 pub struct GesturePackSpec {
   #[serde(default)]
   pub name: OptionalString,
-  //#[serde(default)]
-  //pub gestures: OptionalStrTHashMap<GestureSpec>,
+  #[serde(default)]
+  pub description: OptionalString,
+  #[serde(default)]
+  pub gestures: OptionalStrTHashMap<GestureSpec>,
 }
 
 #[cfg(feature = "core")]
@@ -321,12 +369,49 @@ pub struct GesturePackSpec {
 #[serde(untagged)]
 pub enum GestureSpec {
   StaticGestureSpec(StaticGestureSpec),
+  DynamicGestureSpec(DynamicGestureSpec),
 }
 
 #[cfg(feature = "core")]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
 pub struct StaticGestureSpec {
   pub static_url: RequiredString,
+}
+
+#[cfg(feature = "core")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
+pub struct DynamicGestureSpec {
+  #[serde(default)]
+  pub name: OptionalString,
+  #[serde(default)]
+  pub configs: OptionalStrTHashMap<ArchetypeTargetSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
+pub struct ArchetypeTargetSpec {
+  #[serde(default)]
+  pub targets: OptionalStrTHashMap<AreaTargetSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
+pub struct AreaTargetSpec {
+  #[serde(rename = "@animation", default)]
+  pub animation: Optional<AnimationSpec>,
+}
+
+#[cfg(feature = "core")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ManifestCompile)]
+pub struct AnimationSpec {
+  #[serde(rename = "type", default)]
+  pub anim_type: OptionalString,
+  #[serde(default)]
+  pub curve: OptionalString,
+  #[serde(default)]
+  pub duration: Option<f64>,
+  #[serde(default)]
+  pub keyframes: Option<serde_json::Value>,
 }
 
 /// Used in conjunction with the [clover_hub_macros] crate provide a function to compile possibly disjointed manifest files into a single object in-memory.
@@ -340,4 +425,24 @@ pub trait ManifestCompilationFrom<T> {
   where
     Self: Sized,
     T: for<'a> Deserialize<'a>;
+}
+
+impl ManifestCompilationFrom<Option<f64>> for Option<f64> {
+  async fn compile(
+    spec: Option<f64>,
+    _resolution_ctx: ResolutionCtx,
+    _repo_dir_path: OsPath,
+  ) -> Result<Self, SimpleError> {
+    Ok(spec)
+  }
+}
+
+impl ManifestCompilationFrom<Option<serde_json::Value>> for Option<serde_json::Value> {
+  async fn compile(
+    spec: Option<serde_json::Value>,
+    _resolution_ctx: ResolutionCtx,
+    _repo_dir_path: OsPath,
+  ) -> Result<Self, SimpleError> {
+    Ok(spec)
+  }
 }

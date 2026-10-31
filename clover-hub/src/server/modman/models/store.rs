@@ -27,6 +27,8 @@ pub struct PortStatuses {
   pub can_2: Arc<Mutex<HashMap<String, PortStatus>>>,
 }
 
+use crate::server::warehouse::repos::models::Manifest;
+
 /// In memory data-store for components, modules, and any needed configuration.
 #[derive(Debug, Clone)]
 pub struct ModManStore {
@@ -41,13 +43,22 @@ pub struct ModManStore {
   pub background_gesture_priority: Arc<Mutex<Vec<String>>>,
   /// Used for [Bus](super::busses::models::Bus) statuses, etc
   pub port_statuses: PortStatuses,
+  /// Manifests from Warehouse containing parsed modules and gesture packs.
+  pub repos: Arc<Mutex<HashMap<String, Manifest>>>,
 }
 
 impl ModManStore {
-  pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
+  pub fn new(
+    optional_config: Option<Arc<Mutex<Config>>>,
+    optional_repos: Option<Arc<Mutex<HashMap<String, Manifest>>>>,
+  ) -> Self {
     let config = match optional_config {
       Some(cfg) => cfg,
       Option::None => Arc::new(Mutex::new(Config::default())),
+    };
+    let repos = match optional_repos {
+      Some(r) => r,
+      Option::None => Arc::new(Mutex::new(HashMap::new())),
     };
 
     ModManStore {
@@ -61,6 +72,7 @@ impl ModManStore {
         can_2: Arc::new(Mutex::new(HashMap::new())),
       },
       config,
+      repos,
     }
   }
 }

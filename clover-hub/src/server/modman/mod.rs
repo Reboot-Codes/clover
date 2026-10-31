@@ -91,6 +91,15 @@ pub async fn modman_main(
             start_busses(bus_store, bus_session, bus_token).await.await;
           });
 
+          let gesture_store = Arc::new(store.clone());
+          let gesture_token = cancellation_tokens.0.clone();
+          let gesture_session = session.clone();
+          let gesture_handle = tokio::task::spawn(gestures::gesture_command_generator_manager(
+            gesture_store,
+            gesture_session,
+            gesture_token,
+          ));
+
           let init_session = session.clone();
           let init_store = Arc::new(store.clone());
           let init_results = cancellation_tokens
@@ -195,6 +204,7 @@ pub async fn modman_main(
             _ = mod_clean_token.cancelled() => {
               bus_handle.abort();
               ipc_handle.abort();
+              gesture_handle.abort();
               drop(status_publisher);
 
               info!("Cleaning up modules...");
@@ -217,7 +227,7 @@ pub async fn modman_main(
 
               if total > 0 {
                 for (id, module) in modules_snapshot {
-                  let (de_initialized, _) = deinit_module(&store, id, module).await;
+                  let (de_initialized, _) = deinit_module(&store, id, module, session.clone()).await;
                   if de_initialized { modules_deinitialized += 1; }
                 }
 
