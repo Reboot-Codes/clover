@@ -15,6 +15,7 @@ use crate::commands::{
     components::CommandComponentPipeline,
     interpolation::{
       CubicInterpolation,
+      CustomInterpolation,
       Interpolation,
       LinearInterpolation,
       SmoothInterpolation,
@@ -125,4 +126,15 @@ pub trait CommandComponentBuilder {
     x2: u16,
     y2: u16,
   ) -> Self::WithInterpolator<CubicInterpolation>;
+
+  /// Interpolate to targets with a custom function or closure.
+  fn interpolate_custom<F: Fn(u16) -> u16>(
+    self,
+    f: F,
+  ) -> Self::WithInterpolator<CustomInterpolation<F>>
+  where
+    Self: Sized,
+  {
+    self.interpolate_with(CustomInterpolation::new(f))
+  }
 }

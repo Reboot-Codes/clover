@@ -21,7 +21,11 @@ impl<Dr: MicrophoneDriver> AlertComponent for MicrophoneComponent<Dr> {
   }
 
   fn get_status(&self) -> Option<AlertMessage> {
-    todo!()
+    None
+  }
+
+  fn step(&mut self, _dt_ms: u32) -> Option<AlertMessage> {
+    todo!("Microphone audio capture deferred to future sprint")
   }
 }
 

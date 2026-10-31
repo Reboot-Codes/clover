@@ -55,7 +55,7 @@ pub async fn can_module_rx(
         {
           Ok(_) => {
             if payload.len() > 0 {
-              match rmp_serde::from_slice::<BusMessage>(&payload) {
+              match postcard::from_bytes::<BusMessage>(&payload) {
                 Ok(decoded_payload) => match serde_json::to_string(&decoded_payload) {
                   Ok(json_payload) => match publisher.put(json_payload).await {
                     Ok(_) => {
@@ -113,7 +113,7 @@ pub async fn can_module_tx(
   mut socket: TokioSocketCanIsoTp,
   module_id: String,
 ) {
-  let key_expr = format!("{MODULE_EVT_ID}/modules/by-id/{}/recv", &module_id);
+  let key_expr = format!("{MODULE_EVT_ID}/modules/by-id/{}/send", &module_id);
 
   match session.declare_queryable(&key_expr).await {
     Ok(queryable) => {
@@ -123,7 +123,7 @@ pub async fn can_module_tx(
             Some(query_payload) => match query_payload.try_to_string() {
               Ok(payload_str) => {
                 match serde_json_lenient::from_str::<BusMessage>(&payload_str.to_owned()) {
-                  Ok(message) => match rmp_serde::to_vec(&message) {
+                  Ok(message) => match postcard::to_allocvec(&message) {
                     Ok(msg_bytes) => {
                       debug!(
                         "Dumping everything in the recv buffer so we don't get a memory leak."
@@ -166,7 +166,7 @@ pub async fn can_module_tx(
                       }
                     }
                     Err(err) => {
-                      error!("Could not turn the BusMessage into a valid MSGPack byte array, this is a bug and should be reported! Due to:\n{err}");
+                      error!("Could not turn the BusMessage into a valid Postcard byte array, this is a bug and should be reported! Due to:\n{err}");
                     }
                   },
                   Err(err) => {

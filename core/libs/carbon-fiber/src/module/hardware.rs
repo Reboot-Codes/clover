@@ -53,9 +53,12 @@ pub mod platform {
     pub fn collect() -> HardwareIdentity {
       let mut id = [0u8; 16];
 
-      // Read hardware ID (Row 0x0002 / 0x0003 in OTP memory)
-      let chip_uid = rp2350_hal::otp::get_chip_id(); // 64-bit or 128-bit
-      id[..8].copy_from_slice(&chip_uid.to_le_bytes());
+      // Read hardware ID (Row 0x0002..0x0005 in OTP memory)
+      for i in 0..4 {
+        if let Ok(word) = rp235x_hal::otp::read_ecc_word(2 + i) {
+          id[i * 2..i * 2 + 2].copy_from_slice(&word.to_le_bytes());
+        }
+      }
 
       // 2. Pull from RP2350's hardware TRNG peripheral
       let mut entropy = [0u8; 32];
@@ -83,7 +86,11 @@ pub mod platform {
 
       // Read 64-bit hardware ID from flash
       let mut flash_id = [0u8; 8];
-      rp2040_flash::flash_get_unique_id(&mut flash_id);
+      unsafe {
+        cortex_m::interrupt::free(|_cs| {
+          rp2040_flash::flash::flash_unique_id(&mut flash_id, true);
+        });
+      }
       id[..8].copy_from_slice(&flash_id);
 
       // ROSC drift calculation
@@ -147,5 +154,15 @@ pub mod platform {
   }
 
   #[cfg(feature = "simulator")]
-  pub mod simulator {}
+  pub mod simulator {
+    use super::super::HardwareIdentity;
+
+    pub fn collect() -> HardwareIdentity {
+      HardwareIdentity {
+        unique_id: [0u8; 16],
+        unique_id_len: 16,
+        dynamic_entropy: [0u8; 32],
+      }
+    }
+  }
 }

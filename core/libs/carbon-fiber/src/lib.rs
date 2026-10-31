@@ -9,8 +9,8 @@
 //!
 //! For supported configurations and MCUs, most module code will be very simple and rely on the builder architecture. For example, a blinkie can be written with:
 //!
-//! ```rust
-//! !#[no_std]
+//! ```rust,ignore
+//! #![no_std]
 //!
 //! #[embassy_executor::main]
 //! async fn main(spawner: Spawner) {
@@ -54,6 +54,14 @@ pub mod commands;
 pub mod hub;
 pub mod models;
 pub mod module;
+
+pub mod comms {
+  pub use crate::models::*;
+  pub use crate::module::comms::*;
+  pub mod models {
+    pub use crate::models::*;
+  }
+}
 
 const fn parse_u8(s: &str) -> u8 {
   let bytes = s.as_bytes();

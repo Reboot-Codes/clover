@@ -46,7 +46,14 @@ where
       interpolator: LinearInterpolation::new(),
       pipeline: CommandComponentPipeline::new(),
       driver,
+      brightness: 255,
     }
+  }
+
+  /// Sets global brightness scaling (0..255).
+  pub fn with_brightness(mut self, brightness: u8) -> Self {
+    self.brightness = brightness;
+    self
   }
 }
 
@@ -64,7 +71,21 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponent
     flags: Option<crate::commands::models::components::GestureFlags>,
     tx_id: [u8; 16],
   ) -> Result<(), ()> {
-    todo!()
+    match target {
+      crate::commands::models::components::ComponentTarget::IndicatorBinary(_)
+      | crate::commands::models::components::ComponentTarget::IndicatorDimmer(_)
+      | crate::commands::models::components::ComponentTarget::IndicatorRGB(_, _, _)
+      | crate::commands::models::components::ComponentTarget::IndicatorNeoPixels { .. } => {
+        let cmd = crate::commands::models::components::GestureTargetCommand {
+          component_id: self.id,
+          transition_ms,
+          flags,
+          target,
+        };
+        self.pipeline.push(cmd, tx_id).map(|_| ()).map_err(|_| ())
+      }
+      _ => Err(()),
+    }
   }
 
   fn step(
@@ -74,7 +95,122 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponent
     [u8; 16],
     crate::commands::models::components::ComponentTelemetry,
   )> {
-    todo!()
+    let event = self.pipeline.tick(dt_ms);
+
+    let active_target = match self.pipeline.current_target {
+      Some(c) => Some((c, false)),
+      None => {
+        if matches!(
+          event,
+          crate::commands::module::components::PipelineEvent::ReachedTarget { .. }
+        ) {
+          self.pipeline.prev_target.map(|p| (p, true))
+        } else {
+          None
+        }
+      }
+    };
+
+    if let Some((current, is_completed)) = active_target {
+      let progress: u16 = if is_completed || current.transition_ms == 0 {
+        u16::MAX
+      } else {
+        let elapsed = ((self.pipeline.elapsed_ms as u64 * 65535)
+          + (current.transition_ms as u64 / 2))
+          / current.transition_ms as u64;
+        elapsed.min(65535) as u16
+      };
+
+      match current.target {
+        crate::commands::models::components::ComponentTarget::IndicatorBinary(b) => {
+          let scaled = if self.brightness == 0 { false } else { b };
+          let waker = core::task::Waker::noop();
+          let mut cx = core::task::Context::from_waker(&waker);
+          let mut fut = core::pin::pin!(self.driver.set_output(IndicatorTarget::Binary(scaled)));
+          let _ = fut.as_mut().poll(&mut cx);
+        }
+        crate::commands::models::components::ComponentTarget::IndicatorDimmer(val) => {
+          let prev_val = match self.pipeline.prev_target.map(|p| p.target) {
+            Some(crate::commands::models::components::ComponentTarget::IndicatorDimmer(pv)) => pv,
+            _ => 0,
+          };
+          let interp = self.interpolator.interpolate_u8(prev_val, val, progress);
+          let scaled = ((interp as u16 * self.brightness as u16) / 255) as u8;
+          let waker = core::task::Waker::noop();
+          let mut cx = core::task::Context::from_waker(&waker);
+          let mut fut = core::pin::pin!(self.driver.set_output(IndicatorTarget::Dimmer(scaled)));
+          let _ = fut.as_mut().poll(&mut cx);
+        }
+        crate::commands::models::components::ComponentTarget::IndicatorRGB(r, g, b) => {
+          let (pr, pg, pb) = match self.pipeline.prev_target.map(|p| p.target) {
+            Some(crate::commands::models::components::ComponentTarget::IndicatorRGB(
+              pr,
+              pg,
+              pb,
+            )) => (pr, pg, pb),
+            _ => (0, 0, 0),
+          };
+          let ir = self.interpolator.interpolate_u8(pr, r, progress);
+          let ig = self.interpolator.interpolate_u8(pg, g, progress);
+          let ib = self.interpolator.interpolate_u8(pb, b, progress);
+          let sr = ((ir as u16 * self.brightness as u16) / 255) as u8;
+          let sg = ((ig as u16 * self.brightness as u16) / 255) as u8;
+          let sb = ((ib as u16 * self.brightness as u16) / 255) as u8;
+          let waker = core::task::Waker::noop();
+          let mut cx = core::task::Context::from_waker(&waker);
+          let mut fut = core::pin::pin!(self.driver.set_output(IndicatorTarget::RGB(sr, sg, sb)));
+          let _ = fut.as_mut().poll(&mut cx);
+        }
+        crate::commands::models::components::ComponentTarget::IndicatorNeoPixels {
+          count,
+          colors,
+        } => {
+          let mut scaled_pixels = [smart_leds::RGB8::new(0, 0, 0); 8];
+          let valid_count = (count as usize).min(8);
+          let prev_colors = match self.pipeline.prev_target.map(|p| p.target) {
+            Some(crate::commands::models::components::ComponentTarget::IndicatorNeoPixels {
+              count: pc,
+              colors: pcols,
+            }) => Some((pc as usize, pcols)),
+            _ => None,
+          };
+          for i in 0..valid_count {
+            let (target_r, target_g, target_b) = colors[i];
+            let (pr, pg, pb) = match prev_colors {
+              Some((pc, pcols)) if i < pc => pcols[i],
+              _ => (0, 0, 0),
+            };
+            let ir = self.interpolator.interpolate_u8(pr, target_r, progress);
+            let ig = self.interpolator.interpolate_u8(pg, target_g, progress);
+            let ib = self.interpolator.interpolate_u8(pb, target_b, progress);
+            let sr = ((ir as u16 * self.brightness as u16) / 255) as u8;
+            let sg = ((ig as u16 * self.brightness as u16) / 255) as u8;
+            let sb = ((ib as u16 * self.brightness as u16) / 255) as u8;
+            scaled_pixels[i] = smart_leds::RGB8::new(sr, sg, sb);
+          }
+          let waker = core::task::Waker::noop();
+          let mut cx = core::task::Context::from_waker(&waker);
+          let mut fut = core::pin::pin!(
+            self
+              .driver
+              .set_output(IndicatorTarget::NeoPixels(&scaled_pixels[..valid_count]))
+          );
+          let _ = fut.as_mut().poll(&mut cx);
+        }
+        _ => {}
+      }
+    }
+
+    match event {
+      crate::commands::module::components::PipelineEvent::ReachedTarget { completed_tx }
+      | crate::commands::module::components::PipelineEvent::PromotedNext { completed_tx } => {
+        Some((
+          completed_tx,
+          crate::commands::models::components::ComponentTelemetry::IndicatorReady,
+        ))
+      }
+      _ => None,
+    }
   }
 
   fn backtrack(&mut self, return_ms: u16) {
@@ -96,6 +232,7 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponentBuilder
       interpolator,
       pipeline: self.pipeline,
       driver: self.driver,
+      brightness: self.brightness,
     }
   }
 
@@ -105,6 +242,7 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponentBuilder
       interpolator: LinearInterpolation::new(),
       pipeline: self.pipeline,
       driver: self.driver,
+      brightness: self.brightness,
     }
   }
 
@@ -114,6 +252,7 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponentBuilder
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
       driver: self.driver,
+      brightness: self.brightness,
     }
   }
 
@@ -129,6 +268,7 @@ impl<D: for<'a> IndicatorDriver<'a>, I: Interpolation> CommandComponentBuilder
       interpolator: CubicInterpolation::new(x1, y1, x2, y2),
       pipeline: self.pipeline,
       driver: self.driver,
+      brightness: self.brightness,
     }
   }
 }

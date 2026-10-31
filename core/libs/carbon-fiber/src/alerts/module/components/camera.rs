@@ -21,7 +21,11 @@ impl<Dr: CameraDriver> AlertComponent for CameraComponent<Dr> {
   }
 
   fn get_status(&self) -> Option<AlertMessage> {
-    todo!()
+    None
+  }
+
+  fn step(&mut self, _dt_ms: u32) -> Option<AlertMessage> {
+    todo!("Camera streaming pipeline deferred to future sprint")
   }
 }
 

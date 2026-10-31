@@ -12,7 +12,7 @@
   "components": {
     "light": {
       "type": "indicator",
-      "input": "rgba"
+      "input": "binary"
     }
   }
 }

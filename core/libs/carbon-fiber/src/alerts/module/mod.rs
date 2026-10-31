@@ -15,6 +15,12 @@ pub trait AlertComponent {
 
   /// Get the current status of the component if the status has sufficently changed.
   fn get_status(&self) -> Option<AlertMessage>;
+
+  /// Advance clock and poll alert events.
+  fn step(&mut self, dt_ms: u32) -> Option<AlertMessage> {
+    let _ = dt_ms;
+    self.get_status()
+  }
 }
 
 pub trait AlertComponentBuilder {}

@@ -21,44 +21,55 @@ pub enum AdoptionMessage<'a> {
   Abortion(AbortionMessage),
 }
 
+/// Lifecycle state machine for the adoption process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum AdoptionState {
+  Initial,
+  Probed,
+  KeyExchanged,
+  Confirmed,
+  Aborted(AbortionReason),
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ProbeMessage<'a> {
-  version: (u8, u8, u8),
-  id: &'a str,
+  pub version: (u8, u8, u8),
+  pub id: &'a str,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct HelloMessage<'a> {
-  version: (u8, u8, u8),
-  rfqdn: &'a str,
-  salt: [u8; 16],
+  pub version: (u8, u8, u8),
+  pub rfqdn: &'a str,
+  pub salt: [u8; 16],
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct KeyHOMIMessage<'a> {
-  hub_pub: &'a [u8],
+  pub hub_pub: &'a [u8],
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct KeyHIMOMessage<'a> {
-  module_pub: &'a [u8],
-  hub_conf: &'a [u8],
+  pub module_pub: &'a [u8],
+  pub hub_conf: &'a [u8],
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ConfirmMessage<'a> {
-  module_conf: &'a [u8],
+  pub module_conf: &'a [u8],
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AbortionMessage {
-  reason: AbortionReason,
+  pub reason: AbortionReason,
 }
 
 /// Reason for connection abortion.

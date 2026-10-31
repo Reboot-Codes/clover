@@ -12,10 +12,10 @@
 //!
 //! Then pass that into the [IndicatorComponent::new] method:
 //!
-//! ```rust
+//! ```rust,ignore
 //! let mut component = IndicatorComponent::new(0,
 //!   // Should bind to the default LED on a Pi Pico
-//!   BinaryIndicator::new(Output::new(p.PIN_25, Level::Low)))
+//!   BinaryIndicator::new(Output::new(p.PIN_25, Level::Low), false)
 //! );
 //! ```
 //!
@@ -52,9 +52,9 @@ pub enum IndicatorTarget<'a, const MAXPIXELS: usize = 1> {
 
 /// This component type is used to control arbitrary GPIO pins, and to control sets of smart leds.
 ///
-/// ```rust
+/// ```rust,ignore
 /// let mut component = IndicatorComponent::new(0,
-///   BinaryIndicator::new(Output::new(p.PIN_25, Level::Low)))
+///   BinaryIndicator::new(Output::new(p.PIN_25, Level::Low), false)
 /// );
 /// ```
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +64,7 @@ pub struct IndicatorComponent<D: for<'a> IndicatorDriver<'a>, I: Interpolation> 
   pub interpolator: I,
   pub pipeline: CommandComponentPipeline,
   pub driver: D,
+  pub brightness: u8,
 }
 
 /// Indicator type which is either on or off.

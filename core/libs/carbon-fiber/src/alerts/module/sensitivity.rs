@@ -1,3 +1,17 @@
+use serde::{
+  Deserialize,
+  Serialize,
+};
+
+/// Digital contact edge trigger configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum EdgeTrigger {
+  Rising,
+  Falling,
+  Both,
+}
+
 /// Default sensitvity definitions.
 ///
 /// Note that the sensitvity deffinition used for an
@@ -6,7 +20,7 @@
 ///
 /// Realtime Sensitivity should be used sparingly as it
 /// can quickly saturate the bus.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Sensitivity {
   /// Send updates at the default realtime update interval for
@@ -40,6 +54,26 @@ impl Sensitivity {
       Sensitivity::Medium => 0.2,
       Sensitivity::Low => 0.15,
       Sensitivity::Polled => 0.05,
+    }
+  }
+
+  pub const fn debounce_ms(&self) -> u32 {
+    match self {
+      Sensitivity::Realtime => 0,
+      Sensitivity::High => 10,
+      Sensitivity::Medium => 20,
+      Sensitivity::Low => 50,
+      Sensitivity::Polled => 0,
+    }
+  }
+
+  pub const fn sample_interval_ms(&self) -> u32 {
+    match self {
+      Sensitivity::Realtime => 0,
+      Sensitivity::High => 1,
+      Sensitivity::Medium => 10,
+      Sensitivity::Low => 50,
+      Sensitivity::Polled => 1000,
     }
   }
 }

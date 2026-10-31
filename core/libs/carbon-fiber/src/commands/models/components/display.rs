@@ -36,4 +36,5 @@ pub struct DisplayComponent<I: Interpolation, Dt: DrawTarget> {
   /// into an I-frame to be placed into `.prev_target`.
   pub pipeline: CommandComponentPipeline,
   pub display: Dt,
+  pub dirty: bool,
 }

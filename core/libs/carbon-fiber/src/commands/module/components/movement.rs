@@ -1,5 +1,8 @@
 use crate::commands::{
-  models::components::movement::MovementComponent,
+  models::components::movement::{
+    ActuatorDriver,
+    MovementComponent,
+  },
   module::{
     CommandComponent,
     CommandComponentBuilder,
@@ -23,8 +26,9 @@ impl MovementComponent<(), (), (), (), (), (), SmoothInterpolation> {
       actuator4: None,
       actuator5: None,
       actuator6: None,
-      interpolator: SmoothInterpolation {},
+      interpolator: SmoothInterpolation::new(),
       pipeline: CommandComponentPipeline::new(),
+      positions: [0; 6],
     }
   }
 }
@@ -42,6 +46,7 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: self.actuator6,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -57,6 +62,7 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: self.actuator6,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -72,6 +78,7 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: self.actuator6,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -87,6 +94,7 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: self.actuator6,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -102,6 +110,7 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: self.actuator6,
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -117,12 +126,20 @@ impl<A1, A2, A3, A4, A5, A6, I: Interpolation> MovementComponent<A1, A2, A3, A4,
       actuator6: Some(pin),
       interpolator: self.interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 }
 
 impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponent
   for MovementComponent<P1, P2, P3, P4, P5, P6, I>
+where
+  P1: ActuatorDriver,
+  P2: ActuatorDriver,
+  P3: ActuatorDriver,
+  P4: ActuatorDriver,
+  P5: ActuatorDriver,
+  P6: ActuatorDriver,
 {
   fn id(&self) -> u8 {
     self.id
@@ -135,7 +152,18 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponent
     flags: Option<crate::commands::models::components::GestureFlags>,
     tx_id: [u8; 16],
   ) -> Result<(), ()> {
-    todo!()
+    match target {
+      crate::commands::models::components::ComponentTarget::Movement(_) => {
+        let cmd = crate::commands::models::components::GestureTargetCommand {
+          component_id: self.id,
+          transition_ms,
+          flags,
+          target,
+        };
+        self.pipeline.push(cmd, tx_id).map(|_| ()).map_err(|_| ())
+      }
+      _ => Err(()),
+    }
   }
 
   fn step(
@@ -145,7 +173,136 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponent
     [u8; 16],
     crate::commands::models::components::ComponentTelemetry,
   )> {
-    todo!()
+    let event = self.pipeline.tick(dt_ms);
+
+    let active_target = match self.pipeline.current_target {
+      Some(c) => Some((c, false)),
+      None => {
+        if matches!(
+          event,
+          crate::commands::module::components::PipelineEvent::ReachedTarget { .. }
+        ) {
+          self.pipeline.prev_target.map(|p| (p, true))
+        } else {
+          None
+        }
+      }
+    };
+
+    if let Some((current, is_completed)) = active_target {
+      let progress: u16 = if is_completed || current.transition_ms == 0 {
+        u16::MAX
+      } else {
+        let elapsed = ((self.pipeline.elapsed_ms as u64 * 65535)
+          + (current.transition_ms as u64 / 2))
+          / current.transition_ms as u64;
+        elapsed.min(65535) as u16
+      };
+
+      if let crate::commands::models::components::ComponentTarget::Movement(target_dofs) =
+        current.target
+      {
+        let prev_dofs = if is_completed {
+          self.positions
+        } else {
+          match self.pipeline.prev_target.map(|p| p.target) {
+            Some(crate::commands::models::components::ComponentTarget::Movement(pt)) => match pt {
+              crate::commands::models::components::movement::MovementTarget::OneDof(a) => {
+                [a, 0, 0, 0, 0, 0]
+              }
+              crate::commands::models::components::movement::MovementTarget::TwoDof(a, b) => {
+                [a, b, 0, 0, 0, 0]
+              }
+              crate::commands::models::components::movement::MovementTarget::ThreeDof(a, b, c) => {
+                [a, b, c, 0, 0, 0]
+              }
+              crate::commands::models::components::movement::MovementTarget::FourDof(a, b, c, d) => {
+                [a, b, c, d, 0, 0]
+              }
+              crate::commands::models::components::movement::MovementTarget::FiveDof(
+                a,
+                b,
+                c,
+                d,
+                e,
+              ) => [a, b, c, d, e, 0],
+              crate::commands::models::components::movement::MovementTarget::SixDof(
+                a,
+                b,
+                c,
+                d,
+                e,
+                f,
+              ) => [a, b, c, d, e, f],
+            },
+            _ => self.positions,
+          }
+        };
+
+        let target_arr = match target_dofs {
+          crate::commands::models::components::movement::MovementTarget::OneDof(a) => {
+            [a, 0, 0, 0, 0, 0]
+          }
+          crate::commands::models::components::movement::MovementTarget::TwoDof(a, b) => {
+            [a, b, 0, 0, 0, 0]
+          }
+          crate::commands::models::components::movement::MovementTarget::ThreeDof(a, b, c) => {
+            [a, b, c, 0, 0, 0]
+          }
+          crate::commands::models::components::movement::MovementTarget::FourDof(a, b, c, d) => {
+            [a, b, c, d, 0, 0]
+          }
+          crate::commands::models::components::movement::MovementTarget::FiveDof(a, b, c, d, e) => {
+            [a, b, c, d, e, 0]
+          }
+          crate::commands::models::components::movement::MovementTarget::SixDof(
+            a,
+            b,
+            c,
+            d,
+            e,
+            f,
+          ) => [a, b, c, d, e, f],
+        };
+
+        for i in 0..6 {
+          self.positions[i] =
+            self.interpolator.interpolate_u32(prev_dofs[i], target_arr[i], progress);
+        }
+
+        if let Some(ref mut a) = self.actuator1 {
+          let _ = a.drive(self.positions[0]);
+        }
+        if let Some(ref mut a) = self.actuator2 {
+          let _ = a.drive(self.positions[1]);
+        }
+        if let Some(ref mut a) = self.actuator3 {
+          let _ = a.drive(self.positions[2]);
+        }
+        if let Some(ref mut a) = self.actuator4 {
+          let _ = a.drive(self.positions[3]);
+        }
+        if let Some(ref mut a) = self.actuator5 {
+          let _ = a.drive(self.positions[4]);
+        }
+        if let Some(ref mut a) = self.actuator6 {
+          let _ = a.drive(self.positions[5]);
+        }
+      }
+    }
+
+    match event {
+      crate::commands::module::components::PipelineEvent::ReachedTarget { completed_tx }
+      | crate::commands::module::components::PipelineEvent::PromotedNext { completed_tx } => {
+        Some((
+          completed_tx,
+          crate::commands::models::components::ComponentTelemetry::Movement {
+            position: self.positions,
+          },
+        ))
+      }
+      _ => None,
+    }
   }
 
   fn backtrack(&mut self, return_ms: u16) {
@@ -155,6 +312,13 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponent
 
 impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
   for MovementComponent<P1, P2, P3, P4, P5, P6, I>
+where
+  P1: ActuatorDriver,
+  P2: ActuatorDriver,
+  P3: ActuatorDriver,
+  P4: ActuatorDriver,
+  P5: ActuatorDriver,
+  P6: ActuatorDriver,
 {
   type WithInterpolator<NewI: Interpolation> = MovementComponent<P1, P2, P3, P4, P5, P6, NewI>;
 
@@ -169,6 +333,7 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator6: self.actuator6,
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -183,6 +348,7 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator6: self.actuator6,
       interpolator: LinearInterpolation::new(),
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -200,6 +366,7 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator6: self.actuator6,
       interpolator,
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 
@@ -220,6 +387,7 @@ impl<P1, P2, P3, P4, P5, P6, I: Interpolation> CommandComponentBuilder
       actuator6: self.actuator6,
       interpolator: CubicInterpolation::new(x1, y1, x2, y2),
       pipeline: self.pipeline,
+      positions: self.positions,
     }
   }
 }

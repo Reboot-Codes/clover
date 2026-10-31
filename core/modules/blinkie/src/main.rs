@@ -1,102 +1,108 @@
 #![no_std]
 #![no_main]
 
-pub mod blinker;
-pub mod comms;
-
-use carbon_fiber::commands::models::components::indicators::{
-  BinaryIndicator,
-  IndicatorComponent,
-};
-use carbon_fiber::module::Module;
-use carbon_fiber::module::comms::ModuleChannels;
 use core::cell::RefCell;
 use core::ptr::addr_of_mut;
 use defmt::*;
 use defmt_rtt as _;
+use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
 use embassy_executor::{
   Executor,
   Spawner,
 };
-use embassy_rp::gpio::{
-  Input,
-  Level,
-  Output,
-};
-use embassy_rp::multicore::Stack;
 use embassy_rp::{
+  gpio::{
+    Input,
+    Level,
+    Output,
+    Pull,
+  },
+  multicore::Stack,
   peripherals::SPI0,
-  spi::Spi,
+  spi::{
+    Config as SpiConfig,
+    Spi,
+  },
 };
 use embassy_sync::blocking_mutex::{
-  Mutex,
   raw::CriticalSectionRawMutex,
+  Mutex,
 };
 use panic_probe as _;
 use static_cell::StaticCell;
 
-static mut CORE1_STACK: Stack<16384> = Stack::new();
-static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
-
-use crate::{
-  blinker::blinker_thread,
-  comms::comms_thread,
+use carbon_fiber::{
+  commands::models::components::indicators::{
+    BinaryIndicator,
+    IndicatorComponent,
+  },
+  module::{
+    comms::{
+      can2::{
+        Mcp2515Driver,
+        CAN2,
+      },
+      CommsWorker,
+    },
+    Module,
+  },
 };
 
-pub type SpiBus =
+type SpiBus =
   Mutex<CriticalSectionRawMutex, RefCell<Spi<'static, SPI0, embassy_rp::spi::Blocking>>>;
 
-static CHANNELS: StaticCell<ModuleChannels<8, 16>> = StaticCell::new();
+type BlinkieSpiDevice = SpiDevice<
+  'static,
+  CriticalSectionRawMutex,
+  Spi<'static, SPI0, embassy_rp::spi::Blocking>,
+  Output<'static>,
+>;
+
+type BlinkieComms =
+  CommsWorker<'static, CAN2<Mcp2515Driver<BlinkieSpiDevice, Input<'static>>>>;
+
+static mut CORE1_STACK: Stack<16384> = Stack::new();
+static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+static SPI_BUS: StaticCell<SpiBus> = StaticCell::new();
+
+#[embassy_executor::task]
+async fn comms_task(mut comms: BlinkieComms) {
+  comms.run().await;
+}
 
 #[embassy_executor::main]
-async fn main(spawner: Spawner) {
+async fn main(_spawner: Spawner) {
   let p = embassy_rp::init(Default::default());
 
   info!("Starting up com.reboot-codes.clover.CORE.blinky...");
 
-  let spi_config = embassy_rp::spi::Config::default();
-  let spi = Spi::new_blocking(p.SPI0, p.PIN_18, p.PIN_19, p.PIN_16, spi_config);
-  static SPI_BUS: StaticCell<SpiBus> = StaticCell::new();
+  let spi = Spi::new_blocking(p.SPI0, p.PIN_18, p.PIN_19, p.PIN_16, SpiConfig::default());
   let spi_bus = SPI_BUS.init(Mutex::new(RefCell::new(spi)));
-  let mcp_int = Input::new(p.PIN_6, embassy_rp::gpio::Pull::Up);
+  let mcp_cs = Output::new(p.PIN_9, Level::High);
+  let mcp_spi = SpiDevice::new(spi_bus, mcp_cs);
+  let mcp_int = Input::new(p.PIN_6, Pull::Up);
 
-  info!("Initing CORE1...");
+  let can2 = CAN2::mcp2515(mcp_spi, mcp_int).expect("Failed to initialize CAN2 MCP2515");
+
+  let mut light_comp = IndicatorComponent::new(
+    0,
+    BinaryIndicator::new(Output::new(p.PIN_25, Level::Low), false),
+  );
+
+  let (comms, mut module) = Module::new("blinky", "com.reboot-codes.clover.CORE.blinky")
+    .add_command_component(&mut light_comp)
+    .build(can2);
+
   embassy_rp::multicore::spawn_core1(
     p.CORE1,
     unsafe { &mut *addr_of_mut!(CORE1_STACK) },
     move || {
-      info!("Core 1 started! Creating EXECUTOR1...");
       let executor1 = EXECUTOR1.init(Executor::new());
       executor1.run(|spawner| {
-        info!("Core 1 executor running! Spawning comms thread...");
-
-        match spawner.spawn(comms_thread(spi_bus, p.PIN_9.into(), mcp_int)) {
-          Ok(_) => {
-            info!("Comms thread spawned successfully on Core 1!");
-          }
-          Err(err) => {
-            error!(
-              "Failed to spawn comms thread due to:\n{:?}",
-              Debug2Format(&err)
-            );
-          }
-        }
-      })
+        spawner.spawn(comms_task(comms)).unwrap();
+      });
     },
   );
 
-  let channels = CHANNELS.init(ModuleChannels::new());
-
-  let mut light_comp = IndicatorComponent::new(
-    0,
-    BinaryIndicator::new(Output::new(p.PIN_25, Level::low), false),
-  );
-
-  let (comms, module) = Module::new()
-    .add_command_component(&mut light_comp)
-    .build(None, channels);
-
-  spawner
-    .spawn(blinker_thread(Output::new(p.PIN_25, Level::Low)))
-    .unwrap();
+  module.run().await;
 }

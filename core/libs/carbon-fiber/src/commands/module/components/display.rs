@@ -15,7 +15,10 @@ use crate::commands::{
   },
 };
 
-impl<I: Interpolation, Dt: DrawTarget> CommandComponent for DisplayComponent<I, Dt> {
+impl<I: Interpolation, Dt: DrawTarget> CommandComponent for DisplayComponent<I, Dt>
+where
+  Dt::Color: From<embedded_graphics::pixelcolor::raw::RawU16>,
+{
   fn id(&self) -> u8 {
     self.id
   }
@@ -27,7 +30,45 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponent for DisplayComponent<I, 
     flags: Option<crate::commands::models::components::GestureFlags>,
     tx_id: [u8; 16],
   ) -> Result<(), ()> {
-    todo!()
+    match target {
+      crate::commands::models::components::ComponentTarget::DisplayClear => {
+        let _ = self.display.clear(Dt::Color::from(
+          embedded_graphics::pixelcolor::raw::RawU16::new(0),
+        ));
+        self.dirty = true;
+      }
+      crate::commands::models::components::ComponentTarget::DisplayBlitChunk {
+        offset: _,
+        x,
+        y,
+        width,
+        height,
+        len,
+        data,
+      } => {
+        let rect = embedded_graphics::primitives::Rectangle::new(
+          embedded_graphics::geometry::Point::new(x as i32, y as i32),
+          embedded_graphics::geometry::Size::new(width as u32, height as u32),
+        );
+        let valid_len = (len as usize).min(data.len());
+        let colors = data[..valid_len].chunks_exact(2).map(|chunk| {
+          Dt::Color::from(embedded_graphics::pixelcolor::raw::RawU16::new(
+            u16::from_le_bytes([chunk[0], chunk[1]]),
+          ))
+        });
+        let _ = self.display.fill_contiguous(&rect, colors);
+        self.dirty = true;
+      }
+      _ => return Err(()),
+    }
+
+    let cmd = crate::commands::models::components::GestureTargetCommand {
+      component_id: self.id,
+      transition_ms,
+      flags,
+      target,
+    };
+    self.pipeline.push(cmd, tx_id).map(|_| ()).map_err(|_| ())
   }
 
   fn step(
@@ -37,7 +78,21 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponent for DisplayComponent<I, 
     [u8; 16],
     crate::commands::models::components::ComponentTelemetry,
   )> {
-    todo!()
+    let event = self.pipeline.tick(dt_ms);
+    if self.dirty {
+      self.dirty = false;
+    }
+
+    match event {
+      crate::commands::module::components::PipelineEvent::ReachedTarget { completed_tx }
+      | crate::commands::module::components::PipelineEvent::PromotedNext { completed_tx } => {
+        Some((
+          completed_tx,
+          crate::commands::models::components::ComponentTelemetry::DisplayReady,
+        ))
+      }
+      _ => None,
+    }
   }
 
   fn backtrack(&mut self, return_ms: u16) {
@@ -45,7 +100,10 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponent for DisplayComponent<I, 
   }
 }
 
-impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayComponent<I, Dt> {
+impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayComponent<I, Dt>
+where
+  Dt::Color: From<embedded_graphics::pixelcolor::raw::RawU16>,
+{
   type WithInterpolator<NewI: Interpolation> = DisplayComponent<NewI, Dt>;
 
   fn interpolate_with<NewI: Interpolation>(
@@ -57,6 +115,7 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayCompon
       interpolator,
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -66,6 +125,7 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayCompon
       interpolator: LinearInterpolation::new(),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -75,6 +135,7 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayCompon
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -90,6 +151,7 @@ impl<I: Interpolation, Dt: DrawTarget> CommandComponentBuilder for DisplayCompon
       interpolator: CubicInterpolation::new(x1, y1, x2, y2),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 }
@@ -102,6 +164,7 @@ impl<Dt: DrawTarget> DisplayComponent<LinearInterpolation, Dt> {
       interpolator: LinearInterpolation::new(),
       pipeline: CommandComponentPipeline::new(),
       display,
+      dirty: false,
     }
   }
 }
@@ -113,6 +176,7 @@ impl<I: Interpolation, Dt: DrawTarget> DisplayComponent<I, Dt> {
       interpolator: SmoothInterpolation::new(),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -122,6 +186,7 @@ impl<I: Interpolation, Dt: DrawTarget> DisplayComponent<I, Dt> {
       interpolator: LinearInterpolation::new(),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -137,6 +202,7 @@ impl<I: Interpolation, Dt: DrawTarget> DisplayComponent<I, Dt> {
       interpolator: CubicInterpolation::new(x1, y1, x2, y2),
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 
@@ -149,6 +215,7 @@ impl<I: Interpolation, Dt: DrawTarget> DisplayComponent<I, Dt> {
       interpolator,
       pipeline: self.pipeline,
       display: self.display,
+      dirty: self.dirty,
     }
   }
 }
