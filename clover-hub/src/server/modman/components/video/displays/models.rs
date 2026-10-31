@@ -15,6 +15,21 @@ use strum::VariantNames;
 
 pub trait DisplayComponent {}
 
+/// Wire payload envelope for compressed display frames streamed over Zenoh.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DisplayFrameEnvelope {
+  /// Monotonically increasing frame sequence counter.
+  pub seq: u64,
+  /// Timestamp in milliseconds (UTC) when the frame was extracted.
+  pub timestamp_ms: u64,
+  /// Image pixel width.
+  pub width: u16,
+  /// Image pixel height.
+  pub height: u16,
+  /// QOI-compressed RGBA image data bytes.
+  pub qoi_data: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicalDisplayComponent {
   /// Required to initialize rendering pipeline for this display.
@@ -27,6 +42,12 @@ pub struct PhysicalDisplayComponent {
   /// If configured, how the display should react to gesture events. Will be overriden if this display is part of a virtual display.
   pub gesture_config: Option<GestureConfig>,
   pub internal: bool,
+  /// Target rendering and dispatch framerate (defaults to 24 FPS for ModManProxy displays when omitted).
+  #[serde(default)]
+  pub target_fps: Option<u32>,
+  /// Whether to mirror this display to an upscaled desktop preview window.
+  #[serde(default)]
+  pub mirror: Option<bool>,
 }
 
 impl DisplayComponent for PhysicalDisplayComponent {}
@@ -56,15 +77,23 @@ pub struct DisplaySize {
   pub width: Option<f64>,
 }
 
+/// Connection and transport configuration for physical display hardware.
 #[derive(Debug, Clone, Serialize, Deserialize, VariantNames)]
 pub enum ConnectionType {
+  /// Directly attached display managed by the system compositor (Wayland / X11).
   #[cfg(feature = "compositor")]
   #[serde(rename = "direct")]
   #[strum(serialize = "direct")]
   Direct(DirectConnection),
+  /// Remote hardware display proxied through ModMan across CAN / serial busses via QOI streams.
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
   ModManProxy,
+  /// Simulated display rendered offscreen for testing in SystemUI without hardware bus blitting.
+  #[serde(rename = "simulated")]
+  #[strum(serialize = "simulated")]
+  Simulated,
+  /// Network or media streaming connection.
   #[serde(rename = "stream")]
   #[strum(serialize = "stream")]
   Stream(StreamingConnection),

@@ -27,6 +27,7 @@ use tracing::{
 use crate::server::modman::{
   busses::proxies::group::can_2::{
     adoption::run_can2_adoption_handshake,
+    display_blitter::can_display_blitter,
     module_listener::{
       can_module_rx,
       can_module_tx,
@@ -233,6 +234,14 @@ pub async fn setup_listener(
                             let tx_id = module_id.clone();
                             tokio::task::spawn(async move {
                               can_module_tx(tx_session, tx_token, tx_socket, tx_id).await;
+                            });
+
+                            let blit_session = ctx.session.clone();
+                            let blit_token = listener_token.clone();
+                            let blit_id = module_id.clone();
+                            let blit_store = ctx.store.clone();
+                            tokio::task::spawn(async move {
+                              can_display_blitter(blit_session, blit_token, blit_id, blit_store).await;
                             });
 
                             bound_port = true;

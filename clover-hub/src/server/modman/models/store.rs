@@ -11,12 +11,12 @@ use crate::server::modman::models::modules::Module;
 use crate::server::modman::models::PortStatus;
 use crate::server::warehouse::config::models::Config;
 
-/// Used for [Bus](super::busses::models::Bus) statuses, etc
+/// Used for [Bus](crate::server::modman::busses::models::Bus) statuses, etc
 #[derive(Debug, Clone)]
 pub struct PortStatuses {
-  /// Used by the [UART Bus](super::busses::proxies::uart::UARTBus).
+  /// Used by the UART Bus.
   pub uart: Arc<Mutex<HashMap<String, PortStatus>>>,
-  /// Used by the [CAN2 Bus](super::busses::proxies::can_2::CAN2Bus).
+  /// Used by the [CAN2 Bus](crate::server::modman::busses::proxies::group::can_2::CAN2Bus).
   ///
   /// Identifier string format is `$IFACE/$RX:$TX` where (e.g. `can0/0x101:0x201`):
   /// - `$IFACE` is the network interface for the needed CAN bus
@@ -41,7 +41,7 @@ pub struct ModManStore {
   pub gesture_states: Arc<Mutex<HashMap<String, GestureStates>>>,
   pub foreground_gesture_priority: Arc<Mutex<Vec<String>>>,
   pub background_gesture_priority: Arc<Mutex<Vec<String>>>,
-  /// Used for [Bus](super::busses::models::Bus) statuses, etc
+  /// Used for [Bus](crate::server::modman::busses::models::Bus) statuses, etc
   pub port_statuses: PortStatuses,
   /// Manifests from Warehouse containing parsed modules and gesture packs.
   pub repos: Arc<Mutex<HashMap<String, Manifest>>>,

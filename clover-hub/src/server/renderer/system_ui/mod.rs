@@ -52,20 +52,30 @@ use serde::{
   Deserialize,
   Serialize,
 };
-use systems::displays::display_registrar;
 
+/// Unified wrapper enum representing either a physical hardware display or a composited virtual display.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnyDisplayComponent {
+  /// Physical display hardware backed by a driver or bus proxy.
   Physical(PhysicalDisplayComponent),
+  /// Virtual display composition aggregating multiple physical or logical views.
   Virtual(VirtualDisplayComponent),
 }
 
+/// IPC bridge and resource sharing state between the Tokio async runtime and the Bevy ECS world.
 #[derive(Resource)]
 pub struct SystemUIIPC {
+  /// Receiver channel delivering graceful shutdown requests to Bevy.
   pub exit_channel: RecvSync<bevy::prelude::AppExit>,
+  /// Queue of newly discovered or registered display components awaiting ECS initialization.
   pub display_registration_queue: Arc<Mutex<Queue<(String, AnyDisplayComponent)>>>,
+  /// Shared Zenoh session handle for publishing alerts and frames.
+  pub zenoh_session: Arc<zenoh::Session>,
+  /// Tokio runtime handle allowing Bevy systems to spawn background async tasks.
+  pub tokio_handle: tokio::runtime::Handle,
 }
 
+/// Bevy ECS system that monitors [`SystemUIIPC::exit_channel`] and initiates app exit when triggered.
 pub fn shutdown_system(
   ipc: Res<SystemUIIPC>,
   mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
@@ -78,20 +88,33 @@ pub fn shutdown_system(
   }
 }
 
+/// Main entrypoint that builds and runs the Bevy [`App`] powering Clover's System UI.
+///
+/// Configures rendering plugins, displays, offscreen frame capturing, and the simulated controls testing interface.
 pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>) {
   let mut app = App::new();
 
   app
     .insert_resource(custom_bevy_ipc)
     // .add_systems(Startup, setup)
-    .add_systems(Update, display_registrar)
-    .add_systems(Update, shutdown_system);
+    .add_systems(
+      Update,
+      (
+        systems::displays::display_registrar,
+        systems::displays::capture_proxied_displays,
+        shutdown_system,
+      ),
+    );
 
   #[cfg(feature = "compositor")]
   match disable_winit {
     Some(disable_winit_bool) => {
       if !disable_winit_bool {
         use bevy::{
+          render::{
+            settings::{Backends, RenderCreation, WgpuSettings},
+            RenderPlugin,
+          },
           window::{
             PresentMode,
             Window,
@@ -105,7 +128,8 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
           DefaultPlugins,
         };
         use systems::simulated_controls::{
-          make_visible,
+          handle_sim_keyboard_controls,
+          sync_testing_window_displays,
           update_scroll_position,
         };
 
@@ -119,8 +143,8 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
             DefaultPlugins
               .set(WindowPlugin {
                 primary_window: Some(Window {
-                  title: "Clover".into(),
-                  resolution: (500.0, 200.0).into(),
+                  title: "Clover - Controls & Displays".into(),
+                  resolution: (640.0, 520.0).into(),
                   present_mode: PresentMode::AutoVsync,
                   // Tells Wasm to resize the window according to the available canvas
                   fit_canvas_to_parent: true,
@@ -128,10 +152,17 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
                   prevent_default_event_handling: false,
                   window_theme: Some(WindowTheme::Dark),
                   enabled_buttons: bevy::window::EnabledButtons {
-                    maximize: false,
+                    maximize: true,
                     ..Default::default()
                   },
-                  visible: false,
+                  visible: true,
+                  ..Default::default()
+                }),
+                ..Default::default()
+              })
+              .set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(WgpuSettings {
+                  backends: Some(Backends::from_env().unwrap_or(Backends::PRIMARY)),
                   ..Default::default()
                 }),
                 ..Default::default()
@@ -139,10 +170,17 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
               .set(modded_winit)
               .disable::<LogPlugin>(),
             LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin,
+            FrameTimeDiagnosticsPlugin::default(),
           ))
           .add_systems(Startup, sim_setup)
-          .add_systems(Update, (make_visible, update_scroll_position));
+          .add_systems(
+            Update,
+            (
+              update_scroll_position,
+              sync_testing_window_displays,
+              handle_sim_keyboard_controls,
+            ),
+          );
       }
     }
     None => {}

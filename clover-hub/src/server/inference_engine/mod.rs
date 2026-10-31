@@ -2,7 +2,7 @@
 //!
 //! Manages Machine Learning models and their respective accelerators.
 //!
-//! Uses [`onnx`] and [`candle`] to handle Analytical Models and Language Models respectively. Primary thread execution starts with [`inference_engine_main`].
+//! Uses `onnx` and `candle` to handle Analytical Models and Language Models respectively. Primary thread execution starts with [`inference_engine_main`].
 //!
 
 pub mod ipc;

@@ -11,6 +11,8 @@
 //! Terminal User Interface to manage a clover instance over UART/SSH.
 //!
 
+#![recursion_limit = "512"]
+
 use std::error::Error;
 use tokio_util::sync::CancellationToken;
 

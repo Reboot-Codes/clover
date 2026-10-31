@@ -5,7 +5,7 @@ use serde::{
 
 use crate::server::modman::connections::ModuleConnection;
 
-/// Modules are comprised of [Components](CloverComponent) and their [Metadata](CloverComponentMeta).
+/// Modules are comprised of [Components](super::components::CloverComponent) and their [Metadata](super::components::CloverComponentMeta).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
   /// RFQDN of the module definition from the manifest database.

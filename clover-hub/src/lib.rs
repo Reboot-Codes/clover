@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 #![feature(stmt_expr_attributes)]
 #![feature(ascii_char)]
 #![feature(trivial_bounds)]
@@ -44,7 +45,12 @@ pub fn cli() -> Command {
         .flatten_help(true)
         .args(aio_args())
         .subcommand(Command::new("aio").args(aio_args()))
-        .subcommand(Command::new("server").arg(data_dir_arg()).arg(port_arg()))
+        .subcommand(
+          Command::new("server")
+            .arg(data_dir_arg())
+            .arg(port_arg())
+            .arg(mirror_displays_arg()),
+        )
         .subcommand(
           Command::new("tui")
             .arg(
@@ -81,8 +87,16 @@ pub fn data_dir_arg() -> Arg {
     .help("The data directory to use other than `/opt/clover`")
 }
 
+pub fn mirror_displays_arg() -> Arg {
+  Arg::new("mirror_displays")
+    .long("mirror-displays")
+    .required(false)
+    .action(clap::ArgAction::SetTrue)
+    .help("Mirror proxied displays on desktop preview windows")
+}
+
 pub fn aio_args() -> Vec<Arg> {
-  vec![data_dir_arg(), port_arg()]
+  vec![data_dir_arg(), port_arg(), mirror_displays_arg()]
 }
 
 pub fn unwrap_port_arg(arg: Result<u16, ParseIntError>) -> u16 {
@@ -220,6 +234,8 @@ pub async fn run(big_boy_token: CancellationToken) {
               .parse::<u16>(),
           );
 
+          let mirror_displays = sub_matches.get_flag("mirror_displays");
+
           info!("Running Backend Server and Terminal UI (All-In-One)...");
 
           let server_port = Arc::new(port);
@@ -228,6 +244,7 @@ pub async fn run(big_boy_token: CancellationToken) {
             server_main(
               data_dir,
               *server_port.to_owned(),
+              mirror_displays,
               server_token,
               from_server_token,
             )
@@ -272,11 +289,19 @@ pub async fn run(big_boy_token: CancellationToken) {
               .expect("Default provided in Clap.")
               .parse::<u16>(),
           );
+          let mirror_displays = sub_matches.get_flag("mirror_displays");
 
           info!("Running Backend Server...");
           let server_token = cancellation_token.clone();
           let server_handle = tokio::task::spawn(async move {
-            server_main(data_dir, port, server_token, from_server_token).await;
+            server_main(
+              data_dir,
+              port,
+              mirror_displays,
+              server_token,
+              from_server_token,
+            )
+            .await;
           });
 
           let signal_handle = get_signal_handle(

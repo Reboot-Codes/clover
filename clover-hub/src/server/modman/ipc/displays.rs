@@ -18,6 +18,10 @@ use crate::server::{
   renderer::system_ui::AnyDisplayComponent,
 };
 
+/// Zenoh queryable responder that serves registered physical and virtual displays.
+///
+/// Listens on `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`
+/// and returns all initialized display components stored in [`ModManStore`].
 #[instrument(skip(store, session, cancellation_token))]
 pub async fn display_queryable(
   store: ModManStore,
@@ -34,7 +38,7 @@ pub async fn display_queryable(
       Ok(query) => {
         debug!("Replying with all displays...");
 
-        let mut res = vec![];
+        let mut res: Vec<(String, AnyDisplayComponent)> = vec![];
 
         for (_module_id, module_config) in store.modules.lock().await.iter() {
           if module_config.initialized {
@@ -45,15 +49,23 @@ pub async fn display_queryable(
 
                   match component_config {
                     CloverComponent::PhysicalDisplayComponent(physical_display_config) => {
-                      res.push(AnyDisplayComponent::Physical(physical_display_config));
+                      res.push((
+                        component_id.clone(),
+                        AnyDisplayComponent::Physical(physical_display_config),
+                      ));
                     }
                     CloverComponent::VirtualDisplayComponent(virtual_display_config) => {
-                      res.push(AnyDisplayComponent::Virtual(virtual_display_config));
+                      res.push((
+                        component_id.clone(),
+                        AnyDisplayComponent::Virtual(virtual_display_config),
+                      ));
                     }
                     _ => {}
                   }
                 }
-                None => todo!(),
+                None => {
+                  debug!("Component {component_id} not found in store");
+                }
               }
             }
           }

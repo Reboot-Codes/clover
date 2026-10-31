@@ -1,6 +1,6 @@
 //! # Clover ModMan Data Structures
 //!
-//! [Modules](Module) are comprised of [Components](components::CloverComponent) and their [Metadata](components::CloverComponentMeta).
+//! [Modules](modules::Module) are comprised of [Components](components::CloverComponent) and their [Metadata](components::CloverComponentMeta).
 //!
 
 use serde::{

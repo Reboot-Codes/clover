@@ -186,3 +186,7 @@ node_modules
 
 .next
 out
+
+# KiCad & editor local history directories
+.history/
+**/.history/

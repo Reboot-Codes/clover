@@ -44,9 +44,19 @@ pub struct RepoSpec {
 
 impl Default for Config {
   fn default() -> Self {
+    let mut repos = HashMap::new();
+    repos.insert(
+      "com.reboot-codes.clover.core".to_string(),
+      RepoSpec {
+        name: Some("Clover CORE (Unstable)".to_string()),
+        src: "https://git.reboot-codes.com/Reboot-Codes/clover.git".to_string(),
+        branch: "main".to_string(),
+      },
+    );
+
     Config {
       docker_daemon: "/run/user/1000/podman/podman.sock".to_string(),
-      repos: HashMap::new(),
+      repos,
       data_dir: OsPath::new(),
       db: None,
       primary_api_key: "CHANGE_ME".to_string(),
@@ -56,3 +66,24 @@ impl Default for Config {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_default_config_includes_core_repo() {
+    let config = Config::default();
+    let repo = config
+      .repos
+      .get("com.reboot-codes.clover.core")
+      .expect("Default config should contain com.reboot-codes.clover.core");
+    assert_eq!(repo.name.as_deref(), Some("Clover CORE (Unstable)"));
+    assert_eq!(
+      repo.src,
+      "https://git.reboot-codes.com/Reboot-Codes/clover.git"
+    );
+    assert_eq!(repo.branch, "main");
+  }
+}
+

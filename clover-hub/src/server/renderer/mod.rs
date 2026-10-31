@@ -23,7 +23,10 @@ use crate::utils::{
 use queues::*;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
-use system_ui::SystemUIIPC;
+use system_ui::{
+  AnyDisplayComponent,
+  SystemUIIPC,
+};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing::{
@@ -42,24 +45,37 @@ use zenoh_ext::{
 
 use super::warehouse::config::models::Config;
 
+/// Zenoh base topic key expression for renderer service events and commands.
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/renderer";
 
+/// Shared state store passed to the renderer service.
 #[derive(Debug, Clone)]
 pub struct RendererStore {
+  /// Clover server configuration handle.
   pub config: Arc<Mutex<Config>>,
+  /// Whether desktop mirror windows should be spawned for proxied displays.
+  pub mirror_displays: bool,
 }
 
 impl RendererStore {
-  pub fn new(optional_config: Option<Arc<Mutex<Config>>>) -> Self {
+  /// Creates a new `RendererStore` with an optional configuration handle and display mirroring flag.
+  pub fn new(optional_config: Option<Arc<Mutex<Config>>>, mirror_displays: bool) -> Self {
     let config = match optional_config {
       Some(cfg) => cfg,
       Option::None => Arc::new(Mutex::new(Config::default())),
     };
 
-    RendererStore { config }
+    RendererStore {
+      config,
+      mirror_displays,
+    }
   }
 }
 
+/// Primary entrypoint and lifecycle loop for the Clover graphics renderer service.
+///
+/// Connects to Zenoh, queries active displays from ModMan, registers them into Bevy's ECS
+/// via [`SystemUIIPC`], handles IPC commands, and launches [`system_ui_main`].
 #[instrument(skip(store, cancellation_tokens))]
 pub async fn renderer_main(
   store: RendererStore,
@@ -101,6 +117,8 @@ pub async fn renderer_main(
           let system_ui_ipc = SystemUIIPC {
             exit_channel: RecvSync(bevy_cancel_rx),
             display_registration_queue: display_registration_queue.clone(),
+            zenoh_session: session.clone(),
+            tokio_handle: tokio::runtime::Handle::current(),
           };
 
           // TODO: Add this as a CLI/Config option!
@@ -117,6 +135,9 @@ pub async fn renderer_main(
           // let display_handles = Arc::new(HashMap::new());
 
           let init_session = session.clone();
+          let queue_for_modman = display_registration_queue.clone();
+          let renderer_config = store.config.clone();
+          let cli_mirror_override = store.mirror_displays;
           cancellation_tokens
             .0
             .run_until_cancelled(async move {
@@ -228,6 +249,24 @@ pub async fn renderer_main(
               match displays_payload {
                 Ok(payload) => {
                   debug!("Got displays: {:?}", payload);
+                  match serde_json_lenient::from_str::<Vec<(String, AnyDisplayComponent)>>(&payload) {
+                    Ok(displays) => {
+                      let config_mirror = renderer_config.lock().await.renderer.mirror_displays;
+                      let global_mirror = cli_mirror_override || config_mirror;
+                      for (display_id, mut display) in displays {
+                        if let AnyDisplayComponent::Physical(ref mut phys) = display {
+                          if global_mirror && phys.mirror.is_none() {
+                            phys.mirror = Some(true);
+                          }
+                        }
+                        info!("Enqueuing display '{display_id}' into SystemUI registration queue");
+                        let _ = queue_for_modman.lock().unwrap().add((display_id, display));
+                      }
+                    }
+                    Err(e) => {
+                      error!("Failed to deserialize displays payload: {e}");
+                    }
+                  }
                   status_publisher
                     .put("ready")
                     .await

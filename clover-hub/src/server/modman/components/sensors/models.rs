@@ -14,4 +14,7 @@ pub enum ConnectionType {
   #[serde(rename = "modman-proxy")]
   #[strum(serialize = "modman-proxy")]
   ModManProxy,
+  #[serde(rename = "simulated")]
+  #[strum(serialize = "simulated")]
+  Simulated,
 }

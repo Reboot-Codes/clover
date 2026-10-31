@@ -525,6 +525,59 @@ pub async fn resolve_entry_value(
   }
 }
 
+/// Probes TCP connectivity to the remote host for a repository source URL.
+///
+/// Returns `true` if `src` is a local path or if TCP connection to `(host, port)` succeeds within `timeout_dur`.
+/// Returns `false` if the remote host is unreachable (timeout, DNS resolution failure, network down).
+pub async fn is_remote_reachable(src: &str, timeout_dur: std::time::Duration) -> bool {
+  if src.starts_with('/') || src.starts_with("file://") {
+    return true;
+  }
+
+  let (host, port) = if let Ok(parsed) = url::Url::parse(src) {
+    let host = match parsed.host_str() {
+      Some(h) => h.to_string(),
+      None => return true,
+    };
+    let default_port = match parsed.scheme() {
+      "http" => 80,
+      "https" => 443,
+      "ssh" => 22,
+      "git" => 9418,
+      _ => 443,
+    };
+    let port = parsed.port().unwrap_or(default_port);
+    (host, port)
+  } else if let Some(at_idx) = src.find('@') {
+    let after_at = &src[at_idx + 1..];
+    if let Some(colon_idx) = after_at.find(':') {
+      let host = &after_at[..colon_idx];
+      (host.to_string(), 22)
+    } else {
+      return true;
+    }
+  } else {
+    return true;
+  };
+
+  match tokio::time::timeout(
+    timeout_dur,
+    tokio::net::TcpStream::connect((host.as_str(), port)),
+  )
+  .await
+  {
+    Ok(Ok(_stream)) => true,
+    Ok(Err(e)) => {
+      debug!("Connectivity probe to {host}:{port} failed: {e}");
+      false
+    }
+    Err(_) => {
+      debug!("Connectivity probe to {host}:{port} timed out after {timeout_dur:?}");
+      false
+    }
+  }
+}
+
 /// Downloads repository updates from their origin remote using git.
 /// Git implicitly supports both HTTP(S) and SSH, so users have options when getting updates.
 #[instrument(skip(store))]
@@ -558,8 +611,23 @@ pub async fn download_repo_updates(
 
     debug!("Repo: {}, checking for updates...", repo_str.clone());
 
-    if err == None {
-      if repo_path.join("/.git/").exists() {
+    let repo_exists = repo_path.join("/.git/").exists();
+    let is_reachable = is_remote_reachable(&repo_spec.src, std::time::Duration::from_secs(2)).await;
+
+    if !is_reachable {
+      if repo_exists {
+        warn!(
+          "Repo: {}, remote is unreachable; update check skipped, using existing local copy.",
+          repo_str
+        );
+      } else {
+        warn!(
+          "Repo: {}, remote is unreachable and not yet cloned locally; skipping.",
+          repo_str
+        );
+      }
+    } else if err == None {
+      if repo_exists {
         match Repository::open(repo_path.to_string()) {
           Ok(repo) => {
             match repo.remotes() {
@@ -724,8 +792,40 @@ pub async fn download_repo_updates(
             );
           }
           Err(e) => {
-            error!("Repo: {}, failed to clone, due to:\n{}", repo_str, e);
-            repo_err = Some(Error(SimpleError::from(e)));
+            if e.class() == git2::ErrorClass::Submodule {
+              warn!(
+                "Repo: {}, recursive submodule clone failed ({}); falling back to standard clone without submodules...",
+                repo_str.clone(),
+                e
+              );
+              if repo_path.exists() {
+                let _ = fs::remove_dir_all(repo_path.clone().to_path()).await;
+              }
+              match Repository::clone(&repo_spec.src.clone(), repo_path.clone()) {
+                Ok(repo) => {
+                  repos_updated += 1;
+                  let comm = repo.head()?.peel_to_commit()?;
+                  let comm_str = match comm.message() {
+                    Some(message) => format!("{}, ({})", message, comm.id()),
+                    None => comm.id().to_string(),
+                  };
+                  info!(
+                    "Repo: {}, Downloaded (submodules skipped), now using commit: {}!",
+                    repo_str, comm_str
+                  );
+                }
+                Err(fallback_err) => {
+                  error!(
+                    "Repo: {}, failed to clone even without submodules, due to:\n{}",
+                    repo_str, fallback_err
+                  );
+                  repo_err = Some(Error(SimpleError::from(fallback_err)));
+                }
+              }
+            } else {
+              error!("Repo: {}, failed to clone, due to:\n{}", repo_str, e);
+              repo_err = Some(Error(SimpleError::from(e)));
+            }
           }
         }
       }
@@ -842,3 +942,22 @@ pub async fn download_repo_updates(
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::time::Duration;
+
+  #[tokio::test]
+  async fn test_is_remote_reachable_local_paths() {
+    assert!(is_remote_reachable("/opt/clover/repos", Duration::from_millis(100)).await);
+    assert!(is_remote_reachable("file:///opt/clover/repos", Duration::from_millis(100)).await);
+  }
+
+  #[tokio::test]
+  async fn test_is_remote_reachable_offline_host() {
+    // 192.0.2.1 is TEST-NET-1 (RFC 5737), non-routable documentation IP
+    assert!(!is_remote_reachable("https://192.0.2.1/repo.git", Duration::from_millis(50)).await);
+  }
+}
+

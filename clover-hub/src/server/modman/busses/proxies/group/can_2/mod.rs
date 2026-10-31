@@ -5,6 +5,7 @@
 
 pub mod adoption;
 pub mod bus_manager;
+pub mod display_blitter;
 pub mod interface_lookout;
 pub mod module_listener;
 

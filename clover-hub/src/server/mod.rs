@@ -5,7 +5,7 @@
 //! Primary server components in startup order are:
 //!
 //! - **[`warehouse`]:** Manages external repositories, and handles configuration parsing from them and the base configuration.
-//! - **[`modman`]:** Manages communication with non-networked [Modules](modman::models::Module) and their [Components](modman::models::CloverComponentMeta).
+//! - **[`modman`]:** Manages communication with non-networked [Modules](modman::models::modules::Module) and their [Components](modman::models::components::CloverComponentMeta).
 //! - **[`renderer`]:** Uses graphical acceleration to render and display graphics on any connected [display components](modman::components::video::displays::models::PhysicalDisplayComponent).
 //! - **[`inference_engine`]:** Manages Machine Learning models and their respective accelerators.
 //! - **[`appd`]:** The Application Daemon (a.k.a. AppDaemon, AppD), handles external Podman applications and utility scripts in coordination with [`warehouse`].
@@ -90,6 +90,7 @@ pub fn spawn_cleanup_task(
 pub async fn server_main(
   data_dir: &String,
   port: u16,
+  mirror_displays: bool,
   cancellation_token: CancellationToken,
   server_token: CancellationToken,
 ) {
@@ -104,7 +105,10 @@ pub async fn server_main(
       match connect_db(warehouse_store.clone()).await {
         Ok(_) => {
           debug!("initializing Stores...");
-          let renderer_store = RendererStore::new(Some(warehouse_store.config.clone()));
+          let renderer_store = RendererStore::new(
+            Some(warehouse_store.config.clone()),
+            mirror_displays,
+          );
           let modman_store = ModManStore::new(
             Some(warehouse_store.config.clone()),
             Some(warehouse_store.repos.clone()),
