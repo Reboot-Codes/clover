@@ -9,6 +9,7 @@ members = [
   "toolbox/carbon-steel",
   "core/libs/tesseract",
   "core/libs/carbon-fiber",
+  "core/applications/sensor-fusion",
   "core/modules/blinkie",
   "core/modules/two-phase-tail",
 ]
@@ -23,8 +24,14 @@ members = [
 
 # Workspace packages
 carbon_fiber = { path = "./core/libs/carbon-fiber" }
+tesseract = { path = "./core/libs/tesseract" }
+carbon_steel = { path = "./toolbox/carbon-steel" }
+
+sensor_fusion = { path = "./core/applications/sensor-fusion" }
 
 tokio-util = { version = "0.7.12", features = ["io", "io-util"] }
+
+bevy = "0.16.1"
 
 serde = { version = "1.0", default-features = false }
 serde_bytes = "0.11.19"

@@ -9,10 +9,10 @@ use crate::server::renderer::system_ui::{
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
 use bevy::render::camera::RenderTarget;
+use bevy::render::gpu_readback::{Readback, ReadbackComplete};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy::render::view::RenderLayers;
-use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 #[cfg(feature = "compositor")]
 use bevy::window::{
   Monitor,
@@ -51,23 +51,33 @@ pub struct VirtualDisplayID {
   pub id: String,
 }
 
-/// Tracking component for an offscreen display proxied through ModMan or rendered for testing.
+/// Tracking component for an offscreen display rendered to texture and periodically extracted over Zenoh.
 #[derive(Component)]
 pub struct ProxiedDisplayTarget {
   /// Unique display component identifier on Zenoh.
   pub id: String,
   /// Asset handle for the offscreen render target image.
   pub image_handle: Handle<Image>,
+  /// Native pixel width.
+  pub width: u16,
+  /// Native pixel height.
+  pub height: u16,
   /// Configured framerate floor (default >= 24 FPS).
   pub target_fps: u32,
-  /// Repeating timer governing frame extraction intervals.
+  /// Repeating timer governing periodic frame extraction intervals.
   pub timer: Timer,
   /// Monotonically increasing frame sequence counter.
   pub seq: u64,
-  /// Whether an asynchronous frame screenshot/extraction task is in flight.
-  pub pending_capture: bool,
+  /// Whether an asynchronous GPU readback is currently in flight.
+  pub pending_readback: bool,
   /// Whether desktop mirror window spawning is enabled for this target.
   pub mirror: bool,
+  /// Optional bounded channel sender delivering extracted frame envelopes to the dedicated Tokio Zenoh publisher (None for simulated displays).
+  pub frame_sender: Option<tokio::sync::mpsc::Sender<DisplayFrameEnvelope>>,
+  /// Reusable pre-allocated scratch buffer for unpadded RGBA pixels.
+  pub unpadded_buffer: Vec<u8>,
+  /// Reusable pre-allocated buffer for QOI encoded frame bytes.
+  pub qoi_buffer: Vec<u8>,
 }
 
 /// Ingests display registration requests from [`SystemUIIPC::display_registration_queue`]
@@ -262,19 +272,77 @@ pub fn display_registrar(
                 || display_id == "debug_external_display";
               let is_mirrored = physical_display_component.mirror.unwrap_or(false);
 
-              // Spawn tracking entity for frame extraction
-              commands.spawn((
-                ProxiedDisplayTarget {
-                  id: display_id.clone(),
-                  image_handle: image_handle.clone(),
-                  target_fps,
-                  timer: Timer::new(frame_duration, TimerMode::Repeating),
-                  seq: 0,
-                  pending_capture: false,
-                  mirror: is_mirrored,
-                },
-                layer.clone(),
-              ));
+              let (frame_sender, unpadded_buffer, qoi_buffer) = if !is_simulated {
+                let (frame_tx, mut frame_rx) = tokio::sync::mpsc::channel::<DisplayFrameEnvelope>(2);
+                let session = ipc.zenoh_session.clone();
+                let pub_topic = format!(
+                  "com/reboot-codes/clover/hub/modman/components/by-id/{display_id}/display/frame"
+                );
+
+                // Dedicated, persistent async publisher worker with 1 declared publisher for ModManProxy displays
+                ipc.tokio_handle.spawn(async move {
+                  let publisher = match session.declare_publisher(&pub_topic).await {
+                    Ok(p) => p,
+                    Err(e) => {
+                      log::error!("Failed to declare Zenoh publisher for {pub_topic}: {e}");
+                      return;
+                    }
+                  };
+
+                  let mut frame_count = 0u64;
+                  while let Some(envelope) = frame_rx.recv().await {
+                    frame_count = frame_count.wrapping_add(1);
+                    if frame_count % 150 == 0 {
+                      #[cfg(target_os = "linux")]
+                      unsafe {
+                        extern "C" {
+                          fn malloc_trim(pad: usize) -> i32;
+                        }
+                        malloc_trim(0);
+                      }
+                    }
+                    match serde_json::to_string(&envelope) {
+                      Ok(json) => {
+                        if let Err(e) = publisher.put(json).await {
+                          log::error!("Failed to publish display frame on {pub_topic}: {e}");
+                        }
+                      }
+                      Err(e) => {
+                        log::error!("Failed to serialize display frame envelope: {e}");
+                      }
+                    }
+                  }
+                });
+
+                (
+                  Some(frame_tx),
+                  Vec::with_capacity((width as usize) * (height as usize) * 4),
+                  vec![0u8; qoi::encode_max_len(width as u32, height as u32, 4)],
+                )
+              } else {
+                (None, Vec::new(), Vec::new())
+              };
+
+              // Spawn persistent tracking entity for offscreen render-to-texture display
+              commands
+                .spawn((
+                  ProxiedDisplayTarget {
+                    id: display_id.clone(),
+                    image_handle: image_handle.clone(),
+                    width: width as u16,
+                    height: height as u16,
+                    target_fps,
+                    timer: Timer::new(frame_duration, TimerMode::Repeating),
+                    seq: 0,
+                    pending_readback: false,
+                    mirror: is_mirrored,
+                    frame_sender,
+                    unpadded_buffer,
+                    qoi_buffer,
+                  },
+                  layer.clone(),
+                ))
+                .observe(on_display_readback_complete);
 
               #[cfg(feature = "compositor")]
               if is_mirrored && !is_simulated {
@@ -329,10 +397,17 @@ pub fn display_registrar(
                 );
               }
 
-              info!(
-                "Initialized ModManProxy display '{display_id}' ({}x{} @ {} FPS, layer {})",
-                width, height, target_fps, layer_idx
-              );
+              if is_simulated {
+                info!(
+                  "Initialized Simulated display '{display_id}' ({}x{} rendering to texture for SystemUI, Zenoh streaming skipped)",
+                  width, height
+                );
+              } else {
+                info!(
+                  "Initialized ModManProxy display '{display_id}' ({}x{} @ {} FPS, layer {}, streaming to Zenoh)",
+                  width, height, target_fps, layer_idx
+                );
+              }
             }
             crate::server::modman::components::video::displays::models::ConnectionType::Stream(
               stream_config,
@@ -358,76 +433,97 @@ pub fn display_registrar(
   }
 }
 
-/// Periodic frame extraction system for offscreen ModManProxy displays.
-pub fn capture_proxied_displays(
+/// Triggers periodic GPU readback on persistent display entities at their configured framerate.
+pub fn trigger_display_readbacks(
   time: Res<Time>,
-  mut query: Query<(Entity, &mut ProxiedDisplayTarget)>,
+  mut query: Query<(Entity, &mut ProxiedDisplayTarget), Without<Readback>>,
   mut commands: Commands,
-  ipc: Res<SystemUIIPC>,
 ) {
   for (entity, mut proxy) in &mut query {
+    // Only perform GPU readback if this target is proxied and has an active frame sender
+    if proxy.frame_sender.is_none() {
+      continue;
+    }
     proxy.timer.tick(time.delta());
-    if proxy.timer.just_finished() && !proxy.pending_capture {
-      proxy.pending_capture = true;
-      let display_id = proxy.id.clone();
-      let session = ipc.zenoh_session.clone();
-      let tokio_handle = ipc.tokio_handle.clone();
-      let target_entity = entity;
-      let seq = proxy.seq;
-      proxy.seq = proxy.seq.wrapping_add(1);
+    if proxy.timer.just_finished() && !proxy.pending_readback {
+      proxy.pending_readback = true;
+      commands.entity(entity).insert(Readback::texture(proxy.image_handle.clone()));
+    }
+  }
+}
 
-      commands
-        .spawn(Screenshot::image(proxy.image_handle.clone()))
-        .observe(
-          move |trigger: Trigger<ScreenshotCaptured>,
-                mut targets: Query<&mut ProxiedDisplayTarget>| {
-            if let Ok(mut target) = targets.get_mut(target_entity) {
-              target.pending_capture = false;
-            }
-            let captured_img = &trigger.event().0;
-            let width = captured_img.texture_descriptor.size.width as u16;
-            let height = captured_img.texture_descriptor.size.height as u16;
+/// Handles completion of GPU texture readback, encodes QOI, and publishes envelope to Zenoh.
+pub fn on_display_readback_complete(
+  trigger: Trigger<ReadbackComplete>,
+  mut query: Query<&mut ProxiedDisplayTarget>,
+  mut commands: Commands,
+) {
+  let entity = trigger.target();
+  commands.entity(entity).remove::<Readback>();
 
-            if let Some(ref raw_bytes) = captured_img.data {
-              match qoi::encode_to_vec(raw_bytes, width as u32, height as u32) {
-                Ok(qoi_data) => {
-                  let timestamp_ms = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis() as u64;
+  let Ok(mut proxy) = query.get_mut(entity) else {
+    return;
+  };
+  let ProxiedDisplayTarget {
+    ref id,
+    width,
+    height,
+    ref mut seq,
+    ref mut pending_readback,
+    ref mut unpadded_buffer,
+    ref mut qoi_buffer,
+    ref frame_sender,
+    ..
+  } = *proxy;
 
-                  let envelope = DisplayFrameEnvelope {
-                    seq,
-                    timestamp_ms,
-                    width,
-                    height,
-                    qoi_data,
-                  };
+  *pending_readback = false;
+  let curr_seq = *seq;
+  *seq = curr_seq.wrapping_add(1);
 
-                  let topic = format!(
-                    "com/reboot-codes/clover/hub/modman/components/by-id/{display_id}/display/frame"
-                  );
-                  match serde_json::to_string(&envelope) {
-                    Ok(json) => {
-                      let session_clone = session.clone();
-                      tokio_handle.spawn(async move {
-                        if let Err(e) = session_clone.put(&topic, json).await {
-                          log::error!("Failed to publish display frame on {topic}: {e}");
-                        }
-                      });
-                    }
-                    Err(e) => {
-                      log::error!("Failed to serialize display frame envelope: {e}");
-                    }
-                  }
-                }
-                Err(e) => {
-                  log::error!("Failed to QOI encode display frame for {display_id}: {e}");
-                }
-              }
-            }
-          },
-        );
+  let raw_bytes = &trigger.event().0;
+
+  // wgpu row alignment requires rows to be aligned to 256 bytes
+  let pixel_size = 4usize; // RGBA8
+  let initial_row_bytes = width as usize * pixel_size;
+  let buffered_row_bytes = (initial_row_bytes + 255) & !255;
+
+  let src_slice: &[u8] = if buffered_row_bytes > initial_row_bytes {
+    unpadded_buffer.clear();
+    let mut take_offset = 0;
+    for _ in 0..height {
+      unpadded_buffer.extend_from_slice(&raw_bytes[take_offset..take_offset + initial_row_bytes]);
+      take_offset += buffered_row_bytes;
+    }
+    unpadded_buffer
+  } else {
+    raw_bytes.as_slice()
+  };
+
+  let Some(ref sender) = frame_sender else {
+    return;
+  };
+
+  match qoi::encode_to_buf(&mut qoi_buffer[..], src_slice, width as u32, height as u32) {
+    Ok(qoi_len) => {
+      let qoi_data = qoi_buffer[..qoi_len].to_vec();
+      let timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+      let envelope = DisplayFrameEnvelope {
+        seq: curr_seq,
+        timestamp_ms,
+        width,
+        height,
+        qoi_data,
+      };
+
+      // Send to bounded worker; if worker is still publishing previous frame, drop this frame
+      let _ = sender.try_send(envelope);
+    }
+    Err(e) => {
+      log::error!("Failed to QOI encode display frame for {id}: {e}");
     }
   }
 }

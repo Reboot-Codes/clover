@@ -88,8 +88,9 @@ serde_json_lenient = { workspace = true }
 sea-orm = { workspace = true }
 
 # SystemUI
-bevy = "0.16.1"
+bevy = { workspace = true }
 qoi = "0.4.1"
+sensor_fusion = { workspace = true }
 
 # Busses
 carbon_fiber = { workspace = true, features = ["std"] }

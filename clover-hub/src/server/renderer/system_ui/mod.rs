@@ -48,6 +48,7 @@ use bevy::{
   prelude::*,
 };
 use queues::*;
+use sensor_fusion::SensorFusion;
 use serde::{
   Deserialize,
   Serialize,
@@ -96,12 +97,12 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
 
   app
     .insert_resource(custom_bevy_ipc)
-    // .add_systems(Startup, setup)
+    .add_plugins(SensorFusion)
     .add_systems(
       Update,
       (
         systems::displays::display_registrar,
-        systems::displays::capture_proxied_displays,
+        systems::displays::trigger_display_readbacks,
         shutdown_system,
       ),
     );
@@ -112,7 +113,11 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
       if !disable_winit_bool {
         use bevy::{
           render::{
-            settings::{Backends, RenderCreation, WgpuSettings},
+            settings::{
+              Backends,
+              RenderCreation,
+              WgpuSettings,
+            },
             RenderPlugin,
           },
           window::{
