@@ -7,9 +7,29 @@
 //! The internal bevy-based engine is found within the [System UI](system_ui) package.
 //!
 
+//! # Renderer Service
+//!
+//! Hosts the Bevy graphics engine, manages 3D scene compositing, offscreen Render-to-Texture (RTT),
+//! and streams rendered frames to physical and virtual displays.
+//!
+//! ## Zenoh Endpoints
+//!
+//! ### Publishers
+//! - `com/reboot-codes/clover/hub/renderer/status`: Emits renderer initialization and readiness states.
+//!   Implemented by [`renderer_main`].
+//!
+//! ### Dependencies
+//! - `com/reboot-codes/clover/hub/modman/status`:
+//!   - **Upstream Provider**: [`crate::server::modman::modman_main`]
+//!   - **Rationale**: Awaits ModMan startup before querying registered displays.
+//! - `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`:
+//!   - **Upstream Provider**: [`crate::server::modman::ipc::displays::display_queryable`]
+//!   - **Rationale**: Ingests display metadata and dimensions to construct Bevy offscreen cameras.
+
 pub mod ipc;
 pub mod models;
 pub mod system_ui;
+
 
 use self::system_ui::system_ui_main;
 use crate::server::{
@@ -76,15 +96,35 @@ impl RendererStore {
 ///
 /// Connects to Zenoh, queries active displays from ModMan, registers them into Bevy's ECS
 /// via [`SystemUIIPC`], handles IPC commands, and launches [`system_ui_main`].
+///
+/// ### Zenoh Publishers
+/// - **Key Expression**: `com/reboot-codes/clover/hub/renderer/status`
+/// - **Payload Format**: String status tokens (`"ready:engine"`, `"started"`, `"ready:incomplete"`)
+///
+/// #### Payload Example
+/// ```text
+/// "ready:engine"
+/// ```
+///
+/// ### Zenoh Dependencies
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/status`
+///   - **Upstream Provider**: [`crate::server::modman::modman_main`]
+///   - **Rationale**: Blocks display configuration until ModMan is verified running.
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`
+///   - **Upstream Provider**: [`crate::server::modman::ipc::displays::display_queryable`]
+///   - **Rationale**: Fetches registered displays to allocate Bevy render textures and cameras.
 #[instrument(skip(store, cancellation_tokens))]
 pub async fn renderer_main(
+
   store: RendererStore,
   cancellation_tokens: (CancellationToken, CancellationToken),
+  port: u16,
 ) {
   info!("Starting Renderer...");
 
+  let endpoint = format!("[\"tcp/localhost:{port}\"]");
   let config_ret = configure_zenoh(vec![
-    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    ("connect/endpoints", &endpoint),
     (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,
@@ -112,19 +152,20 @@ pub async fn renderer_main(
           let ipc_handle = tokio::task::spawn(handle_ipc(ipc_token, ipc_session));
 
           let display_registration_queue = Arc::new(StdMutex::new(queue![]));
+          let event_loop_proxy = Arc::new(StdMutex::new(None));
 
           let (bevy_cancel_tx, bevy_cancel_rx) = std::sync::mpsc::channel();
           let system_ui_ipc = SystemUIIPC {
             exit_channel: RecvSync(bevy_cancel_rx),
+            event_loop_proxy: event_loop_proxy.clone(),
             display_registration_queue: display_registration_queue.clone(),
             zenoh_session: session.clone(),
             tokio_handle: tokio::runtime::Handle::current(),
           };
 
-          // TODO: Add this as a CLI/Config option!
           let custom_bevy_ipc = system_ui_ipc;
           let bevy_thread =
-            std::thread::spawn(move || system_ui_main(custom_bevy_ipc, Some(false)));
+            std::thread::spawn(move || system_ui_main(custom_bevy_ipc));
 
           // Signal that the renderer engine has initialized and is accepting displays
           status_publisher
@@ -293,14 +334,28 @@ pub async fn renderer_main(
               info!("Cleaning up displays...");
 
               let _ = bevy_cancel_tx.send(bevy::prelude::AppExit::Success);
+              if let Ok(guard) = event_loop_proxy.lock() {
+                if let Some(proxy) = guard.as_ref() {
+                  let _ = proxy.send_event(bevy::winit::WakeUp);
+                }
+              }
 
               info!("Waiting for Bevy to shut down...");
-              match bevy_thread.join() {
-                Ok(_) => {
+              let (join_tx, join_rx) = tokio::sync::oneshot::channel();
+              std::thread::spawn(move || {
+                let res = bevy_thread.join();
+                let _ = join_tx.send(res);
+              });
+
+              match tokio::time::timeout(std::time::Duration::from_millis(3000), join_rx).await {
+                Ok(Ok(Ok(_))) => {
                   info!("Bevy thread exited cleanly");
                 }
-                Err(e) => {
+                Ok(Ok(Err(e))) => {
                   error!("Bevy thread panicked during shutdown: {:?}", e);
+                }
+                _ => {
+                  tracing::warn!("Bevy thread did not finish within 3s; proceeding with server shutdown");
                 }
               }
 

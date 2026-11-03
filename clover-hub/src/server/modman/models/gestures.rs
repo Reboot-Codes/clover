@@ -42,8 +42,11 @@ pub enum GestureState {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GestureCommand {
   pub state: GestureState,
+  #[serde(default)]
   pub auto_switch: Option<f64>,
+  #[serde(default)]
   pub is_from_system: bool,
+  #[serde(default)]
   pub areas: Option<Vec<String>>,
 }
 
@@ -75,6 +78,9 @@ pub struct GestureStates {
   pub current_state: GestureState,
   /// The next state to switch to (pre-loaded into Renderer and Modules if it loads resources), with a delay if we want to switch automatically.
   pub next_state: Option<(f64, GestureState)>,
+  /// Generation counter incremented whenever Begin/restart is commanded.
+  #[serde(default)]
+  pub start_epoch: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

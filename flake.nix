@@ -73,7 +73,7 @@
           pango
           webkitgtk_4_1
           fontconfig
-          libz
+          zlib
           mesa
           libglvnd
         ];
@@ -197,6 +197,7 @@
               tokio-console
               zenoh
               process-compose
+              heaptrack
 
               # Run scripts
               cloverCompose

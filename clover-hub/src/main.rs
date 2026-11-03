@@ -13,6 +13,14 @@
 
 #![recursion_limit = "512"]
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+#[cfg(not(feature = "dhat-heap"))]
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::error::Error;
 use tokio_util::sync::CancellationToken;
 
@@ -21,6 +29,12 @@ use clover_hub::run;
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
   let big_boy_token = CancellationToken::new();
+
+  #[cfg(feature = "dhat-heap")]
+  {
+    let profiler = dhat::Profiler::builder().trim_backtraces(Some(20)).build();
+    *clover_hub::PROFILER.lock().unwrap() = Some(profiler);
+  }
 
   tokio::select! {
     _ = run(big_boy_token.clone()) => {},

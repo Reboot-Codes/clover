@@ -6,6 +6,16 @@
 //!
 //! Later, after an initial connection to Zenoh is initialized, Warehouse will then monitor for [events](ipc) using its primary service defined in [`warehouse_main`].
 //!
+//! ## Zenoh Endpoints
+//!
+//! ### Publishers
+//! - `com/reboot-codes/clover/hub/warehouse/status`: Emits Warehouse readiness and database connection states.
+//!   Implemented by [`warehouse_main`].
+//!
+//! ### Subscribers
+//! - `com/reboot-codes/clover/hub/warehouse/**`: Ingests configuration updates and repository sync events.
+//!   Implemented by [`ipc::handle_ipc`].
+
 
 pub mod config;
 pub mod db;
@@ -225,15 +235,27 @@ pub async fn setup_warehouse(data_dir: String, store: Arc<WarehouseStore>) -> Re
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/warehouse";
 
 /// Main service function for Warehouse. Maintains an ongoing connection to Zenoh, and will manage filesystem operations as needed.
+///
+/// ### Zenoh Publishers
+/// - **Key Expression**: `com/reboot-codes/clover/hub/warehouse/status`
+/// - **Payload Format**: String status tokens (`"started"`, `"stopping"`)
+///
+/// #### Payload Example
+/// ```text
+/// "started"
+/// ```
 #[instrument(skip(store, cancellation_tokens))]
 pub async fn warehouse_main(
+
   store: Arc<WarehouseStore>,
   cancellation_tokens: (CancellationToken, CancellationToken),
+  port: u16,
 ) {
   info!("Starting Warehouse...");
 
+  let endpoint = format!("[\"tcp/localhost:{port}\"]");
   let config_ret = configure_zenoh(vec![
-    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    ("connect/endpoints", &endpoint),
     (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,
@@ -300,7 +322,13 @@ pub async fn warehouse_main(
               // TODO: Lock db and clean up when done.
               debug!("Writing Config File...");
               let config = store.config.lock().await;
-              match fs::File::open(config.data_dir.join("/config.json")).await {
+              match fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(config.data_dir.join("/config.json"))
+                .await
+              {
                 Ok(mut config_file) => {
                   debug!("Config file opened!");
 
@@ -316,7 +344,7 @@ pub async fn warehouse_main(
                       debug!("Wrote config from store state!");
                     }
                     Err(e) => {
-                      error!("Failed to write config file");
+                      error!("Failed to write config file: {e}");
                       // TODO!
                     }
                   }

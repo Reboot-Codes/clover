@@ -3,8 +3,16 @@
 //! Short for Module Manager.
 //!
 //! Manages [communication](busses) with [Modules](modules) and their [Components](components), as well as managing message generation for [Gestures](gestures).
-//! Primary execution starts at [`modman_main`]
+//! Primary execution starts at [`modman_main`].
 //!
+//! ## Zenoh Endpoints
+//!
+//! ### Publishers
+//! - `com/reboot-codes/clover/hub/modman/status`: Emits ModMan readiness and shutdown states.
+//!   Implemented by [`modman_main`].
+//!
+//! See [`ipc`] for the complete catalog of ModMan queryables (modules, ports, gestures, displays).
+
 
 pub mod busses;
 pub mod components;
@@ -47,16 +55,28 @@ use crate::{
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/modman";
 
-/// Begin the ModMan threads and sub-processes to ensure module/compoent communications.
+/// Begin the ModMan threads and sub-processes to ensure module/component communications.
+///
+/// ### Zenoh Publishers
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/status`
+/// - **Payload Format**: String status tokens (`"started"`, `"stopping"`)
+///
+/// #### Payload Example
+/// ```text
+/// "started"
+/// ```
 #[instrument(skip(store, cancellation_tokens))]
 pub async fn modman_main(
+
   store: ModManStore,
   cancellation_tokens: (CancellationToken, CancellationToken),
+  port: u16,
 ) {
   info!("Starting ModMan...");
 
+  let endpoint = format!("[\"tcp/localhost:{port}\"]");
   let config_ret = configure_zenoh(vec![
-    ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+    ("connect/endpoints", &endpoint),
     (
       "timestamping/enabled",
       r#"{ router: true, peer: true, client: true }"#,

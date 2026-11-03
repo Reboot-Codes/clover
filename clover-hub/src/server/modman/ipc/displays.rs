@@ -1,3 +1,13 @@
+//! # ModMan Display IPC Queryable
+//!
+//! Exposes Zenoh queryables for querying all initialized physical and virtual video displays.
+//!
+//! ## Zenoh Endpoints
+//!
+//! ### Queryables Provided
+//! - `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`: Queries all registered displays.
+//!   Implemented by [`display_queryable`].
+
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -20,10 +30,34 @@ use crate::server::{
 
 /// Zenoh queryable responder that serves registered physical and virtual displays.
 ///
-/// Listens on `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`
-/// and returns all initialized display components stored in [`ModManStore`].
+/// ### Zenoh Queryables
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/components/by-type/video/displays/all`
+/// - **Query Payload**: Empty
+/// - **Reply Format**: Serialized JSON array of tuples `(String, AnyDisplayComponent)`
+///
+/// #### Example Reply
+/// ```json
+/// [
+///   [
+///     "display-oled-01",
+///     {
+///       "Physical": {
+///         "width": 128,
+///         "height": 64,
+///         "target_fps": 30,
+///         "connection": {
+///           "Can": {
+///             "can_id": 42
+///           }
+///         }
+///       }
+///     }
+///   ]
+/// ]
+/// ```
 #[instrument(skip(store, session, cancellation_token))]
 pub async fn display_queryable(
+
   store: ModManStore,
   session: Arc<zenoh::Session>,
   cancellation_token: CancellationToken,

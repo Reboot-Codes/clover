@@ -100,6 +100,46 @@ pub fn find_gesture_in_manifests(
   None
 }
 
+/// Resolves the total duration (in milliseconds) and playback repetition behavior for a gesture.
+///
+/// Inspects Warehouse manifests first, falling back to default catalog definitions.
+pub fn get_gesture_duration_and_type(
+  repos: &HashMap<String, Manifest>,
+  default_pack: &str,
+  gesture_id: &str,
+) -> (f64, String) {
+  if let Some(dyn_spec) = find_gesture_in_manifests(repos, default_pack, gesture_id) {
+    let mut max_duration = 0.0;
+    let mut anim_type = "once".to_string();
+
+    #[cfg(feature = "core")]
+    if let OptionalStrTHashMap::Some(ref configs) = dyn_spec.configs {
+      for (_arch_id, arch) in configs {
+        if let OptionalStrTHashMap::Some(ref targets) = arch.targets {
+          for (_area_id, area) in targets {
+            if let Optional::Some(ref anim) = area.animation {
+              if let Some(dur) = anim.duration {
+                if dur > max_duration {
+                  max_duration = dur;
+                }
+              }
+              if let OptionalString::Some(ref t) = anim.anim_type {
+                anim_type = t.clone();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if max_duration > 0.0 {
+      return (max_duration, anim_type);
+    }
+  }
+
+  (0.0, "once".to_string())
+}
+
 /// Evaluates a single keyframe channel for a given elapsed time.
 ///
 /// Returns a tuple `(interpolated_value, is_completed)`:
@@ -484,6 +524,58 @@ mod tests {
     assert!(is_outside_deadband(&tone1, &tone3, 0));
     assert!(is_outside_deadband(&tone1, &silence, 0));
     assert!(!is_outside_deadband(&silence, &silence, 0));
+  }
+
+  fn dummy_manifest(gesture_id: &str, duration: f64, anim_type: &str) -> Manifest {
+    let raw_json = serde_json::json!({
+      "version": "1.0.0",
+      "directory": {
+        "gesture_packs": {
+          "default": {
+            "gestures": {
+              gesture_id: {
+                "configs": {
+                  "robot": {
+                    "targets": {
+                      "head.*": {
+                        "@animation": {
+                          "type": anim_type,
+                          "duration": duration,
+                          "keyframes": [
+                            { "x": 0.0 },
+                            { "x": 1.0 }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    serde_json::from_value(raw_json).expect("valid manifest json")
+  }
+
+  #[test]
+  fn test_get_gesture_duration_and_type() {
+    let mut repos = HashMap::new();
+    repos.insert("test_repo".to_string(), dummy_manifest("custom_nod", 1200.0, "bounce"));
+    repos.insert("test_repo2".to_string(), dummy_manifest("custom_loop", 2500.0, "loop"));
+
+    let (dur_nod, type_nod) = get_gesture_duration_and_type(&repos, "default", "custom_nod");
+    assert_eq!(dur_nod, 1200.0);
+    assert_eq!(type_nod, "bounce");
+
+    let (dur_loop, type_loop) = get_gesture_duration_and_type(&repos, "default", "custom_loop");
+    assert_eq!(dur_loop, 2500.0);
+    assert_eq!(type_loop, "loop");
+
+    let (dur_none, type_none) = get_gesture_duration_and_type(&repos, "default", "non_existent");
+    assert_eq!(dur_none, 0.0);
+    assert_eq!(type_none, "once");
   }
 }
 

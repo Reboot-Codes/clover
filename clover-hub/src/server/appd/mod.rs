@@ -2,6 +2,16 @@
 //!
 //! The Application Daemon (a.k.a. AppD), handles external Podman applications and utility scripts in coordination with [`super::warehouse`]. Primary thread execution starts with [`appd_main`].
 //!
+//! ## Zenoh Endpoints
+//!
+//! ### Publishers
+//! - `com/reboot-codes/clover/server/appdaemon/status`: Emits AppDaemon initialization and readiness states.
+//!   Implemented by [`appd_main`].
+//!
+//! ### Subscribers
+//! - `com/reboot-codes/clover/server/appdaemon/**`: Ingests container and application control events.
+//!   Implemented by [`ipc::handle_ipc`].
+
 
 pub mod docker;
 pub mod ipc;
@@ -37,10 +47,24 @@ use zenoh_ext::{
 
 pub const MODULE_EVT_ID: &str = "com/reboot-codes/clover/hub/appdaemon";
 
+/// Primary service entrypoint for AppDaemon.
+///
+/// Connects to Docker daemon, opens Zenoh session, and spawns application container supervisors.
+///
+/// ### Zenoh Publishers
+/// - **Key Expression**: `com/reboot-codes/clover/server/appdaemon/status`
+/// - **Payload Format**: String status tokens (`"started"`, `"stopping"`)
+///
+/// #### Payload Example
+/// ```text
+/// "started"
+/// ```
 #[instrument(skip(store, cancellation_tokens))]
 pub async fn appd_main(
+
   store: AppDStore,
   cancellation_tokens: (CancellationToken, CancellationToken),
+  port: u16,
 ) {
   info!("Starting AppDaemon...");
 
@@ -51,8 +75,9 @@ pub async fn appd_main(
       info!("Connected to docker on {}!", docker_path.clone());
       let docker = Arc::new(docker_conn);
 
+      let endpoint = format!("[\"tcp/localhost:{port}\"]");
       let config_ret = configure_zenoh(vec![
-        ("connect/endpoints", "[\"tcp/localhost:6699\"]"),
+        ("connect/endpoints", &endpoint),
         (
           "timestamping/enabled",
           r#"{ router: true, peer: true, client: true }"#,

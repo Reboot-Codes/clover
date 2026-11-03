@@ -1,3 +1,18 @@
+//! # ModMan Gesture IPC Queryables & Status Publisher
+//!
+//! Exposes Zenoh queryables to inspect, query, and command gesture playback, and publishes
+//! lifecycle events as gestures start, loop, pause, and end.
+//!
+//! ## Zenoh Endpoints
+//!
+//! ### Queryables Provided
+//! - `com/reboot-codes/clover/hub/modman/gestures/all`: Queries all loaded gestures and keyframe track summaries.
+//! - `com/reboot-codes/clover/hub/modman/gestures/active`: Queries active foreground/background stacks and states.
+//! - `com/reboot-codes/clover/hub/modman/gestures/update`: Commands gesture state changes (Begin, Pause, End).
+//!
+//! ### Publishers
+//! - `com/reboot-codes/clover/hub/modman/gestures/status`: Emits gesture lifecycle transition events.
+
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -25,6 +40,7 @@ use crate::server::modman::{
   },
   MODULE_EVT_ID,
 };
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
@@ -62,8 +78,85 @@ pub async fn should_be_bg(store: Arc<ModManStore>, bg_from_state: Option<bool>) 
   }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct GestureCatalogItem {
+  pub id: String,
+  pub name: String,
+  pub duration_ms: f64,
+  pub curve: String,
+  pub anim_type: String,
+  pub keyframe_count: usize,
+  pub keyframe_fractions: Vec<f64>,
+}
+
+
+
+/// Zenoh queryable responder and status publisher for gesture management.
+///
+/// ### Zenoh Queryables
+///
+/// #### 1. Gesture Command & Update
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/gestures/update`
+/// - **Query Payload**: Serialized JSON [`GestureUpdatePayload`]
+/// - **Reply Format**: Status string confirming outcome (e.g. `"ok"`, `"no-op: ..."`).
+///
+/// ##### Example Query Payload
+/// ```json
+/// {
+///   "gesture_id": "wag_tail",
+///   "state": {
+///     "Begin": {
+///       "speed": 1.0,
+///       "intensity": 1.0,
+///       "background": false
+///     }
+///   },
+///   "auto_switch": null,
+///   "is_from_system": false
+/// }
+/// ```
+///
+/// #### 2. Active Gestures
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/gestures/active`
+/// - **Query Payload**: Empty
+/// - **Reply Format**: Serialized JSON with priority lists and current playback states
+///
+/// ##### Example Reply
+/// ```json
+/// {
+///   "foreground": ["wag_tail"],
+///   "background": ["idle_breathing"],
+///   "states": {
+///     "wag_tail": {
+///       "current_state": "Begin",
+///       "paused": false,
+///       "start_epoch": 1
+///     }
+///   }
+/// }
+/// ```
+///
+/// #### 3. Gestures Catalog
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/gestures/all`
+/// - **Query Payload**: Empty
+/// - **Reply Format**: Serialized JSON array of [`GestureSummary`]
+///
+/// ### Zenoh Publishers
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/gestures/status`
+/// - **Payload Format**: JSON event object notifying lifecycle status
+///
+/// ##### Example Event
+/// ```json
+/// {
+///   "gesture_id": "wag_tail",
+///   "status": "started",
+///   "foreground": ["wag_tail"],
+///   "background": []
+/// }
+/// ```
 #[instrument(skip(store, cancellation_token, session))]
 pub async fn gesture_queryable(
+
   store: ModManStore,
   cancellation_token: CancellationToken,
   session: Arc<zenoh::Session>,
@@ -87,14 +180,142 @@ pub async fn gesture_queryable(
     }
   };
 
+  let active_key_expr = format!("{MODULE_EVT_ID}/gestures/active");
+  let active_queryable = match session.declare_queryable(&active_key_expr).await {
+    Ok(q) => Some(q),
+    Err(e) => {
+      warn!("Failed to declare active gestures queryable at {active_key_expr}: {e}");
+      None
+    }
+  };
+
+  let all_key_expr = format!("{MODULE_EVT_ID}/gestures/all");
+  let all_queryable = match session.declare_queryable(&all_key_expr).await {
+    Ok(q) => Some(q),
+    Err(e) => {
+      warn!("Failed to declare all gestures queryable at {all_key_expr}: {e}");
+      None
+    }
+  };
+
   let store_arc = Arc::new(store);
 
-  debug!("Listening for gesture updates on {key_expr}!");
+  debug!("Listening for gesture updates on {key_expr}, {active_key_expr}, and {all_key_expr}!");
   while !cancellation_token.is_cancelled() {
     tokio::select! {
       _ = cancellation_token.cancelled() => {
         debug!("Shutting down gesture queryable...");
         break;
+      }
+      recv_all = async {
+        if let Some(ref q) = all_queryable {
+          q.recv_async().await
+        } else {
+          futures::future::pending().await
+        }
+      } => {
+        match recv_all {
+          Ok(query) => {
+            let mut items = Vec::new();
+            {
+              let repos = store_arc.repos.lock().await;
+              for (_repo_id, manifest) in repos.iter() {
+                if let crate::server::warehouse::repos::models::Optional::Some(ref dir) = manifest.directory {
+                  #[cfg(feature = "core")]
+                  if let crate::server::warehouse::repos::models::OptionalStrTHashMap::Some(ref packs) = dir.gesture_packs {
+                    for (_pack_id, pack) in packs {
+                      if let crate::server::warehouse::repos::models::OptionalStrTHashMap::Some(ref gestures) = pack.gestures {
+                        for (g_id, g_spec) in gestures {
+                          if let crate::server::warehouse::repos::models::GestureSpec::DynamicGestureSpec(ref dyn_spec) = g_spec {
+                            let name = match &dyn_spec.name {
+                              crate::server::warehouse::repos::models::OptionalString::Some(s) => s.clone(),
+                              _ => g_id.clone(),
+                            };
+
+                            let mut duration_ms = 1000.0;
+                            let mut curve = "ease_in_out".to_string();
+                            let mut anim_type = "once".to_string();
+                            let mut kf_count = 3;
+                            let mut kf_fractions = vec![0.0, 0.5, 1.0];
+
+                            if let crate::server::warehouse::repos::models::OptionalStrTHashMap::Some(ref configs) = dyn_spec.configs {
+                              for (_arch_id, arch) in configs {
+                                if let crate::server::warehouse::repos::models::OptionalStrTHashMap::Some(ref targets) = arch.targets {
+                                  for (_area_id, area) in targets {
+                                    if let crate::server::warehouse::repos::models::Optional::Some(ref anim) = area.animation {
+                                      if let Some(dur) = anim.duration {
+                                        duration_ms = dur;
+                                      }
+                                      if let crate::server::warehouse::repos::models::OptionalString::Some(ref c) = anim.curve {
+                                        curve = c.clone();
+                                      }
+                                      if let crate::server::warehouse::repos::models::OptionalString::Some(ref t) = anim.anim_type {
+                                        anim_type = t.clone();
+                                      }
+                                      if let Some(ref kfs_val) = anim.keyframes {
+                                        if let Some(arr) = kfs_val.as_array() {
+                                          kf_count = arr.len().max(2);
+                                          kf_fractions = (0..kf_count).map(|i| i as f64 / (kf_count - 1) as f64).collect();
+                                        }
+                                      }
+                                      break;
+                                    }
+                                  }
+                                }
+                              }
+                            }
+
+                            items.push(GestureCatalogItem {
+                              id: g_id.clone(),
+                              name,
+                              duration_ms,
+                              curve,
+                              anim_type,
+                              keyframe_count: kf_count,
+                              keyframe_fractions: kf_fractions,
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            if let Ok(json_str) = serde_json::to_string(&items) {
+              let _ = query.reply(&all_key_expr, json_str).await;
+            }
+          }
+          Err(err) => {
+            warn!("Error receiving from all gestures queryable: {err}");
+          }
+        }
+      }
+      recv_active = async {
+        if let Some(ref q) = active_queryable {
+          q.recv_async().await
+        } else {
+          futures::future::pending().await
+        }
+      } => {
+        match recv_active {
+          Ok(query) => {
+            let fg = store_arc.foreground_gesture_priority.lock().await.clone();
+            let bg = store_arc.background_gesture_priority.lock().await.clone();
+            let states = store_arc.gesture_states.lock().await.clone();
+            let status_json = serde_json::json!({
+              "foreground": fg,
+              "background": bg,
+              "states": states,
+            });
+            if let Ok(json_str) = serde_json::to_string(&status_json) {
+              let _ = query.reply(&active_key_expr, json_str).await;
+            }
+          }
+          Err(err) => {
+            warn!("Error receiving from active gestures queryable: {err}");
+          }
+        }
       }
       recv_result = queryable.recv_async() => {
         match recv_result {
@@ -190,7 +411,10 @@ pub async fn handle_gesture_cmd(
 
   let stored_states = match gesture_state_map.get(&gesture_id.clone()) {
     Some(stored_states_from_map) => {
-      if stored_states_from_map.current_state == command.state {
+      if (stored_states_from_map.current_state == command.state)
+        || (command.state == GestureState::Pause && stored_states_from_map.paused)
+        || (command.state == GestureState::UnPause && !stored_states_from_map.paused)
+      {
         warn!("Sent gesture state command which matches current state, this is a no-op!");
         return Ok("no-op: state already set to requested value".to_string());
       } else {
@@ -208,6 +432,7 @@ pub async fn handle_gesture_cmd(
           current_state: GestureState::End,
           next_state: None,
           paused: false,
+          start_epoch: 0,
         },
         _ => {
           let msg = format!(
@@ -227,26 +452,31 @@ pub async fn handle_gesture_cmd(
       speed: _,
       background,
     } => {
-      // When beginning a gesture (or setting new parameters), move it to the top of either back/foreground application list.
-      let mut priority_vec;
+      let is_bg = should_be_bg(store.clone(), background).await;
+      if is_bg {
+        let mut fg = store.foreground_gesture_priority.lock().await;
+        fg.retain(|item| item != &gesture_id);
+        drop(fg);
 
-      if should_be_bg(store.clone(), background).await {
-        priority_vec = store.background_gesture_priority.lock().await;
+        let mut bg = store.background_gesture_priority.lock().await;
+        bg.retain(|item| item != &gesture_id);
+        bg.push(gesture_id.clone());
       } else {
-        priority_vec = store.foreground_gesture_priority.lock().await;
-      }
+        let mut bg = store.background_gesture_priority.lock().await;
+        bg.retain(|item| item != &gesture_id);
+        drop(bg);
 
-      if let Some(index) = priority_vec.iter().position(|item| item == &gesture_id) {
-        priority_vec.remove(index);
+        let mut fg = store.foreground_gesture_priority.lock().await;
+        fg.retain(|item| item != &gesture_id);
+        fg.push(gesture_id.clone());
       }
-
-      priority_vec.push(gesture_id.clone());
 
       modded_gesture_state = Some(GestureStates {
         prev_state: stored_states.prev_state.clone(),
         current_state: command.state,
         next_state: stored_states.next_state.clone(),
         paused: false,
+        start_epoch: stored_states.start_epoch.wrapping_add(1),
       });
     }
     GestureState::Pause => {
@@ -255,20 +485,17 @@ pub async fn handle_gesture_cmd(
         current_state: stored_states.current_state.clone(),
         next_state: stored_states.next_state.clone(),
         paused: true,
+        start_epoch: stored_states.start_epoch,
       });
     }
     GestureState::End => {
-      // Remove the gesture from either gesture priority vec.
+      // Remove the gesture from both gesture priority vecs.
       let mut bg_priority = store.background_gesture_priority.lock().await;
-      if let Some(index) = bg_priority.iter().position(|item| item == &gesture_id) {
-        bg_priority.remove(index);
-      }
+      bg_priority.retain(|item| item != &gesture_id);
       drop(bg_priority);
 
       let mut fg_priority = store.foreground_gesture_priority.lock().await;
-      if let Some(index) = fg_priority.iter().position(|item| item == &gesture_id) {
-        fg_priority.remove(index);
-      }
+      fg_priority.retain(|item| item != &gesture_id);
       drop(fg_priority);
     }
     GestureState::UnPause => {
@@ -277,6 +504,7 @@ pub async fn handle_gesture_cmd(
         current_state: stored_states.current_state.clone(),
         next_state: stored_states.next_state.clone(),
         paused: false,
+        start_epoch: stored_states.start_epoch,
       });
     }
   }

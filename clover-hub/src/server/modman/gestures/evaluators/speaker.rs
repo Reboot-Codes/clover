@@ -199,6 +199,7 @@ mod tests {
         intensity: 1.0,
         speed: 1.0,
         background: false,
+        epoch: 0,
         last_dispatched_targets: HashMap::new(),
       },
     );
@@ -245,6 +246,7 @@ mod tests {
         intensity: 1.0,
         speed: 1.0,
         background: false,
+        epoch: 0,
         last_dispatched_targets: HashMap::new(),
       },
     );

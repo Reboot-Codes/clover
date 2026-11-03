@@ -4,6 +4,11 @@
 //! decompresses them into 16-bit RGB565 buffers, computes dirty bounding rectangles between
 //! consecutive frames, and packages changed pixel data into 32-byte CAN 2.0 [`ComponentTarget::DisplayBlitChunk`]
 //! frames transmitted across ISO-TP to adopted hardware modules.
+//!
+//! ## Zenoh Dependencies
+//! - `com/reboot-codes/clover/hub/modman/components/by-id/{display_id}/display/frame`:
+//!   - **Upstream Provider**: [`crate::server::renderer::system_ui::systems::displays::display_registrar`]
+//!   - **Rationale**: Consumes QOI display frames rendered by SystemUI to stream onto physical CAN hardware displays.
 
 use std::{
   sync::Arc,
@@ -182,8 +187,15 @@ pub fn generate_blit_chunks(
 /// Subscribes to Zenoh display frame envelopes for each ModManProxy display component
 /// hosted on this module, decompresses QOI, computes dirty bounding boxes, and streams
 /// `DisplayBlitChunk` commands via `dispatch_target`.
+///
+/// ### Zenoh Dependencies
+/// - **Key Expression**: `com/reboot-codes/clover/hub/modman/components/by-id/{display_id}/display/frame`
+/// - **Upstream Provider**: [`crate::server::renderer::system_ui::systems::displays::display_registrar`]
+/// - **Expected Schema**: Serialized JSON string of [`DisplayFrameEnvelope`]
+/// - **Rationale**: Ingests high-frequency rendered frames from SystemUI to transcode into CAN differential updates.
 #[instrument(skip(session, cancellation_token, store))]
 pub async fn can_display_blitter(
+
   session: Arc<zenoh::Session>,
   cancellation_token: CancellationToken,
   module_id: String,

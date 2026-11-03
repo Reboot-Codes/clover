@@ -40,11 +40,6 @@ use crate::server::modman::components::video::displays::models::{
 use crate::utils::RecvSync;
 use bevy::{
   app::App,
-  diagnostic::{
-    FrameTimeDiagnosticsPlugin,
-    LogDiagnosticsPlugin,
-  },
-  log::LogPlugin,
   prelude::*,
 };
 use queues::*;
@@ -68,6 +63,8 @@ pub enum AnyDisplayComponent {
 pub struct SystemUIIPC {
   /// Receiver channel delivering graceful shutdown requests to Bevy.
   pub exit_channel: RecvSync<bevy::prelude::AppExit>,
+  /// Optional Winit event loop proxy to wake up Bevy when shutting down.
+  pub event_loop_proxy: Arc<Mutex<Option<bevy::winit::EventLoopProxy<bevy::winit::WakeUp>>>>,
   /// Queue of newly discovered or registered display components awaiting ECS initialization.
   pub display_registration_queue: Arc<Mutex<Queue<(String, AnyDisplayComponent)>>>,
   /// Shared Zenoh session handle for publishing alerts and frames.
@@ -76,23 +73,35 @@ pub struct SystemUIIPC {
   pub tokio_handle: tokio::runtime::Handle,
 }
 
+/// ECS system that captures Winit's EventLoopProxy so Tokio can wake the event loop on exit.
+pub fn capture_event_loop_proxy(
+  ipc: Res<SystemUIIPC>,
+  proxy: Option<Res<bevy::winit::EventLoopProxyWrapper<bevy::winit::WakeUp>>>,
+) {
+  if let Some(proxy) = proxy {
+    if let Ok(mut guard) = ipc.event_loop_proxy.lock() {
+      if guard.is_none() {
+        *guard = Some((*proxy).clone());
+      }
+    }
+  }
+}
+
 /// Bevy ECS system that monitors [`SystemUIIPC::exit_channel`] and initiates app exit when triggered.
 pub fn shutdown_system(
   ipc: Res<SystemUIIPC>,
-  mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
+  mut app_exit_events: EventWriter<bevy::app::AppExit>,
 ) {
-  match ipc.exit_channel.0.try_recv() {
-    Ok(exit_state) => {
-      app_exit_events.send(exit_state);
-    }
-    Err(_) => {}
+  while let Ok(exit_state) = ipc.exit_channel.0.try_recv() {
+    app_exit_events.write(exit_state);
   }
 }
 
 /// Main entrypoint that builds and runs the Bevy [`App`] powering Clover's System UI.
 ///
-/// Configures rendering plugins, displays, offscreen frame capturing, and the simulated controls testing interface.
-pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>) {
+/// Configured to run in headless mode with Render-to-Texture (RTT), streaming display frames
+/// over Zenoh while maintaining minimal memory usage and zero desktop window overhead.
+pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC) {
   let mut app = App::new();
 
   app
@@ -103,92 +112,71 @@ pub fn system_ui_main(custom_bevy_ipc: SystemUIIPC, disable_winit: Option<bool>)
       (
         systems::displays::display_registrar,
         systems::displays::trigger_display_readbacks,
+        capture_event_loop_proxy,
         shutdown_system,
       ),
     );
 
+  #[cfg(not(feature = "compositor"))]
+  {
+    use bevy::app::ScheduleRunnerPlugin;
+    use bevy::render::{
+      settings::{Backends, RenderCreation, WgpuSettings},
+      RenderPlugin,
+    };
+    use bevy::window::{ExitCondition, WindowPlugin};
+    use bevy::DefaultPlugins;
+
+    app
+      .add_plugins(
+        DefaultPlugins
+          .set(RenderPlugin {
+            render_creation: RenderCreation::Automatic(WgpuSettings {
+              backends: Some(Backends::from_env().unwrap_or(Backends::PRIMARY)),
+              ..Default::default()
+            }),
+            ..Default::default()
+          })
+          .set(WindowPlugin {
+            primary_window: None,
+            exit_condition: ExitCondition::DontExit,
+            ..Default::default()
+          })
+          .disable::<bevy::log::LogPlugin>(),
+      )
+      .add_plugins(ScheduleRunnerPlugin::run_loop(std::time::Duration::from_millis(16)));
+  }
+
   #[cfg(feature = "compositor")]
-  match disable_winit {
-    Some(disable_winit_bool) => {
-      if !disable_winit_bool {
-        use bevy::{
-          render::{
-            settings::{
-              Backends,
-              RenderCreation,
-              WgpuSettings,
-            },
-            RenderPlugin,
-          },
-          window::{
-            PresentMode,
-            Window,
-            WindowPlugin,
-            WindowTheme,
-          },
-          winit::{
-            WakeUp,
-            WinitPlugin,
-          },
-          DefaultPlugins,
-        };
-        use systems::simulated_controls::{
-          handle_sim_keyboard_controls,
-          sync_testing_window_displays,
-          update_scroll_position,
-        };
+  {
+    use bevy::app::ScheduleRunnerPlugin;
+    use bevy::render::{
+      settings::{Backends, RenderCreation, WgpuSettings},
+      RenderPlugin,
+    };
+    use bevy::window::{ExitCondition, WindowPlugin};
+    use bevy::winit::WinitPlugin;
+    use bevy::DefaultPlugins;
 
-        use crate::server::renderer::system_ui::systems::simulated_controls::sim_setup;
-
-        let mut modded_winit: WinitPlugin<WakeUp> = Default::default();
-        modded_winit.run_on_any_thread = true;
-
-        app
-          .add_plugins((
-            DefaultPlugins
-              .set(WindowPlugin {
-                primary_window: Some(Window {
-                  title: "Clover - Controls & Displays".into(),
-                  resolution: (640.0, 520.0).into(),
-                  present_mode: PresentMode::AutoVsync,
-                  // Tells Wasm to resize the window according to the available canvas
-                  fit_canvas_to_parent: true,
-                  // Tells Wasm not to override default event handling, like F5, Ctrl+R etc.
-                  prevent_default_event_handling: false,
-                  window_theme: Some(WindowTheme::Dark),
-                  enabled_buttons: bevy::window::EnabledButtons {
-                    maximize: true,
-                    ..Default::default()
-                  },
-                  visible: true,
-                  ..Default::default()
-                }),
-                ..Default::default()
-              })
-              .set(RenderPlugin {
-                render_creation: RenderCreation::Automatic(WgpuSettings {
-                  backends: Some(Backends::from_env().unwrap_or(Backends::PRIMARY)),
-                  ..Default::default()
-                }),
-                ..Default::default()
-              })
-              .set(modded_winit)
-              .disable::<LogPlugin>(),
-            LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin::default(),
-          ))
-          .add_systems(Startup, sim_setup)
-          .add_systems(
-            Update,
-            (
-              update_scroll_position,
-              sync_testing_window_displays,
-              handle_sim_keyboard_controls,
-            ),
-          );
-      }
-    }
-    None => {}
+    app
+      .add_plugins(
+        DefaultPlugins
+          .set(RenderPlugin {
+            render_creation: RenderCreation::Automatic(WgpuSettings {
+              backends: Some(Backends::from_env().unwrap_or(Backends::PRIMARY)),
+              ..Default::default()
+            }),
+            ..Default::default()
+          })
+          .set(WindowPlugin {
+            primary_window: None,
+            exit_condition: ExitCondition::DontExit,
+            ..Default::default()
+          })
+          .disable::<bevy::log::LogPlugin>()
+          .disable::<WinitPlugin>(),
+      )
+      .add_plugins(ScheduleRunnerPlugin::run_loop(std::time::Duration::from_millis(16)));
   }
 
   app.run();

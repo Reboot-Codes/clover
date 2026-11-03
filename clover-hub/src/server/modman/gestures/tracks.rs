@@ -135,6 +135,8 @@ pub struct GesturePlayhead {
   pub intensity: f64,
   /// True if this gesture is running on the background ambient priority stack.
   pub background: bool,
+  /// Generation counter matching `GestureStates::start_epoch` to detect restarts.
+  pub epoch: u64,
   /// Cache of previously dispatched actuator targets per component, used for deadband filtering.
   pub last_dispatched_targets: HashMap<String, ComponentTarget>,
 }
@@ -147,6 +149,7 @@ impl GesturePlayhead {
       speed,
       intensity,
       background,
+      epoch: 0,
       last_dispatched_targets: HashMap::new(),
     }
   }
